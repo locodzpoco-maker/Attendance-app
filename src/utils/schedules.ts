@@ -16,7 +16,8 @@ export const STOCK_SHIFT_1: WorkSchedule = {
   overtimeStartTime: '18:00',
   normalWorkedHours: 7.0,
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-  arrivalGraceMinutes: 0,
+  arrivalGraceMinutes: 10,
+  breakGraceMinutes: 10,
   overtimeGraceMinutes: 15,
 };
 
@@ -36,7 +37,8 @@ export const STOCK_SHIFT_2: WorkSchedule = {
   overtimeStartTime: '02:00', // overtime starts 02:00 next day
   normalWorkedHours: 7.0,
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-  arrivalGraceMinutes: 0,
+  arrivalGraceMinutes: 10,
+  breakGraceMinutes: 10,
   overtimeGraceMinutes: 15,
 };
 
@@ -56,7 +58,8 @@ export const STOCK_SHIFT_3: WorkSchedule = {
   overtimeStartTime: '16:00',
   normalWorkedHours: 6.5,
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-  arrivalGraceMinutes: 0,
+  arrivalGraceMinutes: 10,
+  breakGraceMinutes: 10,
   overtimeGraceMinutes: 15,
 };
 
@@ -76,7 +79,8 @@ export const STOCK_SHIFT_4: WorkSchedule = {
   overtimeStartTime: '00:00', // overtime starts 00:00 midnight next day
   normalWorkedHours: 7.0,
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-  arrivalGraceMinutes: 0,
+  arrivalGraceMinutes: 10,
+  breakGraceMinutes: 10,
   overtimeGraceMinutes: 15,
 };
 
@@ -93,7 +97,8 @@ export const STOCK_DYNAMIC_SCHEDULE: WorkSchedule = {
   overtimeAllowed: true,
   normalWorkedHours: 7.0,
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-  arrivalGraceMinutes: 0,
+  arrivalGraceMinutes: 10,
+  breakGraceMinutes: 10,
   overtimeGraceMinutes: 15,
 };
 
@@ -113,7 +118,8 @@ export const DEFAULT_SCHEDULES: WorkSchedule[] = [
     overtimeAllowed: false,
     normalWorkedHours: 6.0,
     workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-    arrivalGraceMinutes: 0,
+    arrivalGraceMinutes: 10,
+    breakGraceMinutes: 10,
     overtimeGraceMinutes: 15,
   },
   {
@@ -129,7 +135,8 @@ export const DEFAULT_SCHEDULES: WorkSchedule[] = [
     overtimeAllowed: false,
     normalWorkedHours: 4.0,
     workingDays: ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
-    arrivalGraceMinutes: 0,
+    arrivalGraceMinutes: 10,
+    breakGraceMinutes: 10,
     overtimeGraceMinutes: 15,
   },
   STOCK_DYNAMIC_SCHEDULE,

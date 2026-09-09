@@ -11,7 +11,8 @@ interface ManualCorrectionModalProps {
     adjustedExit: string | undefined,
     reason: string,
     auditor: string,
-    overrideShiftId?: string
+    overrideShiftId?: string,
+    adjustedSecondCheckIn?: string
   ) => void;
   currentUser: string;
 }
@@ -25,6 +26,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
   if (!record) return null;
 
   const [entry, setEntry] = useState(record.entryTime || '');
+  const [secondCheckIn, setSecondCheckIn] = useState(record.secondCheckInTime || '');
   const [exit, setExit] = useState(record.exitTime || '');
   const [overrideShift, setOverrideShift] = useState<string>(
     record.manualAdjustment?.overrideShiftId || (record.isShiftUnclear ? 'stock_g1' : '')
@@ -45,7 +47,8 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
       exit.trim() ? exit.trim() : undefined,
       reason.trim(),
       auditor.trim(),
-      overrideShift || undefined
+      overrideShift || undefined,
+      secondCheckIn.trim() ? secondCheckIn.trim() : undefined
     );
     onClose();
   };
@@ -137,10 +140,10 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
             </div>
           )}
 
-          <div className="grid grid-cols-2 gap-3">
+          <div className="grid grid-cols-3 gap-2.5">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Corrected Entry (HH:MM)
+                Entry (HH:MM)
               </label>
               <input
                 id="correction-entry-input"
@@ -149,13 +152,28 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 value={entry}
                 onChange={(e) => setEntry(e.target.value)}
                 pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
+                className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
               />
               <span className="text-[11px] text-slate-400">Current: {record.entryTime || 'None'}</span>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Corrected Exit (HH:MM)
+                2nd In (Pause)
+              </label>
+              <input
+                id="correction-second-in-input"
+                type="text"
+                placeholder="e.g. 14:05"
+                value={secondCheckIn}
+                onChange={(e) => setSecondCheckIn(e.target.value)}
+                pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
+                className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
+              />
+              <span className="text-[11px] text-slate-400">Current: {record.secondCheckInTime || 'None'}</span>
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-slate-700 mb-1">
+                Exit (HH:MM)
               </label>
               <input
                 id="correction-exit-input"
@@ -164,7 +182,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 value={exit}
                 onChange={(e) => setExit(e.target.value)}
                 pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
-                className="w-full rounded-lg border border-slate-300 px-3 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
+                className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
               />
               <span className="text-[11px] text-slate-400">Current: {record.exitTime || 'None'}</span>
             </div>

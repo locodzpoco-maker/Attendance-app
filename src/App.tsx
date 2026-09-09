@@ -51,7 +51,8 @@ export default function App() {
       companyName: 'Attendance Management System',
       companySubtitle: 'Automated Biometric Fingerprint & Schedule Engine',
       defaultOvertimeGraceMinutes: 15,
-      defaultArrivalGraceMinutes: 0,
+      defaultArrivalGraceMinutes: 10,
+      defaultBreakGraceMinutes: 10,
       allowRecalculationOnFly: true,
       activeRole: 'Administrator',
     };
@@ -247,7 +248,8 @@ export default function App() {
     adjustedExit: string | undefined,
     reason: string,
     auditor: string,
-    overrideShiftId?: string
+    overrideShiftId?: string,
+    adjustedSecondCheckIn?: string
   ) => {
     const target = dailyRecords.find((r) => r.id === recordId);
     if (!target) return;
@@ -256,6 +258,7 @@ export default function App() {
       date: target.date,
       employeeId: target.employeeId,
       adjustedEntry,
+      adjustedSecondCheckIn,
       adjustedExit,
       overrideShiftId,
       reason,
@@ -277,7 +280,7 @@ export default function App() {
       employeeName: target.employeeName,
       date: target.date,
       action: 'MANUAL_PUNCH_ADJUSTMENT',
-      details: `Entry: ${adjustedEntry || target.entryTime || 'none'} | Exit: ${adjustedExit || target.exitTime || 'none'} | Shift: ${overrideShiftId || 'Auto'} | Reason: ${reason}`,
+      details: `Entry: ${adjustedEntry || target.entryTime || 'none'} | 2nd In: ${adjustedSecondCheckIn || target.secondCheckInTime || 'none'} | Exit: ${adjustedExit || target.exitTime || 'none'} | Shift: ${overrideShiftId || 'Auto'} | Reason: ${reason}`,
     };
 
     setAuditLogs((prev) => [newLog, ...prev]);

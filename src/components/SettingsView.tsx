@@ -32,6 +32,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [companySubtitle, setCompanySubtitle] = useState(settings.companySubtitle);
   const [overtimeGrace, setOvertimeGrace] = useState(settings.defaultOvertimeGraceMinutes);
   const [arrivalGrace, setArrivalGrace] = useState(settings.defaultArrivalGraceMinutes);
+  const [breakGrace, setBreakGrace] = useState(settings.defaultBreakGraceMinutes ?? 10);
   const [activeRole, setActiveRole] = useState(settings.activeRole);
   const [savedSuccess, setSavedSuccess] = useState(false);
 
@@ -43,6 +44,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       companySubtitle: companySubtitle.trim(),
       defaultOvertimeGraceMinutes: Number(overtimeGrace),
       defaultArrivalGraceMinutes: Number(arrivalGrace),
+      defaultBreakGraceMinutes: Number(breakGrace),
       activeRole,
     });
     setSavedSuccess(true);
@@ -90,10 +92,10 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </div>
           </div>
 
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 pt-2">
+          <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-2">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                Default Overtime Grace Threshold (Minutes)
+                Default Overtime Grace (Min)
               </label>
               <input
                 id="setting-ot-grace"
@@ -105,13 +107,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-slate-800 outline-none focus:border-indigo-500"
               />
               <span className="text-[11px] text-slate-400 mt-1 block">
-                PRD Section 18: Default 15 minutes. Once exceeded, count entire overtime from start.
+                Default 15m. Once exceeded, count entire OT from start.
               </span>
             </div>
 
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                Arrival Grace Threshold (Minutes)
+                Arrival Grace (1st In) (Min)
               </label>
               <input
                 id="setting-arrival-grace"
@@ -123,7 +125,25 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-slate-800 outline-none focus:border-indigo-500"
               />
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Allowed delay buffer before marking as "Retard"
+                Default 10m. Grace allowed on shift start.
+              </span>
+            </div>
+
+            <div>
+              <label className="block font-semibold text-slate-700 mb-1">
+                Break Return Grace (2nd In) (Min)
+              </label>
+              <input
+                id="setting-break-grace"
+                type="number"
+                min="0"
+                max="60"
+                value={breakGrace}
+                onChange={(e) => setBreakGrace(Number(e.target.value))}
+                className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-slate-800 outline-none focus:border-indigo-500"
+              />
+              <span className="text-[11px] text-slate-400 mt-1 block">
+                Default 10m. Grace allowed on return from break.
               </span>
             </div>
 

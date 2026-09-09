@@ -16,7 +16,8 @@ export interface WorkSchedule {
   overtimeStartTime?: string; // "18:00" or "02:00" (or cross midnight)
   normalWorkedHours: number; // e.g. 6.0, 7.0, 6.5
   workingDays: DayOfWeek[]; // default ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']
-  arrivalGraceMinutes: number; // default 0 or 5
+  arrivalGraceMinutes: number; // default 10
+  breakGraceMinutes?: number; // default 10
   overtimeGraceMinutes: number; // default 15
 }
 
@@ -75,6 +76,7 @@ export interface ManualAdjustment {
   date: string;
   employeeId: string;
   adjustedEntry?: string;
+  adjustedSecondCheckIn?: string;
   adjustedExit?: string;
   overrideShiftId?: string; // e.g. "stock_g1", "stock_g2", "stock_g3", "stock_g4"
   reason: string;
@@ -106,6 +108,7 @@ export interface DailyAttendanceRecord {
   rawPunches: string[];
   rawPunchesText: string;
   firstCheckInTime: string | null; // e.g. "09:57"
+  secondCheckInTime: string | null; // e.g. "14:26" (return from break)
   entryTime: string | null; // e.g. "08:10"
   exitTime: string | null; // e.g. "18:13"
   isOvernightPunch: boolean; // if exit belongs to next day early morning
@@ -115,7 +118,9 @@ export interface DailyAttendanceRecord {
   isManuallyAdjusted: boolean;
 
   // Calculated figures
-  delayMinutes: number; // delay past scheduled start
+  firstCheckInDelayMinutes: number; // delay on shift entry past 10m grace
+  secondCheckInDelayMinutes: number; // delay on break return past 10m grace
+  delayMinutes: number; // total delay = firstCheckInDelayMinutes + secondCheckInDelayMinutes
   breakDurationMinutes: number; // break deducted
   workedMinutes: number; // normal worked minutes
   workedHoursFormatted: string; // e.g. "7h 12"
@@ -166,7 +171,8 @@ export interface AppSettings {
   companyName: string;
   companySubtitle: string;
   defaultOvertimeGraceMinutes: number; // 15
-  defaultArrivalGraceMinutes: number; // 0
+  defaultArrivalGraceMinutes: number; // default 10
+  defaultBreakGraceMinutes: number; // default 10
   allowRecalculationOnFly: boolean;
   activeRole: 'Administrator' | 'HR / Attendance User' | 'Management';
 }

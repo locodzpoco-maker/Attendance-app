@@ -41,7 +41,8 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     'Thursday',
   ]);
   const [overtimeGraceMinutes, setOvertimeGraceMinutes] = useState(15);
-  const [arrivalGraceMinutes, setArrivalGraceMinutes] = useState(0);
+  const [arrivalGraceMinutes, setArrivalGraceMinutes] = useState(10);
+  const [breakGraceMinutes, setBreakGraceMinutes] = useState(10);
 
   const openEdit = (s: WorkSchedule) => {
     setEditingSchedule(s);
@@ -60,7 +61,8 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     setNormalWorkedHours(s.normalWorkedHours);
     setWorkingDays([...s.workingDays]);
     setOvertimeGraceMinutes(s.overtimeGraceMinutes);
-    setArrivalGraceMinutes(s.arrivalGraceMinutes);
+    setArrivalGraceMinutes(s.arrivalGraceMinutes ?? 10);
+    setBreakGraceMinutes(s.breakGraceMinutes ?? 10);
     setModalOpen(true);
   };
 
@@ -81,7 +83,8 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     setNormalWorkedHours(7.0);
     setWorkingDays(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']);
     setOvertimeGraceMinutes(15);
-    setArrivalGraceMinutes(0);
+    setArrivalGraceMinutes(10);
+    setBreakGraceMinutes(10);
     setModalOpen(true);
   };
 
@@ -112,6 +115,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
       normalWorkedHours: Number(normalWorkedHours),
       workingDays,
       arrivalGraceMinutes: Number(arrivalGraceMinutes),
+      breakGraceMinutes: Number(breakGraceMinutes),
       overtimeGraceMinutes: Number(overtimeGraceMinutes),
     };
 
@@ -210,6 +214,13 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                   <span className="text-slate-500">Overtime (Supp):</span>
                   <span className="font-medium text-indigo-700">
                     {s.overtimeAllowed ? `After ${s.overtimeStartTime}` : 'None'}
+                  </span>
+                </div>
+
+                <div className="flex items-center justify-between">
+                  <span className="text-slate-500">Grace (1st / 2nd In):</span>
+                  <span className="font-semibold text-slate-800">
+                    {s.arrivalGraceMinutes ?? 10}m / {s.breakGraceMinutes ?? 10}m
                   </span>
                 </div>
 
@@ -344,18 +355,62 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 </label>
               </div>
 
-              <div className="grid grid-cols-3 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Break Duration (mins)
-                  </label>
+              {/* Break Configuration */}
+              <div className="rounded-lg border border-slate-200 p-3 space-y-2.5 bg-slate-50/50">
+                <div className="flex items-center gap-2">
                   <input
-                    type="number"
-                    value={breakDurationMinutes}
-                    onChange={(e) => setBreakDurationMinutes(Number(e.target.value))}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none"
+                    type="checkbox"
+                    id="has-break-chk"
+                    checked={hasBreak}
+                    onChange={(e) => setHasBreak(e.target.checked)}
+                    className="rounded text-indigo-600"
                   />
+                  <label htmlFor="has-break-chk" className="font-semibold text-slate-800 cursor-pointer">
+                    Schedule Includes Unpaid Lunch / Rest Break
+                  </label>
                 </div>
+                {hasBreak && (
+                  <div className="grid grid-cols-3 gap-2.5 pt-1">
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Break Start (HH:MM)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="12:30"
+                        value={breakStart}
+                        onChange={(e) => setBreakStart(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-slate-800 outline-none text-xs bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Break End / 2nd In (HH:MM)
+                      </label>
+                      <input
+                        type="text"
+                        placeholder="14:00"
+                        value={breakEnd}
+                        onChange={(e) => setBreakEnd(e.target.value)}
+                        className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 font-mono text-slate-800 outline-none text-xs bg-white"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-[11px] font-semibold text-slate-600 mb-1">
+                        Duration (mins)
+                      </label>
+                      <input
+                        type="number"
+                        value={breakDurationMinutes}
+                        onChange={(e) => setBreakDurationMinutes(Number(e.target.value))}
+                        className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 outline-none text-xs bg-white"
+                      />
+                    </div>
+                  </div>
+                )}
+              </div>
+
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     Normal Hours
@@ -365,6 +420,28 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     step="0.5"
                     value={normalWorkedHours}
                     onChange={(e) => setNormalWorkedHours(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Arrival Grace (mins)
+                  </label>
+                  <input
+                    type="number"
+                    value={arrivalGraceMinutes}
+                    onChange={(e) => setArrivalGraceMinutes(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    Break Grace (mins)
+                  </label>
+                  <input
+                    type="number"
+                    value={breakGraceMinutes}
+                    onChange={(e) => setBreakGraceMinutes(Number(e.target.value))}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none"
                   />
                 </div>
