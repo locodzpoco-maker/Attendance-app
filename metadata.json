@@ -1,0 +1,6 @@
+{
+  "name": "Attendance Management System",
+  "description": "Automated employee attendance calculation, schedule management, daily and monthly reporting from raw attendance exports.",
+  "requestFramePermissions": [],
+  "majorCapabilities": ["MAJOR_CAPABILITY_SERVER_SIDE_GEMINI_API"]
+}
