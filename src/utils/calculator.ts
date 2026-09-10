@@ -125,6 +125,8 @@ export function calculateAttendance(
       }
     }
 
+    const isAdminWorkerType = !isStock;
+
     // For overnight shifts (Shift 2: 18:00-02:00, Shift 4: 16:00-00:00), the punch recorded in
     // early morning of the next day is associated as the exit of the previous night.
     // We track consumed morning punches to avoid counting them as the next day's check-in.
@@ -354,9 +356,16 @@ export function calculateAttendance(
       if (entryTime) {
         firstCheckInDelayMinutes = computeFirstCheckInDelay(entryTime);
       }
-      // Note: Second check-in (return from break) is excluded from late calculation per user requirement
-      secondCheckInDelayMinutes = 0;
-      delayMinutes = firstCheckInDelayMinutes;
+
+      // Count late time on 2nd check-in (after break) for Admin workers only.
+      // Excludes the 10 min break grace from the total late duration.
+      if (isAdminWorkerType && secondCheckInTime) {
+        secondCheckInDelayMinutes = computeSecondCheckInDelay(secondCheckInTime);
+      } else {
+        secondCheckInDelayMinutes = 0;
+      }
+
+      delayMinutes = firstCheckInDelayMinutes + secondCheckInDelayMinutes;
 
       if (isShiftUnclear) {
         // Shift could not be clearly identified
@@ -391,7 +400,13 @@ export function calculateAttendance(
         // Missing exit
         observation = 'Sortie non pointée';
         if (delayMinutes > 0) {
-          observationDetail = `Sortie non pointée (Retard: ${delayMinutes} min)`;
+          if (firstCheckInDelayMinutes > 0 && secondCheckInDelayMinutes > 0) {
+            observationDetail = `Sortie non pointée (Retard: ${delayMinutes} min [Entrée ${firstCheckInDelayMinutes}m, Pause ${secondCheckInDelayMinutes}m])`;
+          } else if (secondCheckInDelayMinutes > 0) {
+            observationDetail = `Sortie non pointée (Retard reprise pause: ${secondCheckInDelayMinutes} min)`;
+          } else {
+            observationDetail = `Sortie non pointée (Retard: ${delayMinutes} min)`;
+          }
         } else {
           observationDetail = 'Sortie non pointée';
         }
@@ -399,7 +414,11 @@ export function calculateAttendance(
       } else if (!entryTime && exitTime) {
         // Missing entry
         observation = 'Entrée non pointée';
-        observationDetail = 'Entrée non pointée';
+        if (secondCheckInDelayMinutes > 0) {
+          observationDetail = `Entrée non pointée (Retard reprise pause: ${secondCheckInDelayMinutes} min)`;
+        } else {
+          observationDetail = 'Entrée non pointée';
+        }
         statusType = 'warning';
       } else if (entryTime && exitTime) {
         // Both punches exist!
@@ -446,7 +465,13 @@ export function calculateAttendance(
         // Observation
         if (delayMinutes > 0) {
           observation = 'Retard';
-          observationDetail = `Retard ${delayMinutes} min`;
+          if (firstCheckInDelayMinutes > 0 && secondCheckInDelayMinutes > 0) {
+            observationDetail = `Retard ${delayMinutes} min (Entrée ${firstCheckInDelayMinutes}m + Pause ${secondCheckInDelayMinutes}m)`;
+          } else if (secondCheckInDelayMinutes > 0) {
+            observationDetail = `Retard ${secondCheckInDelayMinutes} min (Reprise pause)`;
+          } else {
+            observationDetail = `Retard ${delayMinutes} min`;
+          }
           statusType = 'warning';
         } else if (isOvernightPunch) {
           observation = 'Sortie après minuit';
@@ -456,6 +481,17 @@ export function calculateAttendance(
           observation = 'Ponctuel';
           observationDetail = 'Ponctuel';
           statusType = 'success';
+        }
+      }
+
+      // Injected Supp Hours (Manual Overtime Injection by Supervisor/Admin)
+      const injectedSuppMinutes = manualAdj?.injectedSuppMinutes || 0;
+      if (injectedSuppMinutes > 0) {
+        suppMinutes += injectedSuppMinutes;
+        if (observation === 'OFF') {
+          observationDetail = `OFF (+${formatMinutesToHoursAndMinutes(injectedSuppMinutes)} Supp)`;
+        } else if (observation === 'Ponctuel') {
+          observationDetail = `Ponctuel (+${formatMinutesToHoursAndMinutes(injectedSuppMinutes)} Supp)`;
         }
       }
 
@@ -500,6 +536,7 @@ export function calculateAttendance(
         isOvernightPunch,
         manualAdjustment: manualAdj,
         isManuallyAdjusted: Boolean(manualAdj),
+        injectedSuppMinutes: injectedSuppMinutes > 0 ? injectedSuppMinutes : undefined,
         firstCheckInDelayMinutes,
         secondCheckInDelayMinutes,
         delayMinutes,
@@ -518,6 +555,18 @@ export function calculateAttendance(
   }
 
   // Generate Monthly Summary
+  const monthlySummary = generateMonthlySummaryFromDailyRecords(dailyRecords);
+
+  return { dailyRecords, monthlySummary };
+}
+
+/**
+ * Computes aggregated attendance summary metrics from any subset of daily attendance records
+ * (e.g. for a custom date range filter like 01/09/2026 to 08/09/2026)
+ */
+export function generateMonthlySummaryFromDailyRecords(
+  dailyRecords: DailyAttendanceRecord[]
+): MonthlySummaryRecord[] {
   const summaryMap = new Map<string, MonthlySummaryRecord>();
 
   for (const record of dailyRecords) {
@@ -576,11 +625,10 @@ export function calculateAttendance(
     summary.totalSuppMinutes += record.suppMinutes;
   }
 
-  const monthlySummary: MonthlySummaryRecord[] = Array.from(summaryMap.values()).map((s) => ({
+  return Array.from(summaryMap.values()).map((s) => ({
     ...s,
     totalWorkedFormatted: formatMinutesToHoursAndMinutes(s.totalWorkedMinutes),
     totalSuppFormatted: formatMinutesToHoursAndMinutes(s.totalSuppMinutes),
   }));
-
-  return { dailyRecords, monthlySummary };
 }
+

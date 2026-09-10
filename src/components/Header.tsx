@@ -25,6 +25,7 @@ interface HeaderProps {
   selectedPeriodId: string;
   settings: AppSettings;
   onUpdateRole: (role: AppSettings['activeRole']) => void;
+  unmappedEmployeesCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -40,6 +41,7 @@ export const Header: React.FC<HeaderProps> = ({
   selectedPeriodId,
   settings,
   onUpdateRole,
+  unmappedEmployeesCount = 0,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
@@ -185,7 +187,15 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Users className="h-3.5 w-3.5" />
-              Employees & Mapping
+              <span>Employees & Mapping</span>
+              {unmappedEmployeesCount > 0 && (
+                <span
+                  className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold text-amber-800 font-mono border border-amber-300"
+                  title={`${unmappedEmployeesCount} unmapped workers detected in raw attendance`}
+                >
+                  +{unmappedEmployeesCount}
+                </span>
+              )}
             </button>
 
             <button

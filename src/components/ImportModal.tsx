@@ -1,4 +1,4 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useMemo } from 'react';
 import {
   UploadCloud,
   FileSpreadsheet,
@@ -8,28 +8,42 @@ import {
   Sparkles,
   X,
   Play,
+  UserPlus,
 } from 'lucide-react';
 import { parseRawAttendanceFile } from '../utils/parser';
 import { generateReferenceDataset, downloadSampleAttendanceFile } from '../utils/sampleData';
-import { RawAttendanceDataset } from '../types';
+import { RawAttendanceDataset, Employee } from '../types';
+import { findUnmappedEmployees, createEmployeeFromDetected } from '../utils/employees';
 
 interface ImportModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDatasetLoaded: (dataset: RawAttendanceDataset) => void;
+  existingEmployees?: Employee[];
+  onAddBatchEmployees?: (newEmployees: Employee[]) => void;
 }
 
 export const ImportModal: React.FC<ImportModalProps> = ({
   isOpen,
   onClose,
   onDatasetLoaded,
+  existingEmployees,
+  onAddBatchEmployees,
 }) => {
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewDataset, setPreviewDataset] = useState<RawAttendanceDataset | null>(null);
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [autoAddUnmapped, setAutoAddUnmapped] = useState(true);
   const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Detect unmapped workers in the preview dataset
+  const unmappedInPreview = useMemo(() => {
+    if (!previewDataset || !existingEmployees) return [];
+    return findUnmappedEmployees(previewDataset.employees, existingEmployees);
+  }, [previewDataset, existingEmployees]);
+
 
   if (!isOpen) return null;
 
@@ -81,10 +95,15 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
   const handleConfirmCalculate = () => {
     if (previewDataset) {
+      if (autoAddUnmapped && unmappedInPreview.length > 0 && onAddBatchEmployees) {
+        const newEmps = unmappedInPreview.map((w) => createEmployeeFromDetected(w));
+        onAddBatchEmployees(newEmps);
+      }
       onDatasetLoaded(previewDataset);
       onClose();
     }
   };
+
 
   return (
     <div
@@ -243,6 +262,43 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                 )}
               </div>
             </div>
+
+            {/* Unmapped Employees Notice & Auto-add Checkbox */}
+            {unmappedInPreview.length > 0 && (
+              <div
+                id="unmapped-in-import-preview-box"
+                className="mt-3.5 rounded-xl border border-amber-300 bg-gradient-to-r from-amber-50 to-orange-50 p-3.5 text-xs text-amber-950 shadow-2xs"
+              >
+                <div className="flex items-center justify-between gap-2">
+                  <div className="flex items-center gap-2">
+                    <UserPlus className="h-4 w-4 text-amber-600 shrink-0" />
+                    <span className="font-bold text-amber-950">
+                      {unmappedInPreview.length} New Workers Detected (Not in Saved Mapping)
+                    </span>
+                  </div>
+                  <span className="rounded-full bg-amber-200/80 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-900 shrink-0">
+                    {previewDataset.employees.length} in file vs {existingEmployees?.length || 0} saved
+                  </span>
+                </div>
+                <p className="mt-1 text-amber-800/90 text-[11px] leading-relaxed">
+                  The uploaded file contains <strong>{unmappedInPreview.length}</strong> workers not yet saved in your Employee Mapping directory.
+                </p>
+                {onAddBatchEmployees && (
+                  <label className="mt-2.5 flex items-center gap-2 cursor-pointer select-none font-semibold text-amber-950 bg-white/70 border border-amber-200 rounded-lg p-2 hover:bg-white transition-colors">
+                    <input
+                      type="checkbox"
+                      id="auto-add-unmapped-import-checkbox"
+                      checked={autoAddUnmapped}
+                      onChange={(e) => setAutoAddUnmapped(e.target.checked)}
+                      className="h-4 w-4 rounded border-amber-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+                    />
+                    <span>
+                      Automatically add these <strong>{unmappedInPreview.length}</strong> new workers to Employee Mapping upon calculation
+                    </span>
+                  </label>
+                )}
+              </div>
+            )}
           </div>
         )}
 

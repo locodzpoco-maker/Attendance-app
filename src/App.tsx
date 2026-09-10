@@ -11,7 +11,7 @@ import {
   HistoricalPeriodRecord,
 } from './types';
 import { DEFAULT_SCHEDULES } from './utils/schedules';
-import { DEFAULT_EMPLOYEES } from './utils/employees';
+import { DEFAULT_EMPLOYEES, findUnmappedEmployees } from './utils/employees';
 import { calculateAttendance } from './utils/calculator';
 import { generateReferenceDataset } from './utils/sampleData';
 import {
@@ -38,6 +38,7 @@ import { SchedulesView } from './components/SchedulesView';
 import { SettingsView } from './components/SettingsView';
 import { ImportModal } from './components/ImportModal';
 import { ManualCorrectionModal } from './components/ManualCorrectionModal';
+import { InjectSuppHoursModal, InjectSuppHoursParams } from './components/InjectSuppHoursModal';
 
 export default function App() {
   // Navigation & Active Tab
@@ -151,6 +152,14 @@ export default function App() {
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [activeCorrectionRecord, setActiveCorrectionRecord] =
     useState<DailyAttendanceRecord | null>(null);
+  const [isInjectSuppModalOpen, setIsInjectSuppModalOpen] = useState(false);
+  const [injectSuppTargetRecord, setInjectSuppTargetRecord] =
+    useState<DailyAttendanceRecord | null>(null);
+
+  const handleOpenInjectSupp = (record?: DailyAttendanceRecord) => {
+    setInjectSuppTargetRecord(record || null);
+    setIsInjectSuppModalOpen(true);
+  };
 
   // Sync to Storage immediately upon state changes with quota safety
   useEffect(() => {
@@ -273,10 +282,13 @@ export default function App() {
     reason: string,
     auditor: string,
     overrideShiftId?: string,
-    adjustedSecondCheckIn?: string
+    adjustedSecondCheckIn?: string,
+    injectedSuppMinutes?: number
   ) => {
     const target = dailyRecords.find((r) => r.id === recordId);
     if (!target) return;
+
+    const existingAdj = manualAdjustments[recordId];
 
     const adjustment: ManualAdjustment = {
       date: target.date,
@@ -285,6 +297,7 @@ export default function App() {
       adjustedSecondCheckIn,
       adjustedExit,
       overrideShiftId,
+      injectedSuppMinutes: injectedSuppMinutes !== undefined ? injectedSuppMinutes : existingAdj?.injectedSuppMinutes,
       reason,
       adjustedBy: auditor,
       adjustedAt: new Date().toISOString(),
@@ -296,6 +309,7 @@ export default function App() {
     }));
 
     // Log to Audit Trail
+    const suppDetail = injectedSuppMinutes !== undefined ? ` | Injected Supp: +${Math.floor(injectedSuppMinutes / 60)}h ${injectedSuppMinutes % 60}m` : '';
     const newLog: AttendanceAuditLog = {
       id: `audit_${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -304,19 +318,122 @@ export default function App() {
       employeeName: target.employeeName,
       date: target.date,
       action: 'MANUAL_PUNCH_ADJUSTMENT',
-      details: `Entry: ${adjustedEntry || target.entryTime || 'none'} | 2nd In: ${adjustedSecondCheckIn || target.secondCheckInTime || 'none'} | Exit: ${adjustedExit || target.exitTime || 'none'} | Shift: ${overrideShiftId || 'Auto'} | Reason: ${reason}`,
+      details: `Entry: ${adjustedEntry || target.entryTime || 'none'} | 2nd In: ${adjustedSecondCheckIn || target.secondCheckInTime || 'none'} | Exit: ${adjustedExit || target.exitTime || 'none'} | Shift: ${overrideShiftId || 'Auto'}${suppDetail} | Reason: ${reason}`,
     };
 
     setAuditLogs((prev) => [newLog, ...prev]);
   };
 
+  // Inject Supplementary Hours Handler
+  const handleInjectSuppHours = (params: InjectSuppHoursParams) => {
+    const { employeeIds, dates, suppMinutesToAdd, mode, reason, auditor } = params;
+
+    setManualAdjustments((prev) => {
+      const updated = { ...prev };
+      employeeIds.forEach((empId) => {
+        dates.forEach((date) => {
+          const recordKey = `${empId}_${date}`;
+          const existing = updated[recordKey] || {};
+          const target = dailyRecords.find((r) => r.id === recordKey);
+
+          let finalInjected: number | undefined;
+          if (mode === 'clear') {
+            finalInjected = undefined;
+          } else if (mode === 'set') {
+            finalInjected = suppMinutesToAdd > 0 ? suppMinutesToAdd : undefined;
+          } else {
+            // 'add'
+            const currentInjected = existing.injectedSuppMinutes ?? target?.injectedSuppMinutes ?? 0;
+            const sum = currentInjected + suppMinutesToAdd;
+            finalInjected = sum > 0 ? sum : undefined;
+          }
+
+          updated[recordKey] = {
+            ...existing,
+            date,
+            employeeId: empId,
+            injectedSuppMinutes: finalInjected,
+            reason: reason || existing.reason || 'Manual supp hours injection',
+            adjustedBy: auditor,
+            adjustedAt: new Date().toISOString(),
+          };
+        });
+      });
+      return updated;
+    });
+
+    // Create Audit Logs
+    const timestamp = new Date().toISOString();
+    const newLogs: AttendanceAuditLog[] = [];
+    employeeIds.forEach((empId, idx) => {
+      const emp = dailyRecords.find((r) => r.employeeId === empId);
+      const empName = emp ? emp.employeeName : empId;
+      const hoursText = `${Math.floor(suppMinutesToAdd / 60)}h ${suppMinutesToAdd % 60}m`;
+      const dateText = dates.length === 1 ? dates[0] : `${dates[0]} → ${dates[dates.length - 1]} (${dates.length} days)`;
+
+      newLogs.push({
+        id: `audit_supp_${Date.now()}_${idx}`,
+        timestamp,
+        user: auditor,
+        employeeId: empId,
+        employeeName: empName,
+        date: dateText,
+        action: 'INJECT_SUPP_HOURS',
+        details: `Injected supplementary hours: ${mode === 'clear' ? 'Cleared' : `+${hoursText}`} per day | Mode: ${mode} | Reason: ${reason}`,
+      });
+    });
+
+    setAuditLogs((prev) => [...newLogs, ...prev]);
+  };
+
+  // Unmapped employees detected in raw dataset compared to saved mapping
+  const unmappedEmployees = useMemo(() => {
+    return findUnmappedEmployees(activeDataset?.employees || [], employees);
+  }, [activeDataset?.employees, employees]);
+  const unmappedEmployeesCount = unmappedEmployees.length;
+
   // Employee modifications
   const handleAddEmployee = (newEmp: Employee) => {
-    setEmployees((prev) => [...prev, newEmp]);
+    setEmployees((prev) => {
+      const next = [...prev, newEmp];
+      saveStorageItem('ams_employees', next);
+      return next;
+    });
+  };
+
+  const handleAddBatchEmployees = (newEmps: Employee[]) => {
+    if (newEmps.length === 0) return;
+    setEmployees((prev) => {
+      const existingNormalized = new Set(prev.map((e) => e.id.trim().replace(/^0+/, '')));
+      const uniqueNew = newEmps.filter((e) => !existingNormalized.has(e.id.trim().replace(/^0+/, '')));
+      const updated = [...prev, ...uniqueNew];
+      saveStorageItem('ams_employees', updated);
+      return updated;
+    });
+
+    const newLog: AttendanceAuditLog = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      user: settings.activeRole,
+      employeeId: 'BATCH',
+      employeeName: `${newEmps.length} Detected Workers`,
+      date: new Date().toISOString().slice(0, 10),
+      action: 'ADD_BATCH_EMPLOYEES',
+      details: `Added ${newEmps.length} unmapped detected workers into Employee Mapping directory.`,
+    };
+    setAuditLogs((prev) => {
+      const next = [newLog, ...prev];
+      saveStorageItem('ams_audit_logs', next);
+      return next;
+    });
   };
 
   const handleUpdateEmployee = (updatedEmp: Employee) => {
-    setEmployees((prev) => prev.map((e) => (e.id === updatedEmp.id ? updatedEmp : e)));
+    setEmployees((prev) => {
+      const next = prev.map((e) => (e.id === updatedEmp.id ? updatedEmp : e));
+      saveStorageItem('ams_employees', next);
+      return next;
+    });
   };
 
   // Schedule modifications with immediate synchronous storage persistence
@@ -389,20 +506,36 @@ export default function App() {
     : 'Selected Period';
 
   // Export handlers
-  const handleExportDailyExcel = () => {
-    exportDailyAttendanceToExcel(dailyRecords, currentPeriodLabel, settings);
+  const handleExportDailyExcel = (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => {
+    exportDailyAttendanceToExcel(
+      recordsToExport && recordsToExport.length > 0 ? recordsToExport : dailyRecords,
+      customPeriodLabel || currentPeriodLabel,
+      settings
+    );
   };
 
-  const handleExportDailyPDF = () => {
-    exportDailyAttendanceToPDF(dailyRecords, currentPeriodLabel, settings);
+  const handleExportDailyPDF = (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => {
+    exportDailyAttendanceToPDF(
+      recordsToExport && recordsToExport.length > 0 ? recordsToExport : dailyRecords,
+      customPeriodLabel || currentPeriodLabel,
+      settings
+    );
   };
 
-  const handleExportMonthlyExcel = () => {
-    exportMonthlySummaryToExcel(monthlySummary, currentPeriodLabel, settings);
+  const handleExportMonthlyExcel = (summariesToExport?: MonthlySummaryRecord[], customPeriodLabel?: string) => {
+    exportMonthlySummaryToExcel(
+      summariesToExport && summariesToExport.length > 0 ? summariesToExport : monthlySummary,
+      customPeriodLabel || currentPeriodLabel,
+      settings
+    );
   };
 
-  const handleExportMonthlyPDF = () => {
-    exportMonthlySummaryToPDF(monthlySummary, currentPeriodLabel, settings);
+  const handleExportMonthlyPDF = (summariesToExport?: MonthlySummaryRecord[], customPeriodLabel?: string) => {
+    exportMonthlySummaryToPDF(
+      summariesToExport && summariesToExport.length > 0 ? summariesToExport : monthlySummary,
+      customPeriodLabel || currentPeriodLabel,
+      settings
+    );
   };
 
   return (
@@ -421,6 +554,7 @@ export default function App() {
         selectedPeriodId={selectedPeriodId}
         settings={settings}
         onUpdateRole={(role) => setSettings((s) => ({ ...s, activeRole: role }))}
+        unmappedEmployeesCount={unmappedEmployeesCount}
       />
 
       {/* Main Content Area */}
@@ -438,6 +572,7 @@ export default function App() {
             onExportMonthlyExcel={handleExportMonthlyExcel}
             onExportMonthlyPDF={handleExportMonthlyPDF}
             settings={settings}
+            unmappedEmployeesCount={unmappedEmployeesCount}
           />
         )}
 
@@ -445,6 +580,7 @@ export default function App() {
           <DailyAttendanceView
             records={dailyRecords}
             onOpenCorrection={(record) => setActiveCorrectionRecord(record)}
+            onOpenInjectSupp={handleOpenInjectSupp}
             onExportExcel={handleExportDailyExcel}
             onExportPDF={handleExportDailyPDF}
             settings={settings}
@@ -454,6 +590,7 @@ export default function App() {
         {activeTab === 'monthly' && (
           <MonthlySummaryView
             summaries={monthlySummary}
+            dailyRecords={dailyRecords}
             onExportExcel={handleExportMonthlyExcel}
             onExportPDF={handleExportMonthlyPDF}
             settings={settings}
@@ -466,9 +603,11 @@ export default function App() {
             employees={employees}
             schedules={schedules}
             onAddEmployee={handleAddEmployee}
+            onAddBatchEmployees={handleAddBatchEmployees}
             onUpdateEmployee={handleUpdateEmployee}
             onResetDefaults={() => setEmployees(DEFAULT_EMPLOYEES)}
             settings={settings}
+            rawEmployeesFromDataset={activeDataset?.employees || []}
           />
         )}
 
@@ -530,6 +669,8 @@ export default function App() {
         isOpen={isImportModalOpen}
         onClose={() => setIsImportModalOpen(false)}
         onDatasetLoaded={handleDatasetLoaded}
+        existingEmployees={employees}
+        onAddBatchEmployees={handleAddBatchEmployees}
       />
 
       {/* Manual Punch Correction Modal */}
@@ -541,6 +682,19 @@ export default function App() {
           currentUser={settings.activeRole}
         />
       )}
+
+      {/* Inject Supplementary Hours Modal */}
+      <InjectSuppHoursModal
+        isOpen={isInjectSuppModalOpen}
+        initialRecord={injectSuppTargetRecord}
+        allDailyRecords={dailyRecords}
+        onClose={() => {
+          setIsInjectSuppModalOpen(false);
+          setInjectSuppTargetRecord(null);
+        }}
+        onInjectSupp={handleInjectSuppHours}
+        currentUser={settings.activeRole}
+      />
     </div>
   );
 }

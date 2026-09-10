@@ -449,3 +449,121 @@ export const DEFAULT_EMPLOYEES: Employee[] = [
   ...ADMIN_EMPLOYEES,
   ...STOCK_EMPLOYEES,
 ];
+
+export interface DetectedUnmappedWorker {
+  id: string;
+  name: string;
+  rawDepartment: string;
+  suggestedDepartment: string;
+  suggestedGroupName: string;
+  suggestedScheduleId: string;
+  isSuggestedStock: boolean;
+  notes: string;
+  punchCount: number;
+}
+
+/**
+ * Finds employees present in raw attendance records that are not yet saved
+ * in the application's employee database.
+ */
+export function findUnmappedEmployees(
+  rawEmployees: { employeeId: string; name: string; rawDepartment?: string; days?: Record<number, any> }[],
+  savedEmployees: Employee[]
+): DetectedUnmappedWorker[] {
+  if (!rawEmployees || rawEmployees.length === 0) return [];
+
+  const savedIdSet = new Set<string>();
+  savedEmployees.forEach((e) => {
+    const trimmed = (e.id || '').trim();
+    if (trimmed) {
+      savedIdSet.add(trimmed);
+      savedIdSet.add(trimmed.toLowerCase());
+      const unpadded = trimmed.replace(/^0+/, '');
+      if (unpadded) {
+        savedIdSet.add(unpadded);
+        savedIdSet.add(unpadded.toLowerCase());
+      }
+    }
+  });
+
+  const unmapped: DetectedUnmappedWorker[] = [];
+
+  for (const raw of rawEmployees) {
+    const idTrim = (raw.employeeId || '').trim();
+    if (!idTrim) continue;
+
+    const idUnpad = idTrim.replace(/^0+/, '');
+    const isAlreadySaved =
+      savedIdSet.has(idTrim) ||
+      savedIdSet.has(idTrim.toLowerCase()) ||
+      (idUnpad && (savedIdSet.has(idUnpad) || savedIdSet.has(idUnpad.toLowerCase())));
+
+    if (!isAlreadySaved) {
+      // Calculate how many punches recorded
+      let punchCount = 0;
+      if (raw.days) {
+        Object.values(raw.days).forEach((d: any) => {
+          if (d && Array.isArray(d.rawPunches)) {
+            punchCount += d.rawPunches.length;
+          }
+        });
+      }
+
+      const isExplicitStock = isStockWorker(raw.employeeId);
+      const isExplicitAdmin = isAdminWorker(raw.employeeId);
+      const deptLower = (raw.rawDepartment || '').toLowerCase();
+
+      const isStock =
+        isExplicitStock ||
+        (!isExplicitAdmin && (deptLower.includes('stock') || deptLower.includes('depot') || deptLower.includes('magasin')));
+
+      let suggestedDept = 'Administration';
+      let suggestedGroup = 'Admin Group 1';
+      let suggestedSchedule = 'admin_g1';
+
+      if (isStock) {
+        suggestedDept = 'Stock & Logistique';
+        suggestedGroup = 'Stock';
+        suggestedSchedule = 'stock_dynamic';
+      } else if (raw.rawDepartment?.trim()) {
+        suggestedDept = raw.rawDepartment.trim();
+      }
+
+      unmapped.push({
+        id: idTrim,
+        name: raw.name?.trim() || `Worker ${idTrim}`,
+        rawDepartment: raw.rawDepartment || '',
+        suggestedDepartment: suggestedDept,
+        suggestedGroupName: suggestedGroup,
+        suggestedScheduleId: suggestedSchedule,
+        isSuggestedStock: isStock,
+        notes: `Detected from raw attendance (${isStock ? 'Stock' : 'Administration'})`,
+        punchCount,
+      });
+    }
+  }
+
+  // Sort by employee ID
+  return unmapped.sort((a, b) => a.id.localeCompare(b.id));
+}
+
+/**
+ * Converts a detected unmapped worker into a persistent Employee record
+ */
+export function createEmployeeFromDetected(
+  detected: DetectedUnmappedWorker,
+  overrides?: Partial<Employee>
+): Employee {
+  return {
+    id: detected.id,
+    name: detected.name,
+    rawDepartment: detected.rawDepartment || undefined,
+    companyDepartment: overrides?.companyDepartment || detected.suggestedDepartment,
+    groupName: overrides?.groupName || detected.suggestedGroupName,
+    scheduleId: overrides?.scheduleId || detected.suggestedScheduleId,
+    status: 'Active',
+    startDate: overrides?.startDate || new Date().toISOString().slice(0, 10),
+    notes: overrides?.notes || detected.notes,
+  };
+}
+

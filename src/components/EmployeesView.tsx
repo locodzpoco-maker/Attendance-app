@@ -1,29 +1,57 @@
-import React, { useState } from 'react';
-import { Employee, WorkSchedule, AppSettings } from '../types';
-import { isStockWorker, isAdminWorker } from '../utils/employees';
-import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert } from 'lucide-react';
+import React, { useState, useMemo } from 'react';
+import { Employee, WorkSchedule, AppSettings, RawEmployeeRecord } from '../types';
+import { isStockWorker, isAdminWorker, findUnmappedEmployees, createEmployeeFromDetected } from '../utils/employees';
+import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert, UserPlus, Sparkles, Zap, Check } from 'lucide-react';
+import { AddDetectedWorkersModal } from './AddDetectedWorkersModal';
 
 interface EmployeesViewProps {
   employees: Employee[];
   schedules: WorkSchedule[];
   onAddEmployee: (emp: Employee) => void;
+  onAddBatchEmployees?: (newEmployees: Employee[]) => void;
   onUpdateEmployee: (emp: Employee) => void;
   onResetDefaults?: () => void;
   settings: AppSettings;
+  rawEmployeesFromDataset?: RawEmployeeRecord[];
 }
 
 export const EmployeesView: React.FC<EmployeesViewProps> = ({
   employees,
   schedules,
   onAddEmployee,
+  onAddBatchEmployees,
   onUpdateEmployee,
   onResetDefaults,
   settings,
+  rawEmployeesFromDataset,
 }) => {
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'STOCK' | 'ADMIN'>('ALL');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
+  const [detectedModalOpen, setDetectedModalOpen] = useState(false);
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+
+  // Compute detected workers in attendance file that are not in employees mapping
+  const unmappedWorkers = useMemo(() => {
+    return findUnmappedEmployees(rawEmployeesFromDataset || [], employees);
+  }, [rawEmployeesFromDataset, employees]);
+
+  const handleQuickAddAllUnmapped = () => {
+    if (!onAddBatchEmployees || unmappedWorkers.length === 0) return;
+    const newEmployees = unmappedWorkers.map((w) => createEmployeeFromDetected(w));
+    onAddBatchEmployees(newEmployees);
+    setToastMessage(`Successfully added all ${newEmployees.length} detected workers to Employee Mapping!`);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleAddBatchFromModal = (newEmps: Employee[]) => {
+    if (!onAddBatchEmployees) return;
+    onAddBatchEmployees(newEmps);
+    setToastMessage(`Successfully added ${newEmps.length} worker${newEmps.length > 1 ? 's' : ''} to Employee Mapping!`);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
 
   // Form states
   const [empId, setEmpId] = useState('');
@@ -125,6 +153,74 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
 
   return (
     <div className="space-y-4 pb-12">
+      {/* Success Toast */}
+      {toastMessage && (
+        <div className="rounded-xl border border-emerald-300 bg-emerald-50 px-4 py-3 text-xs font-semibold text-emerald-800 shadow-sm flex items-center justify-between animate-in fade-in slide-in-from-top-2">
+          <div className="flex items-center gap-2">
+            <CheckCircle className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>{toastMessage}</span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setToastMessage(null)}
+            className="text-emerald-600 hover:text-emerald-800"
+          >
+            <XCircle className="h-4 w-4" />
+          </button>
+        </div>
+      )}
+
+      {/* Unmapped Workers Banner */}
+      {unmappedWorkers.length > 0 && settings.activeRole !== 'Management' && (
+        <div
+          id="unmapped-workers-detected-banner"
+          className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 p-4 shadow-xs flex flex-col md:flex-row items-start md:items-center justify-between gap-3 animate-in fade-in"
+        >
+          <div className="flex items-start gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-2xs shrink-0">
+              <UserPlus className="h-5 w-5" />
+            </div>
+            <div>
+              <div className="flex items-center gap-2">
+                <h4 className="text-sm font-bold text-amber-950">
+                  {unmappedWorkers.length} Unmapped Workers Detected in Attendance File
+                </h4>
+                <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-xs font-bold text-amber-900 font-mono">
+                  {rawEmployeesFromDataset?.length || 0} in file vs {employees.length} saved
+                </span>
+              </div>
+              <p className="text-xs text-amber-800/90 mt-0.5 max-w-2xl">
+                The imported raw attendance file contains <strong>{rawEmployeesFromDataset?.length || (employees.length + unmappedWorkers.length)}</strong> workers, but only <strong>{employees.length}</strong> are saved in your Employee Mapping. You can add the remaining <strong>{unmappedWorkers.length}</strong> workers with their auto-detected shifts.
+              </p>
+            </div>
+          </div>
+
+          <div className="flex items-center gap-2 self-end md:self-center shrink-0">
+            <button
+              id="quick-add-all-unmapped-btn"
+              type="button"
+              onClick={handleQuickAddAllUnmapped}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-amber-300 bg-white hover:bg-amber-50 px-3.5 py-2 text-xs font-bold text-amber-900 transition-colors shadow-2xs"
+              title="Add all detected unmapped workers with default detected shifts"
+            >
+              <Zap className="h-3.5 w-3.5 fill-amber-500 text-amber-600" />
+              Quick Add All ({unmappedWorkers.length})
+            </button>
+
+            <button
+              id="review-add-unmapped-btn"
+              type="button"
+              onClick={() => setDetectedModalOpen(true)}
+              className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-xs font-bold text-white transition-colors shadow-2xs"
+              title="Review, customize departments/schedules, and add selected workers"
+            >
+              <UserPlus className="h-4 w-4" />
+              Review & Add ({unmappedWorkers.length})
+            </button>
+          </div>
+        </div>
+      )}
+
       {/* Control bar */}
       <div className="rounded-2xl border border-slate-200 bg-white p-4 shadow-xs">
         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -167,13 +263,27 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
           </div>
 
           {settings.activeRole !== 'Management' && (
-            <button
-              id="add-employee-btn"
-              onClick={openAddModal}
-              className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
-            >
-              <Plus className="h-4 w-4" /> Add Employee
-            </button>
+            <div className="flex items-center gap-2">
+              {unmappedWorkers.length > 0 && (
+                <button
+                  id="toolbar-add-detected-btn"
+                  type="button"
+                  onClick={() => setDetectedModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors shadow-2xs"
+                  title="Review and add unmapped workers detected in attendance logs"
+                >
+                  <UserPlus className="h-4 w-4" />
+                  <span>Add Detected ({unmappedWorkers.length})</span>
+                </button>
+              )}
+              <button
+                id="add-employee-btn"
+                onClick={openAddModal}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
+              >
+                <Plus className="h-4 w-4" /> Add Employee
+              </button>
+            </div>
           )}
         </div>
       </div>
@@ -419,6 +529,17 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
           </div>
         </div>
       )}
+
+      {/* Add Detected Workers Modal */}
+      <AddDetectedWorkersModal
+        isOpen={detectedModalOpen}
+        onClose={() => setDetectedModalOpen(false)}
+        unmappedWorkers={unmappedWorkers}
+        schedules={schedules}
+        onAddWorkers={handleAddBatchFromModal}
+        totalSavedCount={employees.length}
+        totalDetectedCount={rawEmployeesFromDataset?.length || (employees.length + unmappedWorkers.length)}
+      />
     </div>
   );
 };

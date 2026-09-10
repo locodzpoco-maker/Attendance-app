@@ -11,6 +11,7 @@ import {
   Sparkles,
   ArrowRight,
   ShieldCheck,
+  UserPlus,
 } from 'lucide-react';
 import {
   DailyAttendanceRecord,
@@ -32,6 +33,7 @@ interface DashboardProps {
   onExportMonthlyExcel: () => void;
   onExportMonthlyPDF: () => void;
   settings: AppSettings;
+  unmappedEmployeesCount?: number;
 }
 
 export const Dashboard: React.FC<DashboardProps> = ({
@@ -46,6 +48,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
   onExportMonthlyExcel,
   onExportMonthlyPDF,
   settings,
+  unmappedEmployeesCount = 0,
 }) => {
   // Aggregate statistics across daily records
   const totalEmployees = monthlySummary.length || dataset?.employees.length || 0;
@@ -130,6 +133,36 @@ export const Dashboard: React.FC<DashboardProps> = ({
           </div>
         </div>
       </div>
+
+      {/* Unmapped Workers Alert in Dashboard */}
+      {unmappedEmployeesCount > 0 && settings.activeRole !== 'Management' && (
+        <div
+          id="dashboard-unmapped-workers-alert"
+          className="rounded-2xl border border-amber-300 bg-gradient-to-r from-amber-50 via-orange-50 to-amber-50 p-4 shadow-xs flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 animate-in fade-in"
+        >
+          <div className="flex items-center gap-3">
+            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-amber-500 text-white shadow-2xs shrink-0">
+              <UserPlus className="h-5 w-5" />
+            </div>
+            <div>
+              <h4 className="text-sm font-bold text-amber-950">
+                {unmappedEmployeesCount} Unmapped Workers Detected in Attendance Dataset
+              </h4>
+              <p className="text-xs text-amber-800/90 mt-0.5">
+                The imported attendance file contains workers not currently saved in your Employee Mapping directory.
+              </p>
+            </div>
+          </div>
+          <button
+            type="button"
+            onClick={() => onNavigateTab('employees')}
+            className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-xs font-bold text-white transition-colors shadow-2xs self-end sm:self-center shrink-0"
+          >
+            Review & Add to Mapping
+            <ArrowRight className="h-4 w-4" />
+          </button>
+        </div>
+      )}
 
       {/* Suggested 7 KPI Cards (PRD Section 4: Employees | Present | Absent | Late | Worked Hours | Overtime Hours | Late Minutes) */}
       <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-3 sm:gap-4">

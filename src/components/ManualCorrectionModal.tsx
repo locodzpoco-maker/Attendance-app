@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { DailyAttendanceRecord } from '../types';
-import { Clock, ShieldAlert, Check, X, HelpCircle, Layers } from 'lucide-react';
+import { Clock, ShieldAlert, Check, X, HelpCircle, Layers, Zap } from 'lucide-react';
+import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
 
 interface ManualCorrectionModalProps {
   record: DailyAttendanceRecord | null;
@@ -12,7 +13,8 @@ interface ManualCorrectionModalProps {
     reason: string,
     auditor: string,
     overrideShiftId?: string,
-    adjustedSecondCheckIn?: string
+    adjustedSecondCheckIn?: string,
+    injectedSuppMinutes?: number
   ) => void;
   currentUser: string;
 }
@@ -31,9 +33,17 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
   const [overrideShift, setOverrideShift] = useState<string>(
     record.manualAdjustment?.overrideShiftId || (record.isShiftUnclear ? 'stock_g1' : '')
   );
+
+  // Injected Supp Hours
+  const initialInjected = record.manualAdjustment?.injectedSuppMinutes ?? record.injectedSuppMinutes ?? 0;
+  const [injectedHours, setInjectedHours] = useState<number>(Math.floor(initialInjected / 60));
+  const [injectedMinutes, setInjectedMinutes] = useState<number>(initialInjected % 60);
+
   const [reason, setReason] = useState(record.manualAdjustment?.reason || '');
   const [auditor, setAuditor] = useState(currentUser || 'HR Admin');
   const [error, setError] = useState('');
+
+  const totalInjectedMins = injectedHours * 60 + injectedMinutes;
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -48,7 +58,8 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
       reason.trim(),
       auditor.trim(),
       overrideShift || undefined,
-      secondCheckIn.trim() ? secondCheckIn.trim() : undefined
+      secondCheckIn.trim() ? secondCheckIn.trim() : undefined,
+      totalInjectedMins > 0 ? totalInjectedMins : undefined
     );
     onClose();
   };
@@ -170,6 +181,11 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
               />
               <span className="text-[11px] text-slate-400">Current: {record.secondCheckInTime || 'None'}</span>
+              {!record.isDynamicShift && (
+                <span className="block text-[10px] text-indigo-600 mt-0.5">
+                  Admin: delay past break end (&gt; 10m grace) counts in total
+                </span>
+              )}
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
@@ -185,6 +201,66 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
               />
               <span className="text-[11px] text-slate-400">Current: {record.exitTime || 'None'}</span>
+            </div>
+          </div>
+
+          {/* Injected Supp Hours Section */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 text-xs">
+            <div className="flex items-center justify-between mb-2">
+              <label className="font-semibold text-amber-900 flex items-center gap-1.5">
+                <Zap className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
+                <span>Inject Supplementary Hours (Overtime)</span>
+              </label>
+              {totalInjectedMins > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setInjectedHours(0);
+                    setInjectedMinutes(0);
+                  }}
+                  className="text-[11px] text-rose-600 hover:underline"
+                >
+                  Reset to 0
+                </button>
+              )}
+            </div>
+
+            <div className="grid grid-cols-2 gap-2">
+              <div>
+                <span className="block text-[11px] text-slate-600 mb-0.5">Hours</span>
+                <input
+                  id="correction-supp-hours-input"
+                  type="number"
+                  min="0"
+                  max="24"
+                  value={injectedHours}
+                  onChange={(e) => setInjectedHours(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 font-mono font-bold outline-none focus:border-amber-500"
+                />
+              </div>
+              <div>
+                <span className="block text-[11px] text-slate-600 mb-0.5">Minutes</span>
+                <select
+                  id="correction-supp-minutes-select"
+                  value={injectedMinutes}
+                  onChange={(e) => setInjectedMinutes(parseInt(e.target.value, 10) || 0)}
+                  className="w-full rounded-lg border border-slate-300 bg-white px-2.5 py-1.5 text-xs text-slate-800 font-mono font-bold outline-none focus:border-amber-500"
+                >
+                  <option value={0}>00 min</option>
+                  <option value={15}>15 min</option>
+                  <option value={30}>30 min</option>
+                  <option value={45}>45 min</option>
+                </select>
+              </div>
+            </div>
+
+            <div className="mt-2 flex items-center justify-between text-[11px] text-amber-900">
+              <span>
+                Injected Overtime: <strong>+{formatMinutesToHoursAndMinutes(totalInjectedMins)}</strong>
+              </span>
+              <span className="text-slate-500">
+                Natural Punch OT: {formatMinutesToHoursAndMinutes(Math.max(0, record.suppMinutes - (record.injectedSuppMinutes || 0)))}
+              </span>
             </div>
           </div>
 

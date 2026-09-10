@@ -79,6 +79,7 @@ export interface ManualAdjustment {
   adjustedSecondCheckIn?: string;
   adjustedExit?: string;
   overrideShiftId?: string; // e.g. "stock_g1", "stock_g2", "stock_g3", "stock_g4"
+  injectedSuppMinutes?: number; // additional/injected overtime minutes for this worker on this day
   reason: string;
   adjustedBy: string;
   adjustedAt: string;
@@ -119,14 +120,15 @@ export interface DailyAttendanceRecord {
 
   // Calculated figures
   firstCheckInDelayMinutes: number; // delay on shift entry past grace
-  secondCheckInDelayMinutes: number; // excluded from late calculation
-  delayMinutes: number; // delay on shift entry (excludes grace and 2nd check-in)
+  secondCheckInDelayMinutes: number; // delay on 2nd check-in (after break) past grace for admin workers (excludes 10m grace)
+  delayMinutes: number; // total delay (firstCheckInDelayMinutes + secondCheckInDelayMinutes)
   breakDurationMinutes: number; // break deducted
   workedMinutes: number; // normal worked minutes
   workedHoursFormatted: string; // e.g. "7h 12"
   workedDecimalHours: number;
 
-  suppMinutes: number; // overtime minutes after 15m threshold
+  suppMinutes: number; // overtime minutes after 15m threshold (including injected)
+  injectedSuppMinutes?: number; // overtime minutes injected manually
   suppHoursFormatted: string; // e.g. "0h 20" or "0"
   suppDecimalHours: number;
 
