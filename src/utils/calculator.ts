@@ -321,15 +321,17 @@ export function calculateAttendance(
 
       const schedStartMins = parseTimeToMinutes(assignedSchedule.startTime);
 
-      // Helper to calculate late time on entry (past 10m grace)
+      // Helper to calculate late time on entry (excluding grace period from the late duration)
       const computeFirstCheckInDelay = (inTime: string): number => {
         if (!assignedSchedule.startTime || assignedSchedule.startTime === 'Dynamic') return 0;
         const entryMins = parseTimeToMinutes(inTime);
         const rawFirstDelay = entryMins - schedStartMins;
-        return rawFirstDelay > arrivalGrace ? rawFirstDelay : 0;
+        if (rawFirstDelay <= 0) return 0;
+        // Do not include the grace period in the calculated late time
+        return rawFirstDelay > arrivalGrace ? rawFirstDelay - arrivalGrace : 0;
       };
 
-      // Helper to calculate late time on break return (past 10m grace)
+      // Helper to calculate late time on break return (excluding grace period from the late duration)
       const computeSecondCheckInDelay = (secondInTime: string): number => {
         if (!assignedSchedule.hasBreak || !assignedSchedule.breakEnd) return 0;
         const secondMins = parseTimeToMinutes(secondInTime);
@@ -343,17 +345,18 @@ export function calculateAttendance(
         if (assignedSchedule.crossesMidnight && rawSecondDelay < -12 * 60) {
           rawSecondDelay += 24 * 60;
         }
+        if (rawSecondDelay <= 0) return 0;
 
-        return rawSecondDelay > breakGrace ? rawSecondDelay : 0;
+        // Do not include the grace period in the calculated late time
+        return rawSecondDelay > breakGrace ? rawSecondDelay - breakGrace : 0;
       };
 
       if (entryTime) {
         firstCheckInDelayMinutes = computeFirstCheckInDelay(entryTime);
       }
-      if (secondCheckInTime) {
-        secondCheckInDelayMinutes = computeSecondCheckInDelay(secondCheckInTime);
-      }
-      delayMinutes = firstCheckInDelayMinutes + secondCheckInDelayMinutes;
+      // Note: Second check-in (return from break) is excluded from late calculation per user requirement
+      secondCheckInDelayMinutes = 0;
+      delayMinutes = firstCheckInDelayMinutes;
 
       if (isShiftUnclear) {
         // Shift could not be clearly identified
@@ -396,11 +399,7 @@ export function calculateAttendance(
       } else if (!entryTime && exitTime) {
         // Missing entry
         observation = 'Entrée non pointée';
-        if (secondCheckInDelayMinutes > 0) {
-          observationDetail = `Entrée non pointée (Retard reprise pause: ${secondCheckInDelayMinutes} min)`;
-        } else {
-          observationDetail = 'Entrée non pointée';
-        }
+        observationDetail = 'Entrée non pointée';
         statusType = 'warning';
       } else if (entryTime && exitTime) {
         // Both punches exist!
@@ -447,13 +446,7 @@ export function calculateAttendance(
         // Observation
         if (delayMinutes > 0) {
           observation = 'Retard';
-          if (firstCheckInDelayMinutes > 0 && secondCheckInDelayMinutes > 0) {
-            observationDetail = `Retard ${delayMinutes} min (Entrée: ${firstCheckInDelayMinutes}m, Pause: ${secondCheckInDelayMinutes}m)`;
-          } else if (firstCheckInDelayMinutes > 0) {
-            observationDetail = `Retard ${firstCheckInDelayMinutes} min (Entrée)`;
-          } else {
-            observationDetail = `Retard ${secondCheckInDelayMinutes} min (Reprise pause)`;
-          }
+          observationDetail = `Retard ${delayMinutes} min`;
           statusType = 'warning';
         } else if (isOvernightPunch) {
           observation = 'Sortie après minuit';

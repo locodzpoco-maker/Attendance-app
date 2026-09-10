@@ -20,6 +20,14 @@ import {
   exportMonthlySummaryToExcel,
   exportMonthlySummaryToPDF,
 } from './utils/exporter';
+import {
+  cleanupLegacyStorage,
+  getStorageItem,
+  saveStorageItem,
+  saveCompactHistoricalPeriods,
+  exportBackupToFile,
+  parseBackupFile,
+} from './utils/storage';
 
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -35,19 +43,16 @@ export default function App() {
   // Navigation & Active Tab
   const [activeTab, setActiveTab] = useState<
     'dashboard' | 'daily' | 'monthly' | 'employees' | 'schedules' | 'settings'
-  >('dashboard');
+  >(() => {
+    return getStorageItem<'dashboard' | 'daily' | 'monthly' | 'employees' | 'schedules' | 'settings'>(
+      'ams_active_tab',
+      'dashboard'
+    );
+  });
 
   // App Settings
   const [settings, setSettings] = useState<AppSettings>(() => {
-    const saved = localStorage.getItem('ams_settings');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return {
+    const defaultSettings: AppSettings = {
       companyName: 'Attendance Management System',
       companySubtitle: 'Automated Biometric Fingerprint & Schedule Engine',
       defaultOvertimeGraceMinutes: 15,
@@ -56,30 +61,37 @@ export default function App() {
       allowRecalculationOnFly: true,
       activeRole: 'Administrator',
     };
+    const saved = getStorageItem<Partial<AppSettings> | null>('ams_settings', null);
+    if (saved && typeof saved === 'object') {
+      return {
+        ...defaultSettings,
+        ...saved,
+      };
+    }
+    return defaultSettings;
   });
 
-  // Schedules
+  // Schedules (Reads from consistent storage key with quota recovery & fallback)
   const [schedules, setSchedules] = useState<WorkSchedule[]>(() => {
-    const saved = localStorage.getItem('ams_schedules_v2');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
+    cleanupLegacyStorage();
+    const saved =
+      getStorageItem<WorkSchedule[] | null>('ams_schedules', null) ||
+      getStorageItem<WorkSchedule[] | null>('ams_schedules_v3', null) ||
+      getStorageItem<WorkSchedule[] | null>('ams_schedules_v2', null);
+    if (Array.isArray(saved) && saved.length > 0) {
+      return saved;
     }
     return DEFAULT_SCHEDULES;
   });
 
   // Employees Database
   const [employees, setEmployees] = useState<Employee[]>(() => {
-    const saved = localStorage.getItem('ams_employees_v4');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
+    const saved =
+      getStorageItem<Employee[] | null>('ams_employees', null) ||
+      getStorageItem<Employee[] | null>('ams_employees_v5', null) ||
+      getStorageItem<Employee[] | null>('ams_employees_v4', null);
+    if (Array.isArray(saved) && saved.length > 0) {
+      return saved;
     }
     return DEFAULT_EMPLOYEES;
   });
@@ -88,37 +100,29 @@ export default function App() {
   const [manualAdjustments, setManualAdjustments] = useState<
     Record<string, ManualAdjustment>
   >(() => {
-    const saved = localStorage.getItem('ams_adjustments');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return {};
+    return getStorageItem<Record<string, ManualAdjustment>>('ams_adjustments', {});
   });
 
   // Audit Logs
   const [auditLogs, setAuditLogs] = useState<AttendanceAuditLog[]>(() => {
-    const saved = localStorage.getItem('ams_audit_logs');
-    if (saved) {
-      try {
-        return JSON.parse(saved);
-      } catch {
-        // fallback
-      }
-    }
-    return [];
+    return getStorageItem<AttendanceAuditLog[]>('ams_audit_logs', []);
   });
 
   // Raw Active Dataset
   const [activeDataset, setActiveDataset] = useState<RawAttendanceDataset>(() => {
+    const saved = getStorageItem<RawAttendanceDataset | null>('ams_active_dataset', null);
+    if (saved && Array.isArray(saved.employees)) {
+      return saved;
+    }
     return generateReferenceDataset();
   });
 
   // Historical Periods
   const [historicalPeriods, setHistoricalPeriods] = useState<HistoricalPeriodRecord[]>(() => {
+    const saved = getStorageItem<HistoricalPeriodRecord[] | null>('ams_historical_periods', null);
+    if (Array.isArray(saved) && saved.length > 0) {
+      return saved;
+    }
     const initialDataset = generateReferenceDataset();
     const initialCalc = calculateAttendance(initialDataset, {
       schedules: DEFAULT_SCHEDULES,
@@ -140,32 +144,52 @@ export default function App() {
     ];
   });
 
-  const [selectedPeriodId, setSelectedPeriodId] = useState('2026-07');
+  const [selectedPeriodId, setSelectedPeriodId] = useState<string>(() => {
+    return getStorageItem<string>('ams_selected_period_id', '2026-07');
+  });
   const [isCalculating, setIsCalculating] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
   const [activeCorrectionRecord, setActiveCorrectionRecord] =
     useState<DailyAttendanceRecord | null>(null);
 
-  // Sync to LocalStorage
+  // Sync to Storage immediately upon state changes with quota safety
   useEffect(() => {
-    localStorage.setItem('ams_settings', JSON.stringify(settings));
+    saveStorageItem('ams_active_tab', activeTab);
+  }, [activeTab]);
+
+  useEffect(() => {
+    saveStorageItem('ams_settings', settings);
   }, [settings]);
 
   useEffect(() => {
-    localStorage.setItem('ams_schedules', JSON.stringify(schedules));
+    saveStorageItem('ams_schedules', schedules);
   }, [schedules]);
 
   useEffect(() => {
-    localStorage.setItem('ams_employees_v3', JSON.stringify(employees));
+    saveStorageItem('ams_employees', employees);
   }, [employees]);
 
   useEffect(() => {
-    localStorage.setItem('ams_adjustments', JSON.stringify(manualAdjustments));
+    saveStorageItem('ams_adjustments', manualAdjustments);
   }, [manualAdjustments]);
 
   useEffect(() => {
-    localStorage.setItem('ams_audit_logs', JSON.stringify(auditLogs));
+    saveStorageItem('ams_audit_logs', auditLogs);
   }, [auditLogs]);
+
+  useEffect(() => {
+    if (activeDataset) {
+      saveStorageItem('ams_active_dataset', activeDataset);
+    }
+  }, [activeDataset]);
+
+  useEffect(() => {
+    saveCompactHistoricalPeriods(historicalPeriods);
+  }, [historicalPeriods]);
+
+  useEffect(() => {
+    saveStorageItem('ams_selected_period_id', selectedPeriodId);
+  }, [selectedPeriodId]);
 
   // Main Calculation Execution
   const { dailyRecords, monthlySummary } = useMemo(() => {
@@ -295,13 +319,68 @@ export default function App() {
     setEmployees((prev) => prev.map((e) => (e.id === updatedEmp.id ? updatedEmp : e)));
   };
 
-  // Schedule modifications
+  // Schedule modifications with immediate synchronous storage persistence
   const handleAddSchedule = (newSched: WorkSchedule) => {
-    setSchedules((prev) => [...prev, newSched]);
+    setSchedules((prev) => {
+      const next = [...prev, newSched];
+      saveStorageItem('ams_schedules', next);
+      return next;
+    });
   };
 
   const handleUpdateSchedule = (updatedSched: WorkSchedule) => {
-    setSchedules((prev) => prev.map((s) => (s.id === updatedSched.id ? updatedSched : s)));
+    setSchedules((prev) => {
+      const next = prev.map((s) => (s.id === updatedSched.id ? updatedSched : s));
+      saveStorageItem('ams_schedules', next);
+      return next;
+    });
+  };
+
+  const handleDeleteSchedule = (id: string) => {
+    setSchedules((prev) => {
+      const next = prev.filter((s) => s.id !== id);
+      saveStorageItem('ams_schedules', next);
+      return next;
+    });
+  };
+
+  const handleResetSchedules = () => {
+    setSchedules(DEFAULT_SCHEDULES);
+    saveStorageItem('ams_schedules', DEFAULT_SCHEDULES);
+  };
+
+  const handleUpdateSettings = (newSettings: AppSettings) => {
+    setSettings(newSettings);
+    saveStorageItem('ams_settings', newSettings);
+  };
+
+  // Export / Import entire application config (schedules, settings, employee assignments)
+  const handleExportBackup = () => {
+    exportBackupToFile(settings, schedules, employees, manualAdjustments);
+  };
+
+  const handleImportBackup = async (file: File) => {
+    try {
+      const backup = await parseBackupFile(file);
+      if (backup.settings) {
+        setSettings(backup.settings);
+        saveStorageItem('ams_settings', backup.settings);
+      }
+      if (Array.isArray(backup.schedules) && backup.schedules.length > 0) {
+        setSchedules(backup.schedules);
+        saveStorageItem('ams_schedules', backup.schedules);
+      }
+      if (Array.isArray(backup.employees) && backup.employees.length > 0) {
+        setEmployees(backup.employees);
+        saveStorageItem('ams_employees', backup.employees);
+      }
+      if (backup.manualAdjustments) {
+        setManualAdjustments(backup.manualAdjustments);
+        saveStorageItem('ams_adjustments', backup.manualAdjustments);
+      }
+    } catch (e: any) {
+      alert(`Could not restore backup file: ${e.message || e}`);
+    }
   };
 
   // Period label for reports
@@ -398,6 +477,10 @@ export default function App() {
             schedules={schedules}
             onUpdateSchedule={handleUpdateSchedule}
             onAddSchedule={handleAddSchedule}
+            onDeleteSchedule={handleDeleteSchedule}
+            onResetSchedules={handleResetSchedules}
+            onExportBackup={handleExportBackup}
+            onImportBackup={handleImportBackup}
             canEdit={settings.activeRole !== 'Management'}
           />
         )}
@@ -405,11 +488,39 @@ export default function App() {
         {activeTab === 'settings' && (
           <SettingsView
             settings={settings}
-            onUpdateSettings={setSettings}
+            onUpdateSettings={handleUpdateSettings}
             historicalPeriods={historicalPeriods}
             onSelectPeriod={handleSelectPeriod}
             onDeletePeriod={handleDeletePeriod}
             auditLogs={auditLogs}
+            onExportBackup={handleExportBackup}
+            onImportBackup={handleImportBackup}
+            onResetAllData={() => {
+              try {
+                localStorage.clear();
+              } catch (e) {
+                console.warn(e);
+              }
+              const defaultSet: AppSettings = {
+                companyName: 'Attendance Management System',
+                companySubtitle: 'Automated Biometric Fingerprint & Schedule Engine',
+                defaultOvertimeGraceMinutes: 15,
+                defaultArrivalGraceMinutes: 10,
+                defaultBreakGraceMinutes: 10,
+                allowRecalculationOnFly: true,
+                activeRole: 'Administrator',
+              };
+              setSettings(defaultSet);
+              saveStorageItem('ams_settings', defaultSet);
+              setSchedules(DEFAULT_SCHEDULES);
+              saveStorageItem('ams_schedules', DEFAULT_SCHEDULES);
+              setEmployees(DEFAULT_EMPLOYEES);
+              saveStorageItem('ams_employees', DEFAULT_EMPLOYEES);
+              setManualAdjustments({});
+              saveStorageItem('ams_adjustments', {});
+              setAuditLogs([]);
+              saveStorageItem('ams_audit_logs', []);
+            }}
           />
         )}
       </main>

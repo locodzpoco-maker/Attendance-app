@@ -424,7 +424,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                           }`}
                           title={
                             (r.firstCheckInDelayMinutes || 0) > 0
-                              ? `1st In: ${r.firstCheckInTime || r.entryTime} (Late: ${r.firstCheckInDelayMinutes}m past 10m grace)`
+                              ? `1st In: ${r.firstCheckInTime || r.entryTime} (Late: ${r.firstCheckInDelayMinutes}m)`
                               : `1st In: ${r.firstCheckInTime || r.entryTime} (On time)`
                           }
                         >
@@ -439,16 +439,8 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     <td className="py-2.5 px-3 text-center font-mono text-slate-700">
                       {r.secondCheckInTime ? (
                         <span
-                          className={`rounded px-1.5 py-0.5 text-xs ${
-                            (r.secondCheckInDelayMinutes || 0) > 0
-                              ? 'bg-amber-100 text-amber-900 font-semibold'
-                              : 'bg-slate-100 text-slate-700'
-                          }`}
-                          title={
-                            (r.secondCheckInDelayMinutes || 0) > 0
-                              ? `2nd In: ${r.secondCheckInTime} (Late: ${r.secondCheckInDelayMinutes}m past 10m grace)`
-                              : `2nd In: ${r.secondCheckInTime} (On time)`
-                          }
+                          className="rounded bg-slate-100 text-slate-700 px-1.5 py-0.5 text-xs"
+                          title={`2nd In: ${r.secondCheckInTime}`}
                         >
                           {r.secondCheckInTime}
                         </span>
@@ -478,21 +470,16 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                       )}
                     </td>
 
-                    {/* Delay (Total of 1st check-in late and 2nd check-in late) */}
+                    {/* Delay (Shift entry late past grace) */}
                     <td className="py-2.5 px-3 text-center">
                       {r.delayMinutes > 0 ? (
                         <div>
                           <span
-                            title={`Retard total: ${r.delayMinutes} min (1ère entrée: ${r.firstCheckInDelayMinutes || 0}m, 2ème reprise: ${r.secondCheckInDelayMinutes || 0}m)`}
+                            title={`Retard entrée: ${r.delayMinutes} min`}
                             className="font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]"
                           >
                             {r.delayMinutes} min
                           </span>
-                          {(r.firstCheckInDelayMinutes || 0) > 0 && (r.secondCheckInDelayMinutes || 0) > 0 && (
-                            <span className="block text-[9px] text-slate-400 mt-0.5 whitespace-nowrap">
-                              {r.firstCheckInDelayMinutes}m + {r.secondCheckInDelayMinutes}m
-                            </span>
-                          )}
                         </div>
                       ) : (
                         <span className="text-slate-400">0 min</span>

@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import { AppSettings, AttendanceAuditLog, HistoricalPeriodRecord } from '../types';
 import {
   Settings as SettingsIcon,
@@ -9,6 +9,11 @@ import {
   Trash2,
   Calendar,
   CheckCircle,
+  Database,
+  RotateCcw,
+  CheckCircle2,
+  Download,
+  Upload,
 } from 'lucide-react';
 
 interface SettingsViewProps {
@@ -18,6 +23,9 @@ interface SettingsViewProps {
   onSelectPeriod: (periodId: string) => void;
   onDeletePeriod: (periodId: string) => void;
   auditLogs: AttendanceAuditLog[];
+  onResetAllData?: () => void;
+  onExportBackup?: () => void;
+  onImportBackup?: (file: File) => void;
 }
 
 export const SettingsView: React.FC<SettingsViewProps> = ({
@@ -27,6 +35,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onSelectPeriod,
   onDeletePeriod,
   auditLogs,
+  onResetAllData,
+  onExportBackup,
+  onImportBackup,
 }) => {
   const [companyName, setCompanyName] = useState(settings.companyName);
   const [companySubtitle, setCompanySubtitle] = useState(settings.companySubtitle);
@@ -35,6 +46,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [breakGrace, setBreakGrace] = useState(settings.defaultBreakGraceMinutes ?? 10);
   const [activeRole, setActiveRole] = useState(settings.activeRole);
   const [savedSuccess, setSavedSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  useEffect(() => {
+    setCompanyName(settings.companyName);
+    setCompanySubtitle(settings.companySubtitle);
+    setOvertimeGrace(settings.defaultOvertimeGraceMinutes);
+    setArrivalGrace(settings.defaultArrivalGraceMinutes);
+    setBreakGrace(settings.defaultBreakGraceMinutes ?? 10);
+    setActiveRole(settings.activeRole);
+  }, [settings]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -303,6 +324,111 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
             </tbody>
           </table>
         </div>
+      </div>
+
+      {/* Storage & Data Persistence Status */}
+      <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
+        <div className="flex items-center justify-between pb-4 border-b border-slate-100">
+          <div className="flex items-center gap-2">
+            <Database className="h-5 w-5 text-indigo-600" />
+            <div>
+              <h2 className="text-base font-bold text-slate-900">Local Browser Storage & Persistence</h2>
+              <p className="text-xs text-slate-500">
+                All settings, shift configurations, employee rosters, and imported files are automatically saved in your browser storage.
+              </p>
+            </div>
+          </div>
+          <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2.5 py-1 text-xs font-semibold text-emerald-700">
+            <CheckCircle2 className="h-3.5 w-3.5" /> Auto-Save Active
+          </span>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3 text-xs">
+          <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+            <span className="text-slate-500 block font-medium">Work Schedules</span>
+            <span className="text-slate-900 font-bold text-sm mt-0.5 block">Saved Locally</span>
+            <span className="text-[11px] text-slate-400 mt-1 block">Custom shift hours, break times & grace periods persist across page reloads.</span>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+            <span className="text-slate-500 block font-medium">Calculation Rules & Settings</span>
+            <span className="text-slate-900 font-bold text-sm mt-0.5 block">Saved Locally</span>
+            <span className="text-[11px] text-slate-400 mt-1 block">Company title, OT grace, arrival grace & role settings remain active.</span>
+          </div>
+
+          <div className="rounded-xl border border-slate-100 bg-slate-50/70 p-3">
+            <span className="text-slate-500 block font-medium">Historical Periods & Audit</span>
+            <span className="text-slate-900 font-bold text-sm mt-0.5 block">{historicalPeriods.length} Stored</span>
+            <span className="text-[11px] text-slate-400 mt-1 block">All manual punch corrections and audit trail events remain safely logged.</span>
+          </div>
+        </div>
+
+        {/* Backup & Export Controls */}
+        <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+          <div>
+            <span className="text-xs font-semibold text-slate-800 block">Configuration Backup & Transfer</span>
+            <span className="text-[11px] text-slate-400 block">
+              Download your custom schedules, grace settings, and employee assignments as a JSON file to transfer or keep safe offline.
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            {onExportBackup && (
+              <button
+                type="button"
+                onClick={onExportBackup}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
+                title="Download JSON file containing all settings and schedules"
+              >
+                <Download className="h-3.5 w-3.5 text-slate-500" /> Export Backup
+              </button>
+            )}
+
+            {onImportBackup && (
+              <>
+                <input
+                  type="file"
+                  ref={fileInputRef}
+                  accept=".json,application/json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      onImportBackup(file);
+                      if (fileInputRef.current) fileInputRef.current.value = '';
+                    }
+                  }}
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
+                  title="Import previously exported JSON configuration file"
+                >
+                  <Upload className="h-3.5 w-3.5 text-indigo-600" /> Import Backup
+                </button>
+              </>
+            )}
+          </div>
+        </div>
+
+        {onResetAllData && settings.activeRole === 'Administrator' && (
+          <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
+            <p className="text-xs text-slate-500">
+              Need to clear custom changes and restore clean factory defaults?
+            </p>
+            <button
+              type="button"
+              onClick={() => {
+                if (window.confirm('Reset all settings, schedules, and custom attendance records to clean factory defaults?')) {
+                  onResetAllData();
+                }
+              }}
+              className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors"
+            >
+              <RotateCcw className="h-3.5 w-3.5" /> Reset All Data to Factory Defaults
+            </button>
+          </div>
+        )}
       </div>
     </div>
   );

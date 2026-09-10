@@ -118,9 +118,9 @@ export interface DailyAttendanceRecord {
   isManuallyAdjusted: boolean;
 
   // Calculated figures
-  firstCheckInDelayMinutes: number; // delay on shift entry past 10m grace
-  secondCheckInDelayMinutes: number; // delay on break return past 10m grace
-  delayMinutes: number; // total delay = firstCheckInDelayMinutes + secondCheckInDelayMinutes
+  firstCheckInDelayMinutes: number; // delay on shift entry past grace
+  secondCheckInDelayMinutes: number; // excluded from late calculation
+  delayMinutes: number; // delay on shift entry (excludes grace and 2nd check-in)
   breakDurationMinutes: number; // break deducted
   workedMinutes: number; // normal worked minutes
   workedHoursFormatted: string; // e.g. "7h 12"
