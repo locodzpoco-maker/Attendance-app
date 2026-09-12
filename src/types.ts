@@ -191,3 +191,71 @@ export interface HistoricalPeriodRecord {
   dailyRecords: DailyAttendanceRecord[];
   monthlySummary: MonthlySummaryRecord[];
 }
+
+export interface DatabaseStats {
+  isElectron: boolean;
+  dataDir?: string;
+  dbPath?: string;
+  backupsDir?: string;
+  dbSizeBytes?: number;
+  employeesCount?: number;
+  schedulesCount?: number;
+  dailyRecordsCount?: number;
+  historicalCount?: number;
+  backupsCount?: number;
+  maxBackups?: number;
+}
+
+export interface BackupItem {
+  fileName: string;
+  filePath: string;
+  sizeBytes: number;
+  createdAt: string;
+}
+
+export interface ElectronAPI {
+  isElectron: boolean;
+  platform: string;
+  getDbStats: () => Promise<DatabaseStats>;
+  getEmployees: () => Promise<Employee[]>;
+  saveEmployee: (emp: Employee) => Promise<boolean>;
+  saveEmployeesBatch: (emps: Employee[]) => Promise<boolean>;
+  deleteEmployee: (id: string) => Promise<boolean>;
+  getSchedules: () => Promise<WorkSchedule[]>;
+  saveSchedule: (sched: WorkSchedule) => Promise<boolean>;
+  saveSchedulesBatch: (scheds: WorkSchedule[]) => Promise<boolean>;
+  deleteSchedule: (id: string) => Promise<boolean>;
+  getDailyRecords: () => Promise<DailyAttendanceRecord[]>;
+  saveDailyRecords: (records: DailyAttendanceRecord[]) => Promise<boolean>;
+  getMonthlySummaries: (periodId?: string) => Promise<MonthlySummaryRecord[]>;
+  saveMonthlySummaries: (periodId: string, summaries: MonthlySummaryRecord[]) => Promise<boolean>;
+  getHistoricalPeriods: () => Promise<HistoricalPeriodRecord[]>;
+  saveHistoricalPeriod: (period: HistoricalPeriodRecord) => Promise<boolean>;
+  deleteHistoricalPeriod: (id: string) => Promise<boolean>;
+  getAuditLogs: () => Promise<AttendanceAuditLog[]>;
+  saveAuditLogs: (logs: AttendanceAuditLog[]) => Promise<boolean>;
+  getManualAdjustments: () => Promise<Record<string, ManualAdjustment>>;
+  saveManualAdjustment: (adj: ManualAdjustment) => Promise<boolean>;
+  getSettings: () => Promise<AppSettings | null>;
+  saveSettings: (settings: AppSettings) => Promise<boolean>;
+  getActiveDataset: () => Promise<RawAttendanceDataset | null>;
+  saveActiveDataset: (dataset: RawAttendanceDataset) => Promise<boolean>;
+  createBackup: (customName?: string) => Promise<{ success: boolean; fileName?: string; filePath?: string; error?: string }>;
+  listBackups: () => Promise<BackupItem[]>;
+  restoreBackup: (fileName: string) => Promise<{ success: boolean; message?: string; error?: string }>;
+  exportDatabase: (targetPath?: string) => Promise<{ success: boolean; targetPath?: string; error?: string; canceled?: boolean }>;
+  importDatabase: (sourcePath?: string) => Promise<{ success: boolean; error?: string; canceled?: boolean }>;
+  openDataFolder: () => Promise<boolean>;
+  migrateFromLocalStorage: (data: Record<string, any>) => Promise<{
+    success: boolean;
+    summary?: { employeesImported: number; schedulesImported: number; periodsImported: number };
+    error?: string;
+  }>;
+}
+
+declare global {
+  interface Window {
+    electronAPI?: ElectronAPI;
+  }
+}
+

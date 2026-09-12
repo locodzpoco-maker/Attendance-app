@@ -1,0 +1,38 @@
+{
+  "appId": "com.attendance.management.system",
+  "productName": "Attendance Management System",
+  "executableName": "AttendanceManagementSystem",
+  "directories": {
+    "output": "dist-electron"
+  },
+  "files": [
+    "dist/**/*",
+    "electron/**/*",
+    "node_modules/sql.js/**/*",
+    "package.json"
+  ],
+  "extraMetadata": {
+    "main": "electron/main.cjs"
+  },
+  "win": {
+    "target": [
+      {
+        "target": "nsis",
+        "arch": ["x64"]
+      }
+    ],
+    "requestedExecutionLevel": "asInvoker"
+  },
+  "nsis": {
+    "oneClick": false,
+    "perMachine": false,
+    "allowElevation": true,
+    "allowToChangeInstallationDirectory": true,
+    "createDesktopShortcut": true,
+    "createStartMenuShortcut": true,
+    "shortcutName": "Attendance Management System",
+    "artifactName": "Attendance-App-Setup.${ext}",
+    "deleteAppDataOnUninstall": false,
+    "runAfterFinish": true
+  }
+}

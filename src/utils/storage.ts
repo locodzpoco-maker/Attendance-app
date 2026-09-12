@@ -49,8 +49,31 @@ export function getStorageItem<T>(key: string, defaultValue: T): T {
   }
 }
 
-// Safely save item with QuotaExceeded recovery
+// Safely save item with QuotaExceeded recovery and Electron SQLite synchronization
 export function saveStorageItem<T>(key: string, value: T): boolean {
+  // Sync with Electron SQLite database if running in desktop shell
+  if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.isElectron) {
+    try {
+      if (key === 'ams_employees' && Array.isArray(value)) {
+        window.electronAPI.saveEmployeesBatch(value as any).catch(console.error);
+      } else if (key === 'ams_schedules' && Array.isArray(value)) {
+        window.electronAPI.saveSchedulesBatch(value as any).catch(console.error);
+      } else if (key === 'ams_settings' && typeof value === 'object') {
+        window.electronAPI.saveSettings(value as any).catch(console.error);
+      } else if (key === 'ams_daily_records' && Array.isArray(value)) {
+        window.electronAPI.saveDailyRecords(value as any).catch(console.error);
+      } else if (key === 'ams_monthly_summary' && Array.isArray(value)) {
+        window.electronAPI.saveMonthlySummaries('CURRENT', value as any).catch(console.error);
+      } else if (key === 'ams_audit_logs' && Array.isArray(value)) {
+        window.electronAPI.saveAuditLogs(value as any).catch(console.error);
+      } else if (key === 'ams_dataset' && typeof value === 'object') {
+        window.electronAPI.saveActiveDataset(value as any).catch(console.error);
+      }
+    } catch (e) {
+      console.warn('Error syncing to Electron SQLite:', e);
+    }
+  }
+
   if (typeof window === 'undefined' || !window.localStorage) return false;
   try {
     const serialized = JSON.stringify(value);

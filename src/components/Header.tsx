@@ -9,6 +9,7 @@ import {
   Play,
   LayoutDashboard,
   ShieldCheck,
+  Database,
 } from 'lucide-react';
 import { AppSettings, HistoricalPeriodRecord } from '../types';
 
@@ -26,6 +27,7 @@ interface HeaderProps {
   settings: AppSettings;
   onUpdateRole: (role: AppSettings['activeRole']) => void;
   unmappedEmployeesCount?: number;
+  onOpenDatabaseModal?: () => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -42,6 +44,7 @@ export const Header: React.FC<HeaderProps> = ({
   settings,
   onUpdateRole,
   unmappedEmployeesCount = 0,
+  onOpenDatabaseModal,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
