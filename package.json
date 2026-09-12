@@ -1,14 +1,23 @@
 {
-  "name": "react-example",
+  "name": "attendance-management-system",
+  "productName": "Attendance Management System",
+  "description": "Offline Attendance Management Desktop Application with Local SQLite Database",
+  "author": "Attendance Management Team",
+  "version": "1.0.0",
+  "main": "electron/main.cjs",
   "private": true,
-  "version": "0.0.0",
   "type": "module",
   "scripts": {
     "dev": "vite --port=3000 --host=0.0.0.0",
     "build": "vite build",
     "preview": "vite preview",
-    "clean": "rm -rf dist server.js",
-    "lint": "tsc --noEmit"
+    "clean": "rm -rf dist dist-electron",
+    "lint": "tsc --noEmit",
+    "electron": "electron electron/main.cjs",
+    "electron:dev": "vite build && electron electron/main.cjs",
+    "electron:build": "vite build && electron-builder",
+    "dist": "vite build && electron-builder --win",
+    "dist:win": "vite build && electron-builder --win"
   },
   "dependencies": {
     "@google/genai": "^2.4.0",

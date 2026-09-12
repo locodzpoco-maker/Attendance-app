@@ -103,7 +103,7 @@ export const DesktopDatabaseModal: React.FC<DesktopDatabaseModalProps> = ({
     setIsLoading(true);
     setStatusMessage({ type: 'info', text: `Restoring database from ${fileName}...` });
     try {
-      const res = await restoreBackup(fileName);
+      const res = await restoreDatabaseBackup(fileName);
       if (res.success) {
         setStatusMessage({ type: 'success', text: res.message || 'Database restored successfully!' });
         await refreshInfo();

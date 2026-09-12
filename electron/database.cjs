@@ -262,14 +262,14 @@ class AttendanceDatabase {
     `);
 
     stmt.run({
-      $id: emp.id,
-      $name: emp.name,
+      $id: String(emp.id),
+      $name: emp.name || '',
       $raw_dept: emp.rawDepartment || null,
-      $company_dept: emp.companyDepartment,
-      $group_name: emp.groupName,
-      $schedule_id: emp.scheduleId,
-      $status: emp.status,
-      $start_date: emp.startDate || new Date().toISOString().slice(0, 10),
+      $company_dept: emp.companyDepartment || emp.department || 'General',
+      $group_name: emp.groupName || 'Default',
+      $schedule_id: emp.scheduleId || 'SCH_01',
+      $status: emp.status || (emp.active === false ? 'Inactive' : 'Active'),
+      $start_date: emp.startDate || emp.hireDate || new Date().toISOString().slice(0, 10),
       $notes: emp.notes || '',
     });
     stmt.free();
@@ -296,14 +296,14 @@ class AttendanceDatabase {
 
       for (const emp of employees) {
         stmt.run({
-          $id: emp.id,
-          $name: emp.name,
+          $id: String(emp.id),
+          $name: emp.name || '',
           $raw_dept: emp.rawDepartment || null,
-          $company_dept: emp.companyDepartment,
-          $group_name: emp.groupName,
-          $schedule_id: emp.scheduleId,
-          $status: emp.status,
-          $start_date: emp.startDate || new Date().toISOString().slice(0, 10),
+          $company_dept: emp.companyDepartment || emp.department || 'General',
+          $group_name: emp.groupName || 'Default',
+          $schedule_id: emp.scheduleId || 'SCH_01',
+          $status: emp.status || (emp.active === false ? 'Inactive' : 'Active'),
+          $start_date: emp.startDate || emp.hireDate || new Date().toISOString().slice(0, 10),
           $notes: emp.notes || '',
         });
       }
@@ -390,18 +390,18 @@ class AttendanceDatabase {
     `);
 
     stmt.run({
-      $id: sched.id,
-      $name: sched.name,
-      $dept: sched.department,
-      $is_active: sched.isActive ? 1 : 0,
-      $weekly_hours: sched.weeklyHours,
-      $work_days_json: JSON.stringify(sched.workDays || []),
-      $check_in: sched.checkIn,
-      $check_out: sched.checkOut,
-      $max_ot: sched.maxOvertimeMinutes || 0,
-      $is_cross_midnight: sched.isCrossMidnight ? 1 : 0,
-      $break_type: sched.breakType || 'Flexible',
-      $break_duration: sched.breakDurationMinutes || 0,
+      $id: String(sched.id),
+      $name: sched.name || 'Standard Schedule',
+      $dept: sched.department || 'General',
+      $is_active: sched.isActive !== false ? 1 : 0,
+      $weekly_hours: Number(sched.weeklyHours ?? (sched.normalWorkedHours ? sched.normalWorkedHours * 5 : 40)),
+      $work_days_json: JSON.stringify(sched.workDays || sched.workingDays || []),
+      $check_in: sched.checkIn || sched.startTime || '08:30',
+      $check_out: sched.checkOut || sched.endTime || '17:00',
+      $max_ot: Number(sched.maxOvertimeMinutes ?? (sched.overtimeAllowed ? 120 : 0)),
+      $is_cross_midnight: (sched.isCrossMidnight || sched.crossesMidnight) ? 1 : 0,
+      $break_type: sched.breakType || (sched.hasBreak ? 'Fixed' : 'None'),
+      $break_duration: Number(sched.breakDurationMinutes ?? 60),
       $break_start: sched.breakStart || null,
       $break_end: sched.breakEnd || null,
       $flex_start: sched.flexibleBreakWindowStart || null,
@@ -415,13 +415,63 @@ class AttendanceDatabase {
     if (!this.db || !Array.isArray(schedules)) return false;
     this.db.run('BEGIN TRANSACTION;');
     try {
-      for (const s of schedules) {
-        this.saveSchedule(s);
+      const stmt = this.db.prepare(`
+        INSERT INTO schedules (
+          id, name, department, is_active, weekly_hours, work_days_json,
+          check_in, check_out, max_overtime_minutes, is_cross_midnight,
+          break_type, break_duration_minutes, break_start, break_end,
+          flexible_break_window_start, flexible_break_window_end
+        )
+        VALUES (
+          $id, $name, $dept, $is_active, $weekly_hours, $work_days_json,
+          $check_in, $check_out, $max_ot, $is_cross_midnight,
+          $break_type, $break_duration, $break_start, $break_end,
+          $flex_start, $flex_end
+        )
+        ON CONFLICT(id) DO UPDATE SET
+          name = excluded.name,
+          department = excluded.department,
+          is_active = excluded.is_active,
+          weekly_hours = excluded.weekly_hours,
+          work_days_json = excluded.work_days_json,
+          check_in = excluded.check_in,
+          check_out = excluded.check_out,
+          max_overtime_minutes = excluded.max_overtime_minutes,
+          is_cross_midnight = excluded.is_cross_midnight,
+          break_type = excluded.break_type,
+          break_duration_minutes = excluded.break_duration_minutes,
+          break_start = excluded.break_start,
+          break_end = excluded.break_end,
+          flexible_break_window_start = excluded.flexible_break_window_start,
+          flexible_break_window_end = excluded.flexible_break_window_end;
+      `);
+
+      for (const sched of schedules) {
+        stmt.run({
+          $id: String(sched.id),
+          $name: sched.name || 'Standard Schedule',
+          $dept: sched.department || 'General',
+          $is_active: sched.isActive !== false ? 1 : 0,
+          $weekly_hours: Number(sched.weeklyHours ?? (sched.normalWorkedHours ? sched.normalWorkedHours * 5 : 40)),
+          $work_days_json: JSON.stringify(sched.workDays || sched.workingDays || []),
+          $check_in: sched.checkIn || sched.startTime || '08:30',
+          $check_out: sched.checkOut || sched.endTime || '17:00',
+          $max_ot: Number(sched.maxOvertimeMinutes ?? (sched.overtimeAllowed ? 120 : 0)),
+          $is_cross_midnight: (sched.isCrossMidnight || sched.crossesMidnight) ? 1 : 0,
+          $break_type: sched.breakType || (sched.hasBreak ? 'Fixed' : 'None'),
+          $break_duration: Number(sched.breakDurationMinutes ?? 60),
+          $break_start: sched.breakStart || null,
+          $break_end: sched.breakEnd || null,
+          $flex_start: sched.flexibleBreakWindowStart || null,
+          $flex_end: sched.flexibleBreakWindowEnd || null,
+        });
       }
+      stmt.free();
       this.db.run('COMMIT;');
       return this.persist();
     } catch (e) {
-      this.db.run('ROLLBACK;');
+      try { this.db.run('ROLLBACK;'); } catch (err) {}
+      console.error('Batch save schedules error:', e);
       return false;
     }
   }
@@ -510,36 +560,36 @@ class AttendanceDatabase {
 
       for (const r of records) {
         stmt.run({
-          $id: r.id,
-          $emp_id: r.employeeId,
-          $emp_name: r.employeeName,
-          $dept: r.department,
-          $sched_id: r.scheduleId,
-          $date: r.date,
-          $day_name: r.dayName,
-          $shift_type: r.shiftType,
-          $shift_name: r.shiftName,
-          $is_off: r.isOffDay ? 1 : 0,
+          $id: String(r.id || `${r.employeeId}_${r.date}`),
+          $emp_id: String(r.employeeId || ''),
+          $emp_name: r.employeeName || '',
+          $dept: r.companyDepartment || r.department || r.rawDepartment || 'General',
+          $sched_id: r.scheduleId || 'SCH_01',
+          $date: r.date || '',
+          $day_name: r.dayName || r.dayOfWeek || '',
+          $shift_type: r.shiftType || r.detectedShiftId || 'Standard',
+          $shift_name: r.shiftName || r.scheduleName || 'Standard Shift',
+          $is_off: (r.isOffDay || r.isWorkingDay === false) ? 1 : 0,
           $exp_in: r.expectedCheckIn || null,
           $exp_out: r.expectedCheckOut || null,
-          $act_in: r.actualCheckIn || null,
-          $act_out: r.actualCheckOut || null,
+          $act_in: r.actualCheckIn || r.entryTime || null,
+          $act_out: r.actualCheckOut || r.exitTime || null,
           $brk_start: r.breakStart || null,
           $brk_end: r.breakEnd || null,
-          $brk_dur: r.breakDurationMinutes || 0,
-          $worked: r.workedMinutes || 0,
-          $normal: r.normalMinutes || 0,
-          $ot: r.overtimeMinutes || 0,
-          $late: r.lateMinutes || 0,
-          $early: r.earlyDepartureMinutes || 0,
-          $grace: r.gracePeriodMinutes || 0,
-          $missing: r.missingPunchesFlag ? 1 : 0,
-          $status: r.attendanceStatus,
+          $brk_dur: Number(r.breakDurationMinutes ?? 0),
+          $worked: Number(r.workedMinutes ?? 0),
+          $normal: Number(r.normalMinutes ?? 0),
+          $ot: Number(r.overtimeMinutes ?? (r.suppMinutes ?? 0)),
+          $late: Number(r.lateMinutes ?? (r.delayMinutes ?? 0)),
+          $early: Number(r.earlyDepartureMinutes ?? 0),
+          $grace: Number(r.gracePeriodMinutes ?? 0),
+          $missing: (r.missingPunchesFlag || r.isShiftUnclear) ? 1 : 0,
+          $status: r.attendanceStatus || r.observation || 'Present',
           $raw_punches: JSON.stringify(r.rawPunches || []),
           $source_file: r.sourceFile || '',
           $notes: r.notes || '',
-          $manual_corr: r.manualCorrection ? JSON.stringify(r.manualCorrection) : null,
-          $injected_supp: r.injectedSuppMinutes || 0,
+          $manual_corr: r.manualCorrection ? JSON.stringify(r.manualCorrection) : (r.manualAdjustment ? JSON.stringify(r.manualAdjustment) : null),
+          $injected_supp: Number(r.injectedSuppMinutes ?? 0),
         });
       }
       stmt.free();
@@ -607,22 +657,22 @@ class AttendanceDatabase {
 
       for (const s of summaries) {
         stmt.run({
-          $pid: periodId,
-          $eid: s.employeeId,
-          $ename: s.employeeName,
-          $dept: s.department,
-          $sched: s.scheduleId,
-          $present: s.presentDays,
-          $absent: s.absentDays,
-          $late: s.lateDays,
-          $late_min: s.totalLateMinutes,
-          $miss_days: s.missingPunchesDays,
-          $miss_in: s.missingEntryCount,
-          $miss_out: s.missingExitCount,
-          $worked_min: s.totalWorkedMinutes,
-          $worked_fmt: s.totalWorkedFormatted,
-          $supp_min: s.totalSuppMinutes,
-          $supp_fmt: s.totalSuppFormatted,
+          $pid: String(periodId || 'CURRENT'),
+          $eid: String(s.employeeId || ''),
+          $ename: s.employeeName || '',
+          $dept: s.companyDepartment || s.department || 'General',
+          $sched: s.scheduleId || 'SCH_01',
+          $present: Number(s.presentDays ?? 0),
+          $absent: Number(s.absentDays ?? 0),
+          $late: Number(s.lateDays ?? 0),
+          $late_min: Number(s.totalLateMinutes ?? (s.totalDelayMinutes ?? 0)),
+          $miss_days: Number(s.missingPunchesDays ?? 0),
+          $miss_in: Number(s.missingEntryCount ?? 0),
+          $miss_out: Number(s.missingExitCount ?? 0),
+          $worked_min: Number(s.totalWorkedMinutes ?? 0),
+          $worked_fmt: s.totalWorkedFormatted || s.totalWorkedHoursFormatted || '',
+          $supp_min: Number(s.totalSuppMinutes ?? 0),
+          $supp_fmt: s.totalSuppFormatted || s.totalSuppHoursFormatted || '',
         });
       }
       stmt.free();
@@ -672,14 +722,14 @@ class AttendanceDatabase {
     `);
 
     stmt.run({
-      $id: period.id,
-      $label: period.label,
-      $start_date: period.startDate,
-      $end_date: period.endDate,
-      $created_at: period.createdAt,
-      $employee_count: period.employeeCount,
-      $daily_record_count: period.dailyRecordCount,
-      $raw_json: period.rawDataset ? JSON.stringify(period.rawDataset) : null,
+      $id: String(period.id),
+      $label: period.label || period.periodLabel || 'Historical Period',
+      $start_date: period.startDate || '',
+      $end_date: period.endDate || '',
+      $created_at: period.createdAt || period.importedAt || new Date().toISOString(),
+      $employee_count: Number(period.employeeCount ?? 0),
+      $daily_record_count: Number(period.dailyRecordCount ?? (period.dailyRecords ? period.dailyRecords.length : 0)),
+      $raw_json: period.rawDataset ? JSON.stringify(period.rawDataset) : (period.dataset ? JSON.stringify(period.dataset) : null),
     });
     stmt.free();
     return this.persist();
@@ -727,14 +777,14 @@ class AttendanceDatabase {
 
       for (const log of logs) {
         stmt.run({
-          $id: log.id,
-          $ts: log.timestamp,
-          $user: log.user,
-          $eid: log.employeeId,
-          $ename: log.employeeName,
-          $date: log.date,
-          $action: log.action,
-          $details: log.details,
+          $id: String(log.id || `log_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`),
+          $ts: log.timestamp || new Date().toISOString(),
+          $user: log.user || 'Administrator',
+          $eid: String(log.employeeId || ''),
+          $ename: log.employeeName || '',
+          $date: log.date || '',
+          $action: log.action || 'Manual Adjustment',
+          $details: log.details || '',
         });
       }
       stmt.free();
@@ -782,9 +832,9 @@ class AttendanceDatabase {
     `);
 
     stmt.run({
-      $id: adjustment.recordId,
-      $by: adjustment.adjustedBy,
-      $at: adjustment.adjustedAt,
+      $id: String(adjustment.recordId || adjustment.id || `${adjustment.employeeId}_${adjustment.date}`),
+      $by: adjustment.adjustedBy || 'Administrator',
+      $at: adjustment.adjustedAt || new Date().toISOString(),
       $orig: JSON.stringify(adjustment.originalValues || {}),
       $new: JSON.stringify(adjustment.newValues || {}),
       $reason: adjustment.reason || '',

@@ -39,8 +39,13 @@ import { SettingsView } from './components/SettingsView';
 import { ImportModal } from './components/ImportModal';
 import { ManualCorrectionModal } from './components/ManualCorrectionModal';
 import { InjectSuppHoursModal, InjectSuppHoursParams } from './components/InjectSuppHoursModal';
+import { DesktopDatabaseModal } from './components/DesktopDatabaseModal';
+import { isElectronApp, loadInitialAppData } from './utils/storageAdapter';
 
 export default function App() {
+  // Desktop SQLite Modal State
+  const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
+
   // Navigation & Active Tab
   const [activeTab, setActiveTab] = useState<
     'dashboard' | 'daily' | 'monthly' | 'employees' | 'schedules' | 'settings'
@@ -199,6 +204,29 @@ export default function App() {
   useEffect(() => {
     saveStorageItem('ams_selected_period_id', selectedPeriodId);
   }, [selectedPeriodId]);
+
+  // Load data from SQLite if running in Electron desktop shell
+  const reloadFromDatabase = useCallback(async () => {
+    if (!isElectronApp()) return;
+    try {
+      const data = await loadInitialAppData();
+      if (data.employees && data.employees.length > 0) setEmployees(data.employees);
+      if (data.schedules && data.schedules.length > 0) setSchedules(data.schedules);
+      if (data.settings) setSettings(data.settings);
+      if (data.manualAdjustments) setManualAdjustments(data.manualAdjustments);
+      if (data.auditLogs && data.auditLogs.length > 0) setAuditLogs(data.auditLogs);
+      if (data.historicalPeriods && data.historicalPeriods.length > 0) setHistoricalPeriods(data.historicalPeriods);
+      if (data.activeDataset) setActiveDataset(data.activeDataset);
+    } catch (e) {
+      console.warn('Could not load data from SQLite:', e);
+    }
+  }, []);
+
+  useEffect(() => {
+    if (isElectronApp()) {
+      reloadFromDatabase();
+    }
+  }, [reloadFromDatabase]);
 
   // Main Calculation Execution
   const { dailyRecords, monthlySummary } = useMemo(() => {
@@ -555,6 +583,7 @@ export default function App() {
         settings={settings}
         onUpdateRole={(role) => setSettings((s) => ({ ...s, activeRole: role }))}
         unmappedEmployeesCount={unmappedEmployeesCount}
+        onOpenDatabaseModal={() => setIsDatabaseModalOpen(true)}
       />
 
       {/* Main Content Area */}
@@ -634,6 +663,7 @@ export default function App() {
             auditLogs={auditLogs}
             onExportBackup={handleExportBackup}
             onImportBackup={handleImportBackup}
+            onOpenDatabaseModal={() => setIsDatabaseModalOpen(true)}
             onResetAllData={() => {
               try {
                 localStorage.clear();
@@ -663,6 +693,13 @@ export default function App() {
           />
         )}
       </main>
+
+      {/* Desktop SQLite Database & Backups Management Modal */}
+      <DesktopDatabaseModal
+        isOpen={isDatabaseModalOpen}
+        onClose={() => setIsDatabaseModalOpen(false)}
+        onDataReloadNeeded={reloadFromDatabase}
+      />
 
       {/* Import Modal */}
       <ImportModal

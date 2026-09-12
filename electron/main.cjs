@@ -208,6 +208,23 @@ app.whenReady().then(async () => {
   db = new AttendanceDatabase();
   await db.init();
   registerIpcHandlers();
+
+  // Automatic backup on app launch
+  try {
+    db.createBackup('auto_startup');
+  } catch (err) {
+    console.warn('Startup backup notice:', err);
+  }
+
+  // Periodic automatic backup every 4 hours while app is running
+  setInterval(() => {
+    try {
+      db.createBackup();
+    } catch (err) {
+      console.warn('Periodic backup notice:', err);
+    }
+  }, 4 * 60 * 60 * 1000);
+
   await createWindow();
 
   app.on('activate', () => {
