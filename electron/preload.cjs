@@ -46,6 +46,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getManualAdjustments: () => ipcRenderer.invoke('db:get-manual-adjustments'),
   saveManualAdjustment: (adjustment) => ipcRenderer.invoke('db:save-manual-adjustment', adjustment),
 
+  // Paid Vacations
+  getPaidVacations: () => ipcRenderer.invoke('db:get-paid-vacations'),
+  savePaidVacation: (vacation) => ipcRenderer.invoke('db:save-paid-vacation', vacation),
+  savePaidVacationsBatch: (vacations) => ipcRenderer.invoke('db:save-paid-vacations-batch', vacations),
+  deletePaidVacation: (id) => ipcRenderer.invoke('db:delete-paid-vacation', id),
+
   // Settings
   getSettings: () => ipcRenderer.invoke('db:get-settings'),
   saveSettings: (settings) => ipcRenderer.invoke('db:save-settings', settings),

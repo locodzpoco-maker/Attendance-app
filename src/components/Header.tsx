@@ -10,6 +10,7 @@ import {
   LayoutDashboard,
   ShieldCheck,
   Database,
+  Palmtree,
 } from 'lucide-react';
 import { AppSettings, HistoricalPeriodRecord } from '../types';
 
@@ -28,6 +29,8 @@ interface HeaderProps {
   onUpdateRole: (role: AppSettings['activeRole']) => void;
   unmappedEmployeesCount?: number;
   onOpenDatabaseModal?: () => void;
+  onOpenVacationModal?: () => void;
+  vacationCount?: number;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -45,6 +48,8 @@ export const Header: React.FC<HeaderProps> = ({
   onUpdateRole,
   unmappedEmployeesCount = 0,
   onOpenDatabaseModal,
+  onOpenVacationModal,
+  vacationCount = 0,
 }) => {
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
@@ -117,6 +122,24 @@ export const Header: React.FC<HeaderProps> = ({
               >
                 <Database className="h-4 w-4 text-blue-600" />
                 <span className="hidden sm:inline">Database & Backups</span>
+              </button>
+            )}
+
+            {/* Paid Vacation Manager */}
+            {onOpenVacationModal && settings.activeRole !== 'Management' && (
+              <button
+                id="header-vacation-btn"
+                onClick={onOpenVacationModal}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 bg-teal-50/70 px-3 py-1.5 text-xs font-semibold text-teal-800 shadow-xs hover:bg-teal-100 transition-colors"
+                title="Manage paid vacation and approved leave ranges for workers"
+              >
+                <Palmtree className="h-4 w-4 text-teal-600" />
+                <span className="hidden sm:inline">Paid Vacation</span>
+                {vacationCount > 0 && (
+                  <span className="rounded-full bg-teal-600 text-white text-[10px] font-bold px-1.5 py-0.2 leading-none">
+                    {vacationCount}
+                  </span>
+                )}
               </button>
             )}
 

@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Employee, WorkSchedule, AppSettings, RawEmployeeRecord } from '../types';
 import { isStockWorker, isAdminWorker, findUnmappedEmployees, createEmployeeFromDetected } from '../utils/employees';
-import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert, UserPlus, Sparkles, Zap, Check } from 'lucide-react';
+import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert, UserPlus, Sparkles, Zap, Check, Palmtree } from 'lucide-react';
 import { AddDetectedWorkersModal } from './AddDetectedWorkersModal';
 
 interface EmployeesViewProps {
@@ -11,6 +11,7 @@ interface EmployeesViewProps {
   onAddBatchEmployees?: (newEmployees: Employee[]) => void;
   onUpdateEmployee: (emp: Employee) => void;
   onResetDefaults?: () => void;
+  onOpenVacationForEmployee?: (empId: string) => void;
   settings: AppSettings;
   rawEmployeesFromDataset?: RawEmployeeRecord[];
 }
@@ -22,6 +23,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   onAddBatchEmployees,
   onUpdateEmployee,
   onResetDefaults,
+  onOpenVacationForEmployee,
   settings,
   rawEmployeesFromDataset,
 }) => {
@@ -356,10 +358,19 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-slate-500">{e.startDate || '-'}</td>
                     {settings.activeRole !== 'Management' && (
-                      <td className="py-3 px-4 text-right">
+                      <td className="py-3 px-4 text-right space-x-1">
+                        {onOpenVacationForEmployee && (
+                          <button
+                            onClick={() => onOpenVacationForEmployee(e.id)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-teal-700 bg-teal-50 hover:bg-teal-100 transition-colors font-medium text-xs"
+                            title={`Planifier congé payé pour ${e.name}`}
+                          >
+                            <Palmtree className="h-3.5 w-3.5 text-teal-600" /> Congé
+                          </button>
+                        )}
                         <button
                           onClick={() => openEditModal(e)}
-                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors font-medium"
+                          className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors font-medium text-xs"
                         >
                           <Edit2 className="h-3.5 w-3.5" /> Edit
                         </button>

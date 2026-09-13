@@ -21,6 +21,7 @@ import {
   RotateCcw,
   CalendarRange,
   Zap,
+  Palmtree,
 } from 'lucide-react';
 import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
 
@@ -28,6 +29,7 @@ interface DailyAttendanceViewProps {
   records: DailyAttendanceRecord[];
   onOpenCorrection: (record: DailyAttendanceRecord) => void;
   onOpenInjectSupp?: (record?: DailyAttendanceRecord) => void;
+  onOpenVacationForEmployee?: (empId: string, date: string) => void;
   onExportExcel: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   onExportPDF: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   settings: AppSettings;
@@ -57,6 +59,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   records,
   onOpenCorrection,
   onOpenInjectSupp,
+  onOpenVacationForEmployee,
   onExportExcel,
   onExportPDF,
   settings,
@@ -195,6 +198,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         if (selectedStatus === 'RETARD' && r.delayMinutes === 0) return false;
         if (selectedStatus === 'ABSENCE' && r.observation !== 'Absence') return false;
         if (selectedStatus === 'OFF' && r.observation !== 'OFF') return false;
+        if (selectedStatus === 'VACATION' && r.observation !== 'Congé payé' && !r.isPaidVacation) return false;
         if (selectedStatus === 'SUPP' && r.suppMinutes === 0) return false;
         if (selectedStatus === 'INJECTED_SUPP' && (!r.injectedSuppMinutes || r.injectedSuppMinutes === 0)) return false;
         if (
@@ -275,7 +279,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         label = 'Shift 2 (18:00–02:00)';
       } else if (shiftName.includes('Shift 3')) {
         color = 'bg-sky-50 text-sky-700 border-sky-200';
-        label = 'Shift 3 (08:30–16:00)';
+        label = 'Shift 3 (08:30–16:30)';
       } else if (shiftName.includes('Shift 4')) {
         color = 'bg-amber-50 text-amber-800 border-amber-200';
         icon = <span className="text-[10px]">🌙</span>;
@@ -336,6 +340,11 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         break;
       case 'OFF':
         bg = 'bg-slate-100 text-slate-600 border-slate-200';
+        break;
+      case 'Congé payé':
+      case 'Congé / Férié':
+        bg = 'bg-teal-50 text-teal-800 border-teal-200';
+        icon = <Palmtree className="h-3 w-3 text-teal-600" />;
         break;
     }
 
@@ -525,6 +534,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                 <option value="INJECTED_SUPP">⚡ Injected Supp Hours ({injectedSuppCount})</option>
               )}
               <option value="MISSING">Missing Punches (Entrée / Sortie)</option>
+              <option value="VACATION">🌴 Congé payé / Paid Vacation</option>
               <option value="ABSENCE">True Absences</option>
               <option value="OFF">Configured OFF Days</option>
             </select>
@@ -811,6 +821,21 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     {settings.activeRole !== 'Management' && (
                       <td className="py-2.5 px-3 text-right whitespace-nowrap">
                         <div className="inline-flex items-center gap-1">
+                          {onOpenVacationForEmployee && (
+                            <button
+                              id={`row-vacation-btn-${r.id}`}
+                              onClick={() => onOpenVacationForEmployee(r.employeeId, r.date)}
+                              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-xs transition-colors ${
+                                r.isPaidVacation
+                                  ? 'bg-teal-100 text-teal-900 border border-teal-300 hover:bg-teal-200'
+                                  : 'text-teal-700 hover:bg-teal-50 hover:text-teal-800'
+                              }`}
+                              title={`Manage or record paid vacation for ${r.employeeName}`}
+                            >
+                              <Palmtree className="h-3 w-3 text-teal-600" />
+                              <span>{r.isPaidVacation ? 'Congé' : '+ Congé'}</span>
+                            </button>
+                          )}
                           {onOpenInjectSupp && (
                             <button
                               id={`row-inject-supp-btn-${r.id}`}

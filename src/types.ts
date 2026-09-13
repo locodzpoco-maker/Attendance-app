@@ -70,7 +70,19 @@ export type AttendanceObservation =
   | 'Sortie après minuit'
   | 'SHIFT UNCLEAR'
   | 'OFF'
+  | 'Congé payé'
   | 'Congé / Férié';
+
+export interface PaidVacation {
+  id: string; // unique ID
+  employeeId: string;
+  employeeName: string;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD"
+  reason?: string; // e.g. "Annual Leave / Congé payé", "Family Event", etc.
+  createdAt: string; // ISO string
+  createdBy: string; // e.g. "Administrator"
+}
 
 export interface ManualAdjustment {
   date: string;
@@ -132,6 +144,10 @@ export interface DailyAttendanceRecord {
   suppHoursFormatted: string; // e.g. "0h 20" or "0"
   suppDecimalHours: number;
 
+  // Paid Vacation Info (if on approved paid leave)
+  isPaidVacation?: boolean;
+  vacationReason?: string;
+
   observation: AttendanceObservation;
   observationDetail: string; // e.g. "Retard 8 min", "Sortie non pointée", "OFF", etc.
   statusType: 'success' | 'warning' | 'danger' | 'info' | 'neutral';
@@ -145,6 +161,7 @@ export interface MonthlySummaryRecord {
   scheduleName: string;
   scheduledWorkingDays: number;
   presentDays: number;
+  paidVacationDays?: number; // Count of paid vacation working days credited
   absentDays: number;
   offDays: number;
   lateDays: number;
@@ -236,6 +253,10 @@ export interface ElectronAPI {
   saveAuditLogs: (logs: AttendanceAuditLog[]) => Promise<boolean>;
   getManualAdjustments: () => Promise<Record<string, ManualAdjustment>>;
   saveManualAdjustment: (adj: ManualAdjustment) => Promise<boolean>;
+  getPaidVacations?: () => Promise<PaidVacation[]>;
+  savePaidVacation?: (vacation: PaidVacation) => Promise<boolean>;
+  savePaidVacationsBatch?: (vacations: PaidVacation[]) => Promise<boolean>;
+  deletePaidVacation?: (id: string) => Promise<boolean>;
   getSettings: () => Promise<AppSettings | null>;
   saveSettings: (settings: AppSettings) => Promise<boolean>;
   getActiveDataset: () => Promise<RawAttendanceDataset | null>;

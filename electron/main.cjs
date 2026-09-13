@@ -133,6 +133,20 @@ function registerIpcHandlers() {
     return db.saveManualAdjustment(adj);
   });
 
+  // Paid Vacations
+  ipcMain.handle('db:get-paid-vacations', async () => {
+    return db.getPaidVacations();
+  });
+  ipcMain.handle('db:save-paid-vacation', async (_, vac) => {
+    return db.savePaidVacation(vac);
+  });
+  ipcMain.handle('db:save-paid-vacations-batch', async (_, vacs) => {
+    return db.savePaidVacationsBatch(vacs);
+  });
+  ipcMain.handle('db:delete-paid-vacation', async (_, id) => {
+    return db.deletePaidVacation(id);
+  });
+
   // Settings
   ipcMain.handle('db:get-settings', async () => {
     return db.getSettings();

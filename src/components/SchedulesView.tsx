@@ -42,7 +42,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   const [breakDurationMinutes, setBreakDurationMinutes] = useState(90);
   const [overtimeAllowed, setOvertimeAllowed] = useState(false);
   const [overtimeStartTime, setOvertimeStartTime] = useState('18:00');
-  const [normalWorkedHours, setNormalWorkedHours] = useState(6.0);
+  const [normalWorkedHours, setNormalWorkedHours] = useState(7.0);
   const [workingDays, setWorkingDays] = useState<DayOfWeek[]>([
     'Sunday',
     'Monday',

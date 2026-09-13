@@ -53,7 +53,7 @@ export function generateReferenceDataset(): RawAttendanceDataset {
       // Shifts rotate by week / day patterns:
       // Shift 1: 10:00 - 18:00
       // Shift 2: 18:00 - 02:00 (crosses midnight)
-      // Shift 3: 08:30 - 16:00
+      // Shift 3: 08:30 - 16:30
       // Shift 4: 16:00 - 00:00 (crosses midnight)
       const shiftType = (Math.floor(d / 7) + idx) % 4;
 
@@ -80,10 +80,10 @@ export function generateReferenceDataset(): RawAttendanceDataset {
           rawPunches: [inStr, outStr],
         };
       } else if (shiftType === 2) {
-        // Shift 3: Check-in around 08:30 (e.g. 08:35), exit 16:02
+        // Shift 3: Check-in around 08:30 (e.g. 08:35), exit 16:34
         const inMin = 28 + ((d + idx) % 9);
         const inStr = `08:${inMin}`;
-        const outStr = (d + idx) % 6 === 0 ? "16:25" : "16:05";
+        const outStr = (d + idx) % 6 === 0 ? "16:55" : "16:34";
         days[d] = {
           dayNumber: d,
           dateStr: dStr(d),

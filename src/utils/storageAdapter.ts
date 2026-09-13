@@ -10,6 +10,7 @@ import {
   RawAttendanceDataset,
   DatabaseStats,
   BackupItem,
+  PaidVacation,
 } from '../types';
 
 /**
@@ -119,6 +120,7 @@ export async function loadInitialAppData(): Promise<{
   auditLogs: AttendanceAuditLog[] | null;
   manualAdjustments: Record<string, ManualAdjustment> | null;
   activeDataset: RawAttendanceDataset | null;
+  paidVacations: PaidVacation[] | null;
 }> {
   if (isElectronApp() && window.electronAPI) {
     try {
@@ -131,6 +133,7 @@ export async function loadInitialAppData(): Promise<{
         auditLogs,
         manualAdjustments,
         activeDataset,
+        paidVacations,
       ] = await Promise.all([
         window.electronAPI.getEmployees(),
         window.electronAPI.getSchedules(),
@@ -140,6 +143,7 @@ export async function loadInitialAppData(): Promise<{
         window.electronAPI.getAuditLogs(),
         window.electronAPI.getManualAdjustments(),
         window.electronAPI.getActiveDataset(),
+        window.electronAPI.getPaidVacations ? window.electronAPI.getPaidVacations() : Promise.resolve([]),
       ]);
 
       const monthlySummary = await window.electronAPI.getMonthlySummaries('CURRENT');
@@ -154,6 +158,7 @@ export async function loadInitialAppData(): Promise<{
         auditLogs: auditLogs && auditLogs.length > 0 ? auditLogs : null,
         manualAdjustments,
         activeDataset,
+        paidVacations: paidVacations && paidVacations.length > 0 ? paidVacations : null,
       };
     } catch (e) {
       console.error('Error loading data from SQLite:', e);
@@ -180,10 +185,32 @@ export async function loadInitialAppData(): Promise<{
     auditLogs: getLocal('ams_audit_logs'),
     manualAdjustments: getLocal('ams_adjustments'),
     activeDataset: getLocal('ams_dataset'),
+    paidVacations: getLocal('ams_paid_vacations'),
   };
 }
 
 /* ================= Persistence Functions ================= */
+
+export async function persistPaidVacations(vacations: PaidVacation[]): Promise<void> {
+  if (isElectronApp() && window.electronAPI && window.electronAPI.savePaidVacationsBatch) {
+    await window.electronAPI.savePaidVacationsBatch(vacations);
+  }
+  try {
+    localStorage.setItem('ams_paid_vacations', JSON.stringify(vacations));
+  } catch (e) {}
+}
+
+export async function persistPaidVacation(vacation: PaidVacation): Promise<void> {
+  if (isElectronApp() && window.electronAPI && window.electronAPI.savePaidVacation) {
+    await window.electronAPI.savePaidVacation(vacation);
+  }
+}
+
+export async function deletePaidVacationFromStorage(id: string): Promise<void> {
+  if (isElectronApp() && window.electronAPI && window.electronAPI.deletePaidVacation) {
+    await window.electronAPI.deletePaidVacation(id);
+  }
+}
 
 export async function persistEmployees(employees: Employee[]): Promise<void> {
   if (isElectronApp() && window.electronAPI) {

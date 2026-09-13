@@ -205,6 +205,17 @@ class AttendanceDatabase {
         id TEXT PRIMARY KEY,
         data_json TEXT NOT NULL
       );
+
+      CREATE TABLE IF NOT EXISTS paid_vacations (
+        id TEXT PRIMARY KEY,
+        employee_id TEXT NOT NULL,
+        employee_name TEXT NOT NULL,
+        start_date TEXT NOT NULL,
+        end_date TEXT NOT NULL,
+        reason TEXT,
+        created_at TEXT NOT NULL,
+        created_by TEXT NOT NULL
+      );
     `);
   }
 
@@ -335,21 +346,37 @@ class AttendanceDatabase {
     return res[0].values.map((row) => {
       const obj = {};
       cols.forEach((col, idx) => (obj[col] = row[idx]));
+      const isAdmin2 = obj.id === 'admin_g2' || (obj.name && String(obj.name).includes('Admin Group 2'));
+      const normalWorked = isAdmin2 ? 4.0 : 7.0;
+      const parsedDays = JSON.parse(obj.work_days_json || '[]');
+
       return {
         id: obj.id,
         name: obj.name,
+        groupName: obj.name,
         department: obj.department,
+        startTime: obj.check_in,
+        endTime: obj.check_out,
+        crossesMidnight: Boolean(obj.is_cross_midnight),
+        hasBreak: obj.break_type !== 'None',
+        breakStart: obj.break_start || undefined,
+        breakEnd: obj.break_end || undefined,
+        breakDurationMinutes: obj.break_duration_minutes,
+        overtimeAllowed: obj.max_overtime_minutes > 0,
+        overtimeStartTime: obj.check_out,
+        normalWorkedHours: normalWorked,
+        workingDays: parsedDays.length > 0 ? parsedDays : ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
+        arrivalGraceMinutes: 10,
+        breakGraceMinutes: 10,
+        overtimeGraceMinutes: 15,
         isActive: Boolean(obj.is_active),
         weeklyHours: obj.weekly_hours,
-        workDays: JSON.parse(obj.work_days_json || '[]'),
+        workDays: parsedDays,
         checkIn: obj.check_in,
         checkOut: obj.check_out,
         maxOvertimeMinutes: obj.max_overtime_minutes,
         isCrossMidnight: Boolean(obj.is_cross_midnight),
         breakType: obj.break_type,
-        breakDurationMinutes: obj.break_duration_minutes,
-        breakStart: obj.break_start || undefined,
-        breakEnd: obj.break_end || undefined,
         flexibleBreakWindowStart: obj.flexible_break_window_start || undefined,
         flexibleBreakWindowEnd: obj.flexible_break_window_end || undefined,
       };
@@ -910,6 +937,107 @@ class AttendanceDatabase {
     stmt.run({ $json: JSON.stringify(dataset) });
     stmt.free();
     return this.persist();
+  }
+
+  /* ================= PAID VACATIONS ================= */
+  getPaidVacations() {
+    if (!this.db) return [];
+    try {
+      const res = this.db.exec(`
+        SELECT id, employee_id, employee_name, start_date, end_date, reason, created_at, created_by
+        FROM paid_vacations
+        ORDER BY start_date DESC;
+      `);
+      if (!res || res.length === 0) return [];
+      return res[0].values.map(([id, empId, empName, start, end, reason, created_at, created_by]) => ({
+        id,
+        employeeId: empId,
+        employeeName: empName,
+        startDate: start,
+        endDate: end,
+        reason: reason || '',
+        createdAt: created_at,
+        createdBy: created_by,
+      }));
+    } catch (e) {
+      console.warn('Error reading paid_vacations table:', e);
+      return [];
+    }
+  }
+
+  savePaidVacation(vacation) {
+    if (!this.db || !vacation) return false;
+    try {
+      const stmt = this.db.prepare(`
+        INSERT INTO paid_vacations (id, employee_id, employee_name, start_date, end_date, reason, created_at, created_by)
+        VALUES ($id, $empId, $empName, $start, $end, $reason, $createdAt, $createdBy)
+        ON CONFLICT(id) DO UPDATE SET
+          employee_id = excluded.employee_id,
+          employee_name = excluded.employee_name,
+          start_date = excluded.start_date,
+          end_date = excluded.end_date,
+          reason = excluded.reason;
+      `);
+      stmt.run({
+        $id: String(vacation.id),
+        $empId: String(vacation.employeeId),
+        $empName: String(vacation.employeeName),
+        $start: String(vacation.startDate),
+        $end: String(vacation.endDate),
+        $reason: vacation.reason || '',
+        $createdAt: vacation.createdAt || new Date().toISOString(),
+        $createdBy: vacation.createdBy || 'Administrator',
+      });
+      stmt.free();
+      return this.persist();
+    } catch (e) {
+      console.error('Error saving paid vacation:', e);
+      return false;
+    }
+  }
+
+  savePaidVacationsBatch(vacations) {
+    if (!this.db || !Array.isArray(vacations)) return false;
+    this.db.run('BEGIN TRANSACTION;');
+    try {
+      this.db.run('DELETE FROM paid_vacations;');
+      const stmt = this.db.prepare(`
+        INSERT INTO paid_vacations (id, employee_id, employee_name, start_date, end_date, reason, created_at, created_by)
+        VALUES ($id, $empId, $empName, $start, $end, $reason, $createdAt, $createdBy);
+      `);
+      for (const v of vacations) {
+        stmt.run({
+          $id: String(v.id),
+          $empId: String(v.employeeId),
+          $empName: String(v.employeeName),
+          $start: String(v.startDate),
+          $end: String(v.endDate),
+          $reason: v.reason || '',
+          $createdAt: v.createdAt || new Date().toISOString(),
+          $createdBy: v.createdBy || 'Administrator',
+        });
+      }
+      stmt.free();
+      this.db.run('COMMIT;');
+      return this.persist();
+    } catch (e) {
+      this.db.run('ROLLBACK;');
+      console.error('Error saving paid vacations batch:', e);
+      return false;
+    }
+  }
+
+  deletePaidVacation(id) {
+    if (!this.db || !id) return false;
+    try {
+      const stmt = this.db.prepare(`DELETE FROM paid_vacations WHERE id = $id;`);
+      stmt.run({ $id: String(id) });
+      stmt.free();
+      return this.persist();
+    } catch (e) {
+      console.error('Error deleting paid vacation:', e);
+      return false;
+    }
   }
 
   /* ================= BACKUP & RESTORE ================= */

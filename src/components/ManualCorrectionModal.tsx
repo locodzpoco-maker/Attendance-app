@@ -142,7 +142,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 <option value="">Auto-Detect (based on first check-in)</option>
                 <option value="stock_g1">Shift 1 (10:00 – 18:00, Break 13:00–14:00, OT &gt; 18:00)</option>
                 <option value="stock_g2">Shift 2 (18:00 – 02:00 Night, Break 21:00–22:00, OT &gt; 02:00)</option>
-                <option value="stock_g3">Shift 3 (08:30 – 16:00, Break 12:00–13:00, OT &gt; 16:00)</option>
+                <option value="stock_g3">Shift 3 (08:30 – 16:30, Break 12:00–13:00, OT &gt; 16:30)</option>
                 <option value="stock_g4">Shift 4 (16:00 – 00:00 Midnight, Break 21:00–22:00, OT &gt; 00:00)</option>
               </select>
               <span className="block text-[11px] text-slate-400 mt-1">

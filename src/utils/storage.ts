@@ -1,6 +1,6 @@
-import { AppSettings, WorkSchedule, Employee, ManualAdjustment, AttendanceAuditLog, RawAttendanceDataset, HistoricalPeriodRecord } from '../types';
+import { AppSettings, WorkSchedule, Employee, ManualAdjustment, AttendanceAuditLog, RawAttendanceDataset, HistoricalPeriodRecord, PaidVacation } from '../types';
 
-const STORAGE_KEYS = {
+export const STORAGE_KEYS = {
   SETTINGS: 'ams_settings',
   SCHEDULES: 'ams_schedules',
   EMPLOYEES: 'ams_employees',
@@ -10,6 +10,7 @@ const STORAGE_KEYS = {
   ACTIVE_DATASET: 'ams_active_dataset',
   HISTORICAL_PERIODS: 'ams_historical_periods',
   SELECTED_PERIOD_ID: 'ams_selected_period_id',
+  PAID_VACATIONS: 'ams_paid_vacations',
 };
 
 // Clean up duplicate legacy keys on module load to free quota space
@@ -68,6 +69,10 @@ export function saveStorageItem<T>(key: string, value: T): boolean {
         window.electronAPI.saveAuditLogs(value as any).catch(console.error);
       } else if (key === 'ams_dataset' && typeof value === 'object') {
         window.electronAPI.saveActiveDataset(value as any).catch(console.error);
+      } else if (key === 'ams_paid_vacations' && Array.isArray(value)) {
+        if (window.electronAPI.savePaidVacationsBatch) {
+          window.electronAPI.savePaidVacationsBatch(value as any).catch(console.error);
+        }
       }
     } catch (e) {
       console.warn('Error syncing to Electron SQLite:', e);
@@ -126,13 +131,15 @@ export interface AppBackupPayload {
   schedules: WorkSchedule[];
   employees: Employee[];
   manualAdjustments: Record<string, ManualAdjustment>;
+  paidVacations?: PaidVacation[];
 }
 
 export function exportBackupToFile(
   settings: AppSettings,
   schedules: WorkSchedule[],
   employees: Employee[],
-  manualAdjustments: Record<string, ManualAdjustment>
+  manualAdjustments: Record<string, ManualAdjustment>,
+  paidVacations?: PaidVacation[]
 ) {
   const payload: AppBackupPayload = {
     version: '2.0',
@@ -141,6 +148,7 @@ export function exportBackupToFile(
     schedules,
     employees,
     manualAdjustments,
+    paidVacations,
   };
 
   const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(

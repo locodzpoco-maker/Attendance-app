@@ -9,6 +9,7 @@ import {
   ManualAdjustment,
   AttendanceAuditLog,
   HistoricalPeriodRecord,
+  PaidVacation,
 } from './types';
 import { DEFAULT_SCHEDULES } from './utils/schedules';
 import { DEFAULT_EMPLOYEES, findUnmappedEmployees } from './utils/employees';
@@ -40,7 +41,8 @@ import { ImportModal } from './components/ImportModal';
 import { ManualCorrectionModal } from './components/ManualCorrectionModal';
 import { InjectSuppHoursModal, InjectSuppHoursParams } from './components/InjectSuppHoursModal';
 import { DesktopDatabaseModal } from './components/DesktopDatabaseModal';
-import { isElectronApp, loadInitialAppData } from './utils/storageAdapter';
+import { PaidVacationModal } from './components/PaidVacationModal';
+import { isElectronApp, loadInitialAppData, persistPaidVacations } from './utils/storageAdapter';
 
 export default function App() {
   // Desktop SQLite Modal State
@@ -85,7 +87,24 @@ export default function App() {
       getStorageItem<WorkSchedule[] | null>('ams_schedules_v3', null) ||
       getStorageItem<WorkSchedule[] | null>('ams_schedules_v2', null);
     if (Array.isArray(saved) && saved.length > 0) {
-      return saved;
+      return saved.map((s) => {
+        if (s.id === 'admin_g2' || s.groupName === 'Admin Group 2' || s.name.includes('Admin Group 2')) {
+          return s;
+        }
+        if (s.id === 'stock_g3') {
+          return {
+            ...s,
+            name: 'Shift 3 (08:30 - 16:30)',
+            endTime: '16:30',
+            overtimeStartTime: '16:30',
+            normalWorkedHours: 7.0,
+          };
+        }
+        return {
+          ...s,
+          normalWorkedHours: 7.0,
+        };
+      });
     }
     return DEFAULT_SCHEDULES;
   });
@@ -161,6 +180,14 @@ export default function App() {
   const [injectSuppTargetRecord, setInjectSuppTargetRecord] =
     useState<DailyAttendanceRecord | null>(null);
 
+  // Paid Vacations State
+  const [paidVacations, setPaidVacations] = useState<PaidVacation[]>(() => {
+    return getStorageItem<PaidVacation[]>('ams_paid_vacations', []);
+  });
+  const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
+  const [vacationModalPreSelectedEmp, setVacationModalPreSelectedEmp] = useState<Employee | null>(null);
+  const [vacationModalPreSelectedDate, setVacationModalPreSelectedDate] = useState<string | undefined>(undefined);
+
   const handleOpenInjectSupp = (record?: DailyAttendanceRecord) => {
     setInjectSuppTargetRecord(record || null);
     setIsInjectSuppModalOpen(true);
@@ -182,6 +209,10 @@ export default function App() {
   useEffect(() => {
     saveStorageItem('ams_employees', employees);
   }, [employees]);
+
+  useEffect(() => {
+    saveStorageItem('ams_paid_vacations', paidVacations);
+  }, [paidVacations]);
 
   useEffect(() => {
     saveStorageItem('ams_adjustments', manualAdjustments);
@@ -211,12 +242,36 @@ export default function App() {
     try {
       const data = await loadInitialAppData();
       if (data.employees && data.employees.length > 0) setEmployees(data.employees);
-      if (data.schedules && data.schedules.length > 0) setSchedules(data.schedules);
+      if (data.schedules && data.schedules.length > 0) {
+        const sanitized = data.schedules.map((s) => {
+          if (s.id === 'admin_g2' || s.groupName === 'Admin Group 2' || (s.name && s.name.includes('Admin Group 2'))) {
+            return s;
+          }
+          if (s.id === 'stock_g3') {
+            return {
+              ...s,
+              name: 'Shift 3 (08:30 - 16:30)',
+              endTime: '16:30',
+              overtimeStartTime: '16:30',
+              normalWorkedHours: 7.0,
+            };
+          }
+          return {
+            ...s,
+            normalWorkedHours: 7.0,
+          };
+        });
+        setSchedules(sanitized);
+      }
       if (data.settings) setSettings(data.settings);
       if (data.manualAdjustments) setManualAdjustments(data.manualAdjustments);
       if (data.auditLogs && data.auditLogs.length > 0) setAuditLogs(data.auditLogs);
       if (data.historicalPeriods && data.historicalPeriods.length > 0) setHistoricalPeriods(data.historicalPeriods);
       if (data.activeDataset) setActiveDataset(data.activeDataset);
+      if (data.paidVacations && Array.isArray(data.paidVacations)) {
+        setPaidVacations(data.paidVacations);
+        saveStorageItem('ams_paid_vacations', data.paidVacations);
+      }
     } catch (e) {
       console.warn('Could not load data from SQLite:', e);
     }
@@ -237,9 +292,10 @@ export default function App() {
       schedules,
       employees,
       manualAdjustments,
+      paidVacations,
       settings,
     });
-  }, [activeDataset, schedules, employees, manualAdjustments, settings]);
+  }, [activeDataset, schedules, employees, manualAdjustments, paidVacations, settings]);
 
   const handleRecalculate = useCallback(() => {
     setIsCalculating(true);
@@ -258,6 +314,7 @@ export default function App() {
       schedules,
       employees,
       manualAdjustments,
+      paidVacations,
       settings,
     });
 
@@ -499,9 +556,53 @@ export default function App() {
     saveStorageItem('ams_settings', newSettings);
   };
 
+  // Vacation handlers
+  const handleOpenVacationModal = (empId?: string, date?: string) => {
+    if (empId) {
+      const found = employees.find((e) => e.id === empId || e.id.trim() === empId.trim());
+      setVacationModalPreSelectedEmp(
+        found || {
+          id: empId,
+          name: empId,
+          companyDepartment: 'Stock & Logistique',
+          groupName: 'Stock',
+          scheduleId: 'stock_dynamic',
+          status: 'Active',
+        }
+      );
+    } else {
+      setVacationModalPreSelectedEmp(null);
+    }
+    setVacationModalPreSelectedDate(date);
+    setIsVacationModalOpen(true);
+  };
+
+  const handleSaveVacation = (vacation: PaidVacation) => {
+    setPaidVacations((prev) => {
+      const filtered = prev.filter((v) => v.id !== vacation.id);
+      const updated = [...filtered, vacation];
+      saveStorageItem('ams_paid_vacations', updated);
+      if (isElectronApp()) {
+        persistPaidVacations(updated);
+      }
+      return updated;
+    });
+  };
+
+  const handleDeleteVacation = (vacationId: string) => {
+    setPaidVacations((prev) => {
+      const updated = prev.filter((v) => v.id !== vacationId);
+      saveStorageItem('ams_paid_vacations', updated);
+      if (isElectronApp()) {
+        persistPaidVacations(updated);
+      }
+      return updated;
+    });
+  };
+
   // Export / Import entire application config (schedules, settings, employee assignments)
   const handleExportBackup = () => {
-    exportBackupToFile(settings, schedules, employees, manualAdjustments);
+    exportBackupToFile(settings, schedules, employees, manualAdjustments, paidVacations);
   };
 
   const handleImportBackup = async (file: File) => {
@@ -522,6 +623,10 @@ export default function App() {
       if (backup.manualAdjustments) {
         setManualAdjustments(backup.manualAdjustments);
         saveStorageItem('ams_adjustments', backup.manualAdjustments);
+      }
+      if (Array.isArray(backup.paidVacations)) {
+        setPaidVacations(backup.paidVacations);
+        saveStorageItem('ams_paid_vacations', backup.paidVacations);
       }
     } catch (e: any) {
       alert(`Could not restore backup file: ${e.message || e}`);
@@ -584,6 +689,8 @@ export default function App() {
         onUpdateRole={(role) => setSettings((s) => ({ ...s, activeRole: role }))}
         unmappedEmployeesCount={unmappedEmployeesCount}
         onOpenDatabaseModal={() => setIsDatabaseModalOpen(true)}
+        onOpenVacationModal={() => handleOpenVacationModal()}
+        vacationCount={paidVacations.length}
       />
 
       {/* Main Content Area */}
@@ -610,6 +717,7 @@ export default function App() {
             records={dailyRecords}
             onOpenCorrection={(record) => setActiveCorrectionRecord(record)}
             onOpenInjectSupp={handleOpenInjectSupp}
+            onOpenVacationForEmployee={handleOpenVacationModal}
             onExportExcel={handleExportDailyExcel}
             onExportPDF={handleExportDailyPDF}
             settings={settings}
@@ -635,6 +743,7 @@ export default function App() {
             onAddBatchEmployees={handleAddBatchEmployees}
             onUpdateEmployee={handleUpdateEmployee}
             onResetDefaults={() => setEmployees(DEFAULT_EMPLOYEES)}
+            onOpenVacationForEmployee={(empId) => handleOpenVacationModal(empId)}
             settings={settings}
             rawEmployeesFromDataset={activeDataset?.employees || []}
           />
@@ -689,6 +798,8 @@ export default function App() {
               saveStorageItem('ams_adjustments', {});
               setAuditLogs([]);
               saveStorageItem('ams_audit_logs', []);
+              setPaidVacations([]);
+              saveStorageItem('ams_paid_vacations', []);
             }}
           />
         )}
@@ -731,6 +842,24 @@ export default function App() {
         }}
         onInjectSupp={handleInjectSuppHours}
         currentUser={settings.activeRole}
+      />
+
+      {/* Paid Vacation Management Modal */}
+      <PaidVacationModal
+        isOpen={isVacationModalOpen}
+        onClose={() => {
+          setIsVacationModalOpen(false);
+          setVacationModalPreSelectedEmp(null);
+          setVacationModalPreSelectedDate(undefined);
+        }}
+        employees={employees}
+        schedules={schedules}
+        paidVacations={paidVacations}
+        onSaveVacation={handleSaveVacation}
+        onDeleteVacation={handleDeleteVacation}
+        preSelectedEmployee={vacationModalPreSelectedEmp}
+        preSelectedDate={vacationModalPreSelectedDate}
+        currentUserRole={settings.activeRole}
       />
     </div>
   );

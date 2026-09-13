@@ -7,6 +7,7 @@ import {
   AttendanceObservation,
   ManualAdjustment,
   AppSettings,
+  PaidVacation,
 } from '../types';
 import {
   DEFAULT_SCHEDULES,
@@ -27,6 +28,7 @@ export interface CalculationOptions {
   schedules?: WorkSchedule[];
   employees?: Employee[];
   manualAdjustments?: Record<string, ManualAdjustment>; // key: "empId_date"
+  paidVacations?: PaidVacation[];
   settings?: AppSettings;
 }
 
@@ -213,6 +215,100 @@ export function calculateAttendance(
       const arrivalGrace = assignedSchedule.arrivalGraceMinutes ?? globalArrivalGrace;
       const breakGrace = assignedSchedule.breakGraceMinutes ?? globalBreakGrace;
       const overtimeGrace = assignedSchedule.overtimeGraceMinutes ?? globalOvertimeGrace;
+
+      // Check if employee is on approved Paid Vacation for this date
+      const activeVacation = options?.paidVacations?.find((v) => {
+        const matchEmp =
+          v.employeeId === empId ||
+          (dbEmp && v.employeeId === dbEmp.id) ||
+          v.employeeId.trim() === empId.trim() ||
+          v.employeeId.trim().replace(/^0+/, '') === empId.trim().replace(/^0+/, '');
+        return matchEmp && dateStr >= v.startDate && dateStr <= v.endDate;
+      });
+
+      if (activeVacation) {
+        const isVacationWorkingDay = assignedSchedule.workingDays.includes(dayOfWeek);
+        const targetNormalMins = Math.round(assignedSchedule.normalWorkedHours * 60);
+        const injectedSupp = manualAdj?.injectedSuppMinutes || 0;
+
+        let observation: AttendanceObservation = 'Congé payé';
+        let observationDetail = activeVacation.reason
+          ? `Congé payé (${activeVacation.reason})`
+          : 'Congé payé';
+        let statusType: 'success' | 'warning' | 'danger' | 'info' | 'neutral' = 'info';
+        let workedMinutes = 0;
+
+        if (isVacationWorkingDay) {
+          observation = 'Congé payé';
+          workedMinutes = targetNormalMins;
+          statusType = 'info';
+        } else {
+          observation = 'OFF';
+          observationDetail = 'OFF (Congé)';
+          statusType = 'neutral';
+          workedMinutes = 0;
+        }
+
+        const suppMinutes = injectedSupp;
+        const workedHoursFormatted = formatMinutesToHoursAndMinutes(workedMinutes);
+        const suppHoursFormatted = suppMinutes > 0 ? formatMinutesToHoursAndMinutes(suppMinutes) : '0';
+        const workedDecimalHours = Math.round((workedMinutes / 60) * 100) / 100;
+        const suppDecimalHours = Math.round((suppMinutes / 60) * 100) / 100;
+        const dateParts = dateStr.split('-');
+        const formattedDate = `${dateParts[2]}/${dateParts[1]}/${dateParts[0]}`;
+
+        dailyRecords.push({
+          id: recordKey,
+          date: dateStr,
+          formattedDate,
+          dayOfWeek,
+          employeeId: empId,
+          employeeName: rawEmp.name,
+          rawDepartment: rawEmp.rawDepartment,
+          companyDepartment: companyDept,
+          groupName: dayGroupName,
+          scheduleId: assignedSchedule.id,
+          scheduleName: isStock
+            ? isShiftUnclear
+              ? 'SHIFT UNCLEAR'
+              : detectedShiftName !== '-'
+                ? `Stock ${detectedShiftName}`
+                : 'Stock (Dynamic)'
+            : assignedSchedule.name,
+          isWorkingDay: isVacationWorkingDay,
+          isDynamicShift: isStock,
+          detectedShiftId,
+          detectedShiftName,
+          isShiftUnclear: false,
+          rawPunches,
+          rawPunchesText,
+          firstCheckInTime,
+          secondCheckInTime: null,
+          entryTime: manualAdj?.adjustedEntry || (rawPunches.length > 0 ? rawPunches[0] : null),
+          exitTime: manualAdj?.adjustedExit || (rawPunches.length > 1 ? rawPunches[rawPunches.length - 1] : null),
+          isOvernightPunch: false,
+          manualAdjustment: manualAdj,
+          isManuallyAdjusted: Boolean(manualAdj),
+          injectedSuppMinutes: injectedSupp > 0 ? injectedSupp : undefined,
+          firstCheckInDelayMinutes: 0,
+          secondCheckInDelayMinutes: 0,
+          delayMinutes: 0,
+          breakDurationMinutes: assignedSchedule.hasBreak ? assignedSchedule.breakDurationMinutes : 0,
+          workedMinutes,
+          workedHoursFormatted,
+          workedDecimalHours,
+          suppMinutes,
+          suppHoursFormatted,
+          suppDecimalHours,
+          observation,
+          observationDetail,
+          statusType,
+          isPaidVacation: true,
+          vacationReason: activeVacation.reason,
+        });
+
+        continue; // Employee is on approved paid vacation for this date
+      }
 
       let entryTime: string | null = null;
       let exitTime: string | null = null;
@@ -580,6 +676,7 @@ export function generateMonthlySummaryFromDailyRecords(
         scheduleName: record.isDynamicShift ? 'Stock (Dynamic Daily Shifts)' : record.scheduleName,
         scheduledWorkingDays: 0,
         presentDays: 0,
+        paidVacationDays: 0,
         absentDays: 0,
         offDays: 0,
         lateDays: 0,
@@ -601,6 +698,9 @@ export function generateMonthlySummaryFromDailyRecords(
 
     if (record.observation === 'OFF') {
       summary.offDays += 1;
+    } else if (record.observation === 'Congé payé' || record.observation === 'Congé / Férié' || record.isPaidVacation) {
+      summary.paidVacationDays = (summary.paidVacationDays || 0) + 1;
+      summary.presentDays += 1;
     } else if (record.observation === 'Absence') {
       summary.absentDays += 1;
     } else if (record.observation === 'Entrée non pointée') {

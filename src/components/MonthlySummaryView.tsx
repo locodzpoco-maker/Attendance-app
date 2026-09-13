@@ -11,6 +11,7 @@ import {
   CalendarRange,
   X,
   RotateCcw,
+  Palmtree,
 } from 'lucide-react';
 import { generateMonthlySummaryFromDailyRecords } from '../utils/calculator';
 
@@ -154,6 +155,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
     let totMissing = 0;
     let totPresent = 0;
     let totAbsent = 0;
+    let totVacation = 0;
 
     filteredSummaries.forEach((s) => {
       totWorkedMins += s.totalWorkedMinutes;
@@ -163,6 +165,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
       totMissing += s.missingPunchesDays;
       totPresent += s.presentDays;
       totAbsent += s.absentDays;
+      totVacation += s.paidVacationDays || 0;
     });
 
     return {
@@ -173,6 +176,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
       missing: totMissing,
       present: totPresent,
       absent: totAbsent,
+      vacation: totVacation,
     };
   }, [filteredSummaries]);
 
@@ -381,6 +385,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                 <th className="py-3 px-3">Department</th>
                 <th className="py-3 px-3">Group & Schedule</th>
                 <th className="py-3 px-3 text-center">Present Days</th>
+                <th className="py-3 px-3 text-center text-teal-800">Congé Payé</th>
                 <th className="py-3 px-3 text-center">Absent Days</th>
                 <th className="py-3 px-3 text-center">OFF Days</th>
                 <th className="py-3 px-3 text-center">Worked Hours</th>
@@ -393,7 +398,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {filteredSummaries.length === 0 ? (
                 <tr>
-                  <td colSpan={12} className="py-12 text-center text-slate-400">
+                  <td colSpan={13} className="py-12 text-center text-slate-400">
                     No matching monthly summary data found.
                   </td>
                 </tr>
@@ -424,6 +429,18 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                     {/* Present Days (excluding OFF) */}
                     <td className="py-2.5 px-3 text-center font-semibold text-emerald-600">
                       {s.presentDays}
+                    </td>
+
+                    {/* Paid Vacation Days (Congé payé) */}
+                    <td className="py-2.5 px-3 text-center">
+                      {s.paidVacationDays && s.paidVacationDays > 0 ? (
+                        <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 border border-teal-200 px-1.5 py-0.5 text-xs font-bold text-teal-700">
+                          <Palmtree className="h-3 w-3 text-teal-600" />
+                          {s.paidVacationDays} j
+                        </span>
+                      ) : (
+                        <span className="text-slate-300">-</span>
+                      )}
                     </td>
 
                     {/* Absent Days (excluding OFF) */}
@@ -490,6 +507,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                     Aggregated Total ({filteredSummaries.length} Employees)
                   </td>
                   <td className="py-3 px-3 text-center text-emerald-700">{aggregates.present}</td>
+                  <td className="py-3 px-3 text-center text-teal-800 font-bold">{aggregates.vacation}</td>
                   <td className="py-3 px-3 text-center text-rose-700">{aggregates.absent}</td>
                   <td className="py-3 px-3 text-center text-slate-400">-</td>
                   <td className="py-3 px-3 text-center text-slate-900">{aggregates.workedHours}</td>
