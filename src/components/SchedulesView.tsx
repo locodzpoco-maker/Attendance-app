@@ -1,7 +1,8 @@
 import React, { useState, useRef } from 'react';
-import { WorkSchedule, DayOfWeek } from '../types';
+import { WorkSchedule, DayOfWeek, AppSettings } from '../types';
 import { DAYS_OF_WEEK } from '../utils/schedules';
-import { Clock, Plus, Edit2, Check, ShieldCheck, Sun, Moon, Trash2, RotateCcw, CheckCircle2, Download, Upload } from 'lucide-react';
+import { Clock, Plus, Edit2, Sun, Moon, Trash2, RotateCcw, CheckCircle2, Download, Upload } from 'lucide-react';
+import { getTranslations, translateDayOfWeek, translateShiftName } from '../utils/i18n';
 
 interface SchedulesViewProps {
   schedules: WorkSchedule[];
@@ -12,6 +13,7 @@ interface SchedulesViewProps {
   onExportBackup?: () => void;
   onImportBackup?: (file: File) => void;
   canEdit: boolean;
+  settings?: AppSettings;
 }
 
 export const SchedulesView: React.FC<SchedulesViewProps> = ({
@@ -23,7 +25,9 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   onExportBackup,
   onImportBackup,
   canEdit,
+  settings,
 }) => {
+  const t = getTranslations(settings?.language);
   const [editingSchedule, setEditingSchedule] = useState<WorkSchedule | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
@@ -50,9 +54,31 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     'Wednesday',
     'Thursday',
   ]);
-  const [overtimeGraceMinutes, setOvertimeGraceMinutes] = useState(15);
   const [arrivalGraceMinutes, setArrivalGraceMinutes] = useState(10);
   const [breakGraceMinutes, setBreakGraceMinutes] = useState(10);
+  const [overtimeGraceMinutes, setOvertimeGraceMinutes] = useState(15);
+
+  const openAdd = () => {
+    setEditingSchedule(null);
+    setName('');
+    setGroupName('');
+    setDepartment('Stock & Logistique');
+    setStartTime('08:30');
+    setEndTime('16:30');
+    setCrossesMidnight(false);
+    setHasBreak(true);
+    setBreakStart('12:00');
+    setBreakEnd('13:00');
+    setBreakDurationMinutes(60);
+    setOvertimeAllowed(true);
+    setOvertimeStartTime('16:30');
+    setNormalWorkedHours(7.0);
+    setWorkingDays(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']);
+    setArrivalGraceMinutes(10);
+    setBreakGraceMinutes(10);
+    setOvertimeGraceMinutes(15);
+    setModalOpen(true);
+  };
 
   const openEdit = (s: WorkSchedule) => {
     setEditingSchedule(s);
@@ -69,32 +95,10 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     setOvertimeAllowed(s.overtimeAllowed);
     setOvertimeStartTime(s.overtimeStartTime || s.endTime);
     setNormalWorkedHours(s.normalWorkedHours);
-    setWorkingDays([...s.workingDays]);
-    setOvertimeGraceMinutes(s.overtimeGraceMinutes);
+    setWorkingDays(s.workingDays);
     setArrivalGraceMinutes(s.arrivalGraceMinutes ?? 10);
     setBreakGraceMinutes(s.breakGraceMinutes ?? 10);
-    setModalOpen(true);
-  };
-
-  const openAdd = () => {
-    setEditingSchedule(null);
-    setName('Custom Shift');
-    setGroupName('Custom Group');
-    setDepartment('Stock & Logistique');
-    setStartTime('08:00');
-    setEndTime('16:00');
-    setCrossesMidnight(false);
-    setHasBreak(true);
-    setBreakStart('12:00');
-    setBreakEnd('13:00');
-    setBreakDurationMinutes(60);
-    setOvertimeAllowed(true);
-    setOvertimeStartTime('16:00');
-    setNormalWorkedHours(7.0);
-    setWorkingDays(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']);
-    setOvertimeGraceMinutes(15);
-    setArrivalGraceMinutes(10);
-    setBreakGraceMinutes(10);
+    setOvertimeGraceMinutes(s.overtimeGraceMinutes ?? 15);
     setModalOpen(true);
   };
 
@@ -141,14 +145,14 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
 
   const handleDelete = (s: WorkSchedule) => {
     if (!onDeleteSchedule) return;
-    if (window.confirm(`Are you sure you want to delete the schedule "${s.groupName}"?`)) {
+    if (window.confirm(`${t.deleteScheduleConfirm} "${s.groupName}"?`)) {
       onDeleteSchedule(s.id);
     }
   };
 
   const handleReset = () => {
     if (!onResetSchedules) return;
-    if (window.confirm('Reset all schedules to system factory defaults? Any custom schedules will be replaced.')) {
+    if (window.confirm(t.resetSchedulesConfirm)) {
       onResetSchedules();
     }
   };
@@ -162,14 +166,14 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
             <div className="flex items-center gap-2">
               <h2 className="text-base font-bold text-slate-900 flex items-center gap-2">
                 <Clock className="h-4 w-4 text-indigo-600" />
-                Configurable Schedule & Shift Engine
+                {t.shiftEngineTitle}
               </h2>
               <span className="inline-flex items-center gap-1 rounded-full bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700">
-                <CheckCircle2 className="h-3 w-3" /> Auto-Saved Locally
+                <CheckCircle2 className="h-3 w-3" /> {t.autoSavedLocally}
               </span>
             </div>
             <p className="text-xs text-slate-500 mt-0.5">
-              PRD Sections 11–13: Work rules, breaks, cross-midnight handling, and 15-minute overtime thresholds. All schedule changes persist on page reload.
+              {t.shiftEngineSubtitle}
             </p>
           </div>
 
@@ -179,9 +183,9 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 type="button"
                 onClick={onExportBackup}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs"
-                title="Download JSON backup of all schedules & settings"
+                title={t.exportBackup}
               >
-                <Download className="h-3.5 w-3.5 text-slate-500" /> Export Backup
+                <Download className="h-3.5 w-3.5 text-slate-500" /> {t.exportBackup}
               </button>
             )}
 
@@ -204,9 +208,9 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs"
-                  title="Import schedules and settings from JSON file"
+                  title={t.importBackup}
                 >
-                  <Upload className="h-3.5 w-3.5 text-slate-500" /> Import Backup
+                  <Upload className="h-3.5 w-3.5 text-slate-500" /> {t.importBackup}
                 </button>
               </>
             )}
@@ -216,9 +220,9 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 type="button"
                 onClick={handleReset}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-50 hover:text-slate-900 transition-colors shadow-2xs"
-                title="Reset all schedules to original default presets"
+                title={t.resetDefaults}
               >
-                <RotateCcw className="h-3.5 w-3.5 text-slate-400" /> Reset Defaults
+                <RotateCcw className="h-3.5 w-3.5 text-slate-400" /> {t.resetDefaults}
               </button>
             )}
 
@@ -227,7 +231,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 onClick={openAdd}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
               >
-                <Plus className="h-4 w-4" /> Add New Schedule
+                <Plus className="h-4 w-4" /> {t.addNewSchedule}
               </button>
             )}
           </div>
@@ -235,7 +239,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
         {justSaved && (
           <div className="mt-3 rounded-lg bg-emerald-50 px-3 py-1.5 text-xs font-semibold text-emerald-800 flex items-center gap-1.5 animate-fadeIn">
             <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-            Schedule saved successfully! Changes are actively saved to browser storage.
+            {t.scheduleSavedSuccess}
           </div>
         )}
       </div>
@@ -251,14 +255,14 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
               <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100">
                 <div>
                   <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-900 text-sm">{s.groupName}</span>
+                    <span className="font-bold text-slate-900 text-sm">{translateShiftName(s.groupName, settings?.language) || s.groupName}</span>
                     {s.crossesMidnight ? (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
-                        <Moon className="h-3 w-3" /> Night Shift
+                        <Moon className="h-3 w-3" /> {t.nightShift}
                       </span>
                     ) : (
                       <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                        <Sun className="h-3 w-3" /> Day Shift
+                        <Sun className="h-3 w-3" /> {t.dayShift}
                       </span>
                     )}
                   </div>
@@ -270,7 +274,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     <button
                       onClick={() => openEdit(s)}
                       className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 transition-colors"
-                      title="Edit schedule"
+                      title={t.editSchedule}
                     >
                       <Edit2 className="h-3.5 w-3.5" />
                     </button>
@@ -280,7 +284,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     <button
                       onClick={() => handleDelete(s)}
                       className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                      title="Delete schedule"
+                      title={t.deleteSchedule}
                     >
                       <Trash2 className="h-3.5 w-3.5" />
                     </button>
@@ -291,47 +295,47 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
               {/* Schedule details */}
               <div className="mt-3.5 space-y-2 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Working Hours:</span>
+                  <span className="text-slate-500">{t.startTime} / {t.endTime}:</span>
                   <span className="font-semibold text-slate-800">
                     {s.startTime} → {s.endTime}
-                    {s.crossesMidnight && ' (next day)'}
+                    {s.crossesMidnight && ` (${t.crossesMidnight})`}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Scheduled Break:</span>
+                  <span className="text-slate-500">{t.hasBreak}:</span>
                   <span className="font-medium text-slate-700">
-                    {s.hasBreak ? `${s.breakDurationMinutes} min (${s.breakStart} - ${s.breakEnd})` : 'None'}
+                    {s.hasBreak ? `${s.breakDurationMinutes} min (${s.breakStart} - ${s.breakEnd})` : '-'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Normal Hours:</span>
-                  <span className="font-bold text-slate-900">{s.normalWorkedHours} hours</span>
+                  <span className="text-slate-500">{t.normalHours}:</span>
+                  <span className="font-bold text-slate-900">{s.normalWorkedHours} h</span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Overtime (Supp):</span>
+                  <span className="text-slate-500">{t.overtimeStarts}:</span>
                   <span className="font-medium text-indigo-700">
-                    {s.overtimeAllowed ? `After ${s.overtimeStartTime}` : 'None'}
+                    {s.overtimeAllowed ? s.overtimeStartTime : '-'}
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">Grace (1st / 2nd In):</span>
+                  <span className="text-slate-500">{t.arrivalGraceMinutesLabel} / {t.breakGraceMinutesLabel}:</span>
                   <span className="font-semibold text-slate-800">
                     {s.arrivalGraceMinutes ?? 10}m / {s.breakGraceMinutes ?? 10}m
                   </span>
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">OT Grace Threshold:</span>
-                  <span className="font-semibold text-slate-800">{s.overtimeGraceMinutes} minutes</span>
+                  <span className="text-slate-500">{t.overtimeGraceMinutesLabel}:</span>
+                  <span className="font-semibold text-slate-800">{s.overtimeGraceMinutes} m</span>
                 </div>
 
                 {/* Working days pill list */}
                 <div className="pt-2 border-t border-slate-100">
-                  <span className="text-[11px] text-slate-400 block mb-1">Configured Workdays:</span>
+                  <span className="text-[11px] text-slate-400 block mb-1">{t.workingDaysLabel}:</span>
                   <div className="flex flex-wrap gap-1">
                     {DAYS_OF_WEEK.map((day) => {
                       const isWorking = s.workingDays.includes(day);
@@ -344,7 +348,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                               : 'bg-slate-100 text-slate-400 line-through'
                           }`}
                         >
-                          {day.slice(0, 3)}
+                          {translateDayOfWeek(day, settings?.language).slice(0, 3)}
                         </span>
                       );
                     })}
@@ -352,36 +356,65 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 </div>
               </div>
             </div>
+
+            {/* Footer Summary Notice */}
+            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+              <span>{s.name}</span>
+              {s.overtimeAllowed && (
+                <span className="text-indigo-600 font-medium">+{t.overtimeAllowed}</span>
+              )}
+            </div>
           </div>
         ))}
       </div>
 
-      {/* Edit / Add Modal */}
+      {/* Edit/Create Modal */}
       {modalOpen && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/60 backdrop-blur-xs p-4 overflow-y-auto">
-          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-2xl border border-slate-200 animate-in fade-in zoom-in-95 duration-150 my-8">
-            <div className="flex items-center justify-between pb-3 border-b border-slate-100">
-              <h3 className="text-base font-bold text-slate-900">
-                {editingSchedule ? 'Edit Work Schedule' : 'Create New Schedule'}
-              </h3>
-              <button
-                onClick={() => setModalOpen(false)}
-                className="rounded-lg p-1 text-slate-400 hover:bg-slate-100 hover:text-slate-600"
-              >
-                ✕
-              </button>
-            </div>
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
+          <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 my-8">
+            <h3 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
+              {editingSchedule ? t.editSchedule : t.addNewSchedule}
+            </h3>
 
-            <form onSubmit={handleSave} className="space-y-3.5 mt-4 text-xs">
+            <form onSubmit={handleSave} className="space-y-3.5 text-xs">
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {t.fullName} / Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Shift 1 (10:00 - 18:00)"
+                    value={name}
+                    onChange={(e) => setName(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none focus:border-indigo-500"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {t.group} Name
+                  </label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="e.g. Stock Shift 1"
+                    value={groupName}
+                    onChange={(e) => setGroupName(e.target.value)}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none focus:border-indigo-500"
+                  />
+                </div>
+              </div>
+
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Schedule Title
+                  {t.department}
                 </label>
                 <input
                   type="text"
                   required
-                  value={name}
-                  onChange={(e) => setName(e.target.value)}
+                  value={department}
+                  onChange={(e) => setDepartment(e.target.value)}
                   className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none focus:border-indigo-500"
                 />
               </div>
@@ -389,34 +422,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Group Identifier
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={groupName}
-                    onChange={(e) => setGroupName(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none"
-                  />
-                </div>
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Department
-                  </label>
-                  <input
-                    type="text"
-                    required
-                    value={department}
-                    onChange={(e) => setDepartment(e.target.value)}
-                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none"
-                  />
-                </div>
-              </div>
-
-              <div className="grid grid-cols-2 gap-3">
-                <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    Shift Start Time
+                    {t.startTime} (HH:MM)
                   </label>
                   <input
                     type="text"
@@ -429,7 +435,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Shift End Time
+                    {t.endTime} (HH:MM)
                   </label>
                   <input
                     type="text"
@@ -451,7 +457,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                   className="rounded text-indigo-600 focus:ring-0"
                 />
                 <label htmlFor="crosses-midnight-chk" className="font-semibold text-indigo-900 cursor-pointer">
-                  Crosses Midnight (e.g. Stock Group 2: 18:00 to 02:00 next day)
+                  {t.crossesMidnight}
                 </label>
               </div>
 
@@ -466,14 +472,14 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     className="rounded text-indigo-600"
                   />
                   <label htmlFor="has-break-chk" className="font-semibold text-slate-800 cursor-pointer">
-                    Schedule Includes Unpaid Lunch / Rest Break
+                    {t.hasBreak}
                   </label>
                 </div>
                 {hasBreak && (
                   <div className="grid grid-cols-3 gap-2.5 pt-1">
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Break Start (HH:MM)
+                        {t.breakStart}
                       </label>
                       <input
                         type="text"
@@ -485,7 +491,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Break End / 2nd In (HH:MM)
+                        {t.breakEnd}
                       </label>
                       <input
                         type="text"
@@ -497,7 +503,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     </div>
                     <div>
                       <label className="block text-[11px] font-semibold text-slate-600 mb-1">
-                        Duration (mins)
+                        {t.breakDuration}
                       </label>
                       <input
                         type="number"
@@ -513,7 +519,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Normal Hours
+                    {t.normalHours}
                   </label>
                   <input
                     type="number"
@@ -525,7 +531,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Arrival Grace (mins)
+                    {t.arrivalGraceMinutesLabel}
                   </label>
                   <input
                     type="number"
@@ -536,7 +542,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Break Grace (mins)
+                    {t.breakGraceMinutesLabel}
                   </label>
                   <input
                     type="number"
@@ -547,7 +553,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    OT Grace (mins)
+                    {t.overtimeGraceMinutesLabel}
                   </label>
                   <input
                     type="number"
@@ -568,13 +574,13 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     className="rounded text-indigo-600"
                   />
                   <label htmlFor="ot-allowed-chk" className="font-semibold text-slate-700 cursor-pointer">
-                    Eligible for Overtime
+                    {t.overtimeAllowed}
                   </label>
                 </div>
                 {overtimeAllowed && (
                   <div>
                     <label className="block font-semibold text-slate-700 mb-1">
-                      Overtime Starts At
+                      {t.overtimeStarts}
                     </label>
                     <input
                       type="text"
@@ -589,7 +595,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Working Days
+                  {t.workingDaysLabel}
                 </label>
                 <div className="flex flex-wrap gap-1.5">
                   {DAYS_OF_WEEK.map((day) => {
@@ -605,7 +611,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                             : 'bg-slate-100 text-slate-500 hover:bg-slate-200'
                         }`}
                       >
-                        {day}
+                        {translateDayOfWeek(day, settings?.language)}
                       </button>
                     );
                   })}
@@ -618,13 +624,13 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                   onClick={() => setModalOpen(false)}
                   className="rounded-lg px-4 py-1.5 text-slate-600 hover:bg-slate-100"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button
                   type="submit"
                   className="rounded-lg bg-indigo-600 px-4 py-1.5 font-bold text-white hover:bg-indigo-700"
                 >
-                  Save Schedule
+                  {t.save}
                 </button>
               </div>
             </form>

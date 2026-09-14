@@ -20,6 +20,7 @@ import {
   RawDayAttendance,
   AppSettings,
 } from '../types';
+import { getTranslations } from '../utils/i18n';
 
 interface DashboardProps {
   dataset: RawAttendanceDataset | null;
@@ -50,6 +51,8 @@ export const Dashboard: React.FC<DashboardProps> = ({
   settings,
   unmappedEmployeesCount = 0,
 }) => {
+  const t = getTranslations(settings.language);
+
   // Aggregate statistics across daily records
   const totalEmployees = monthlySummary.length || dataset?.employees.length || 0;
 
@@ -101,9 +104,9 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <div className="flex items-center gap-2">
               <span className="inline-flex items-center rounded-full bg-indigo-50 px-2.5 py-0.5 text-xs font-semibold text-indigo-700">
-                Active Period
+                {t.activePeriodBadge}
               </span>
-              <span className="text-xs text-slate-400 font-medium">Authoritative Made Date</span>
+              <span className="text-xs text-slate-400 font-medium">{t.authoritativeDate}</span>
             </div>
             <h2 className="mt-1 text-2xl font-extrabold text-slate-900 tracking-tight">
               {dataset?.madeDateRaw || 'Attendance Period: July 2026'}
@@ -120,7 +123,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-colors"
             >
               <Sparkles className="h-4 w-4" />
-              Recalculate Entire Period
+              {t.recalculateEntirePeriod}
             </button>
             <button
               id="dash-import-btn"
@@ -128,7 +131,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
             >
               <FileSpreadsheet className="h-4 w-4 text-slate-500" />
-              Import New File
+              {t.importNewFile}
             </button>
           </div>
         </div>
@@ -146,7 +149,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
             <div>
               <h4 className="text-sm font-bold text-amber-950">
-                {unmappedEmployeesCount} Unmapped Workers Detected in Attendance Dataset
+                {unmappedEmployeesCount} {t.unmappedWorkers}
               </h4>
               <p className="text-xs text-amber-800/90 mt-0.5">
                 The imported attendance file contains workers not currently saved in your Employee Mapping directory.
@@ -158,7 +161,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             onClick={() => onNavigateTab('employees')}
             className="inline-flex items-center gap-1.5 rounded-xl bg-amber-600 hover:bg-amber-700 px-4 py-2 text-xs font-bold text-white transition-colors shadow-2xs self-end sm:self-center shrink-0"
           >
-            Review & Add to Mapping
+            {t.reviewAndAdd}
             <ArrowRight className="h-4 w-4" />
           </button>
         </div>
@@ -169,71 +172,71 @@ export const Dashboard: React.FC<DashboardProps> = ({
         {/* Employees */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-500">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Employees</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.totalEmployees}</span>
             <Users className="h-4 w-4 text-slate-400" />
           </div>
           <p className="mt-2 text-2xl font-bold text-slate-900">{totalEmployees}</p>
-          <span className="text-[11px] text-slate-400">Total in report</span>
+          <span className="text-[11px] text-slate-400">Total</span>
         </div>
 
         {/* Present */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
           <div className="flex items-center justify-between text-emerald-600">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Present</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.colPresentDays}</span>
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </div>
           <p className="mt-2 text-2xl font-bold text-emerald-600">{totalPresentDays}</p>
-          <span className="text-[11px] text-slate-400">Days attended</span>
+          <span className="text-[11px] text-slate-400">{t.daysWord}</span>
         </div>
 
         {/* Absent */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
           <div className="flex items-center justify-between text-rose-600">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Absent</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.colAbsentDays}</span>
             <AlertTriangle className="h-4 w-4 text-rose-500" />
           </div>
           <p className="mt-2 text-2xl font-bold text-rose-600">{totalAbsentDays}</p>
-          <span className="text-[11px] text-slate-400">True scheduled absences</span>
+          <span className="text-[11px] text-slate-400">{t.daysWord}</span>
         </div>
 
         {/* Late Days */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
           <div className="flex items-center justify-between text-amber-600">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Late Days</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.colLateDays}</span>
             <Clock className="h-4 w-4 text-amber-500" />
           </div>
           <p className="mt-2 text-2xl font-bold text-amber-600">{totalLateDays}</p>
-          <span className="text-[11px] text-slate-400">Occurrences</span>
+          <span className="text-[11px] text-slate-400">{t.daysWord}</span>
         </div>
 
         {/* Worked Hours */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
           <div className="flex items-center justify-between text-slate-600">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Worked Hours</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.workedHoursStat}</span>
             <TrendingUp className="h-4 w-4 text-slate-500" />
           </div>
           <p className="mt-2 text-xl font-bold text-slate-900">{workedHoursStr}</p>
-          <span className="text-[11px] text-slate-400">Normal base time</span>
+          <span className="text-[11px] text-slate-400">Total</span>
         </div>
 
         {/* Overtime Hours (Supp) */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs bg-indigo-50/20">
           <div className="flex items-center justify-between text-indigo-600">
-            <span className="text-xs font-semibold uppercase tracking-wider text-indigo-800">Overtime (Supp)</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-indigo-800">{t.overtimeHoursStat}</span>
             <TrendingUp className="h-4 w-4 text-indigo-500" />
           </div>
           <p className="mt-2 text-xl font-bold text-indigo-700">{suppHoursStr}</p>
-          <span className="text-[11px] text-indigo-600 font-medium">&gt; 15m threshold</span>
+          <span className="text-[11px] text-indigo-600 font-medium">&gt; 15m</span>
         </div>
 
         {/* Late Minutes */}
         <div className="rounded-xl border border-slate-200 bg-white p-4 shadow-2xs">
           <div className="flex items-center justify-between text-amber-600">
-            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">Late Minutes</span>
+            <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.lateMinutesStat}</span>
             <Clock className="h-4 w-4 text-amber-500" />
           </div>
           <p className="mt-2 text-2xl font-bold text-amber-700">{totalLateMinutes} m</p>
-          <span className="text-[11px] text-slate-400">Cumulative delay</span>
+          <span className="text-[11px] text-slate-400">{t.delay}</span>
         </div>
       </div>
 
@@ -247,13 +250,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <h3 className="text-sm font-bold text-slate-900">Attendance Quality Control & Integrity Check</h3>
             </div>
             <span className="text-xs text-slate-400 font-mono">
-              {totalRawPunchesCount} raw biometric punches
+              {totalRawPunchesCount} biometric punches
             </span>
           </div>
 
           <div className="grid grid-cols-1 sm:grid-cols-3 gap-3 mt-4">
             <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-200/70">
-              <p className="text-xs font-medium text-slate-500">Missing Punches</p>
+              <p className="text-xs font-medium text-slate-500">{t.colMissingPunches}</p>
               <p className="text-xl font-bold text-slate-800 mt-1">{totalMissingPunches}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">
                 Single punch entries or exits
@@ -261,20 +264,20 @@ export const Dashboard: React.FC<DashboardProps> = ({
             </div>
 
             <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-200/70">
-              <p className="text-xs font-medium text-slate-500">Configured OFF Days</p>
+              <p className="text-xs font-medium text-slate-500">{t.colOffDays}</p>
               <p className="text-xl font-bold text-slate-800 mt-1">{totalOffDays}</p>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Excluded from absences (Fridays)
+                Excluded from absences
               </p>
             </div>
 
             <div className="rounded-xl bg-slate-50 p-3.5 border border-slate-200/70">
-              <p className="text-xs font-medium text-slate-500">Overtime Rule</p>
+              <p className="text-xs font-medium text-slate-500">{t.overtimeGrace}</p>
               <p className="text-xl font-bold text-indigo-700 mt-1">
-                {settings.defaultOvertimeGraceMinutes} min grace
+                {settings.defaultOvertimeGraceMinutes} min
               </p>
               <p className="text-[11px] text-slate-400 mt-0.5">
-                Threshold logic applied (&gt;15m)
+                Threshold (&gt;15m)
               </p>
             </div>
           </div>
@@ -282,13 +285,13 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div className="mt-4 flex flex-wrap items-center justify-between gap-3 pt-3 border-t border-slate-100 text-xs">
             <div className="flex items-center gap-2 text-slate-600">
               <span className="h-2 w-2 rounded-full bg-emerald-500"></span>
-              Leading zeros preserved in all IDs (e.g. 0004, 00022236)
+              Leading zeros preserved (0004, 00022236)
             </div>
             <button
               onClick={() => onNavigateTab('daily')}
               className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800"
             >
-              Review all daily records <ArrowRight className="h-3.5 w-3.5" />
+              {t.reviewDailyRecords} <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>
@@ -298,16 +301,16 @@ export const Dashboard: React.FC<DashboardProps> = ({
           <div>
             <h3 className="text-sm font-bold text-slate-900 flex items-center gap-2">
               <Download className="h-4 w-4 text-indigo-600" />
-              Exports & Reporting
+              {t.exportsAndReporting}
             </h3>
             <p className="text-xs text-slate-500 mt-1">
-              Download audited Excel workbooks or print-ready A4 PDF reports.
+              {t.exportsAndReportingDesc}
             </p>
 
             <div className="mt-4 space-y-2">
               <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50">
                 <div>
-                  <p className="text-xs font-semibold text-slate-800">Daily Attendance</p>
+                  <p className="text-xs font-semibold text-slate-800">{t.dailyAttendance}</p>
                   <p className="text-[11px] text-slate-400">Detailed punch & observation log</p>
                 </div>
                 <div className="flex gap-1.5">
@@ -330,7 +333,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
 
               <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-slate-200 bg-slate-50/50">
                 <div>
-                  <p className="text-xs font-semibold text-slate-800">Monthly Summary</p>
+                  <p className="text-xs font-semibold text-slate-800">{t.monthlySummary}</p>
                   <p className="text-[11px] text-slate-400">Employee totals, worked & supp</p>
                 </div>
                 <div className="flex gap-1.5">
@@ -358,7 +361,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
               onClick={() => onNavigateTab('monthly')}
               className="w-full inline-flex items-center justify-center gap-1 text-xs font-semibold text-indigo-600 hover:text-indigo-800"
             >
-              View Full Monthly Summary Table <ArrowRight className="h-3.5 w-3.5" />
+              {t.viewFullMonthlySummary} <ArrowRight className="h-3.5 w-3.5" />
             </button>
           </div>
         </div>

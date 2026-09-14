@@ -24,6 +24,7 @@ import {
   Palmtree,
 } from 'lucide-react';
 import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
+import { getTranslations, translateDayOfWeek, Translations } from '../utils/i18n';
 
 interface DailyAttendanceViewProps {
   records: DailyAttendanceRecord[];
@@ -64,6 +65,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   onExportPDF,
   settings,
 }) => {
+  const t = getTranslations(settings.language);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('ALL');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
@@ -250,16 +252,47 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
     onExportPDF(filteredRecords, activePeriodLabel);
   };
 
+  // Helper to translate observation details
+  const getObservationDisplay = (record: DailyAttendanceRecord): string => {
+    switch (record.observation) {
+      case 'SHIFT UNCLEAR':
+        return t.obsShiftUnclear;
+      case 'Ponctuel':
+        return t.obsOnTime;
+      case 'Retard':
+        if (record.observationDetail) {
+          return record.observationDetail.replace('Retard', t.obsLate).replace('Late', t.obsLate);
+        }
+        return t.obsLate;
+      case 'Absence':
+        return t.obsAbsent;
+      case 'Entrée non pointée':
+        return t.obsMissingEntry;
+      case 'Sortie non pointée':
+        return t.obsMissingExit;
+      case 'Sortie après minuit':
+        return t.obsExitAfterMidnight;
+      case 'OFF':
+        return t.obsOff;
+      case 'Congé payé':
+        return t.obsPaidVacation;
+      case 'Congé / Férié':
+        return t.obsHoliday;
+      default:
+        return record.observationDetail || record.observation;
+    }
+  };
+
   // Helper for Detected Shift badge styling
   const renderDetectedShiftBadge = (record: DailyAttendanceRecord) => {
     if (record.isShiftUnclear) {
       return (
         <span
           className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-bold border bg-rose-50 text-rose-700 border-rose-300"
-          title="First check-in time does not clearly correspond to any Stock shift. Manual review required."
+          title={t.shiftUnclear}
         >
           <AlertTriangle className="h-3 w-3 text-rose-600" />
-          SHIFT UNCLEAR
+          {t.obsShiftUnclear}
         </span>
       );
     }
@@ -272,18 +305,18 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
 
       if (shiftName.includes('Shift 1')) {
         color = 'bg-indigo-50 text-indigo-700 border-indigo-200';
-        label = 'Shift 1 (10:00–18:00)';
+        label = t.shift1Label;
       } else if (shiftName.includes('Shift 2')) {
         color = 'bg-purple-50 text-purple-700 border-purple-200';
         icon = <span className="text-[10px]">🌙</span>;
-        label = 'Shift 2 (18:00–02:00)';
+        label = t.shift2Label;
       } else if (shiftName.includes('Shift 3')) {
         color = 'bg-sky-50 text-sky-700 border-sky-200';
-        label = 'Shift 3 (08:30–16:30)';
+        label = t.shift3Label;
       } else if (shiftName.includes('Shift 4')) {
         color = 'bg-amber-50 text-amber-800 border-amber-200';
         icon = <span className="text-[10px]">🌙</span>;
-        label = 'Shift 4 (16:00–00:00)';
+        label = t.shift4Label;
       } else if (shiftName === '-') {
         return <span className="text-slate-300">-</span>;
       }
@@ -291,7 +324,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
       return (
         <span
           className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold border ${color}`}
-          title={`Automatically detected from check-in ${record.firstCheckInTime || record.entryTime || '-'}`}
+          title={`Check-in ${record.firstCheckInTime || record.entryTime || '-'}`}
         >
           {icon}
           {label}
@@ -302,7 +335,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
     // Admin / Fixed schedule
     return (
       <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium border bg-slate-100 text-slate-700 border-slate-200">
-        {record.groupName}
+        {record.groupName || t.adminFixedSchedule}
       </span>
     );
   };
@@ -353,7 +386,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold border ${bg}`}
       >
         {icon}
-        {record.observationDetail}
+        {getObservationDisplay(record)}
       </span>
     );
   };
@@ -366,9 +399,9 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
           <div className="flex items-center gap-2.5">
             <AlertTriangle className="h-4 w-4 text-amber-600 shrink-0" />
             <div>
-              <span className="font-bold">{unclearCount} check-in{unclearCount > 1 ? 's' : ''} flagged as SHIFT UNCLEAR:</span>
+              <span className="font-bold">{unclearCount} {t.obsShiftUnclear}:</span>
               <span className="ml-1 text-amber-800">
-                The employee's first check-in time did not clearly match any of the 4 Stock shifts (Shift 1, 2, 3, or 4). Flagged for manual review.
+                {t.shiftUnclear}
               </span>
             </div>
           </div>
@@ -376,7 +409,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
             onClick={() => setSelectedStatus('SHIFT_UNCLEAR')}
             className="rounded-lg bg-amber-600 text-white font-semibold px-3 py-1 hover:bg-amber-700 transition-colors shrink-0 text-xs shadow-2xs"
           >
-            Review Unclear ({unclearCount})
+            {t.obsShiftUnclear} ({unclearCount})
           </button>
         </div>
       )}
@@ -390,7 +423,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
             <input
               id="search-daily-input"
               type="text"
-              placeholder="Search by ID, Name, Department, or Shift..."
+              placeholder={t.searchWorker}
               value={searchTerm}
               onChange={(e) => {
                 setSearchTerm(e.target.value);
@@ -408,7 +441,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               
               {/* From Date */}
               <div className="flex items-center gap-1">
-                <span className="text-[11px] font-medium text-slate-500">From</span>
+                <span className="text-[11px] font-medium text-slate-500">{t.fromLabel}</span>
                 <input
                   id="filter-date-from-input"
                   type="date"
@@ -426,7 +459,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
 
               {/* To Date */}
               <div className="flex items-center gap-1">
-                <span className="text-[11px] font-medium text-slate-500">To</span>
+                <span className="text-[11px] font-medium text-slate-500">{t.toLabel}</span>
                 <input
                   id="filter-date-to-input"
                   type="date"
@@ -471,11 +504,11 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                 className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] text-slate-700 outline-none cursor-pointer"
                 title="Quick date range presets"
               >
-                <option value="ALL">All Dates ({dateOptions.length} days)</option>
-                <option value="PRESET_01_08">01 to 08 (First 8 days)</option>
-                <option value="PRESET_01_15">01 to 15 (1st half)</option>
-                <option value="PRESET_16_END">16 to End (2nd half)</option>
-                {isDateRangeFiltered && <option value="CUSTOM">Custom Range Selected</option>}
+                <option value="ALL">{t.allDatesPreset} ({dateOptions.length} {t.daysWord})</option>
+                <option value="PRESET_01_08">{t.presetFirst8}</option>
+                <option value="PRESET_01_15">{t.presetFirst15}</option>
+                <option value="PRESET_16_END">{t.presetSecondHalf}</option>
+                {isDateRangeFiltered && <option value="CUSTOM">{t.customRange}</option>}
               </select>
 
               {/* Clear date filter button */}
@@ -488,7 +521,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     setPage(1);
                   }}
                   className="text-slate-400 hover:text-rose-600 p-0.5 rounded transition-colors"
-                  title="Reset date range to all dates"
+                  title={t.clearDateFilter}
                 >
                   <X className="h-3.5 w-3.5" />
                 </button>
@@ -505,7 +538,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               }}
               className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-slate-700 outline-none"
             >
-              <option value="ALL">All Groups</option>
+              <option value="ALL">{t.allGroups}</option>
               {groupOptions.map((g) => (
                 <option key={g} value={g}>
                   {g}
@@ -523,20 +556,20 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               }}
               className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-slate-700 outline-none"
             >
-              <option value="ALL">All Observations</option>
+              <option value="ALL">{t.allObservations}</option>
               {unclearCount > 0 && (
-                <option value="SHIFT_UNCLEAR">⚠️ SHIFT UNCLEAR ({unclearCount})</option>
+                <option value="SHIFT_UNCLEAR">⚠️ {t.obsShiftUnclear} ({unclearCount})</option>
               )}
-              <option value="PONCTUEL">Ponctuel (On time)</option>
-              <option value="RETARD">Retard (Late)</option>
-              <option value="SUPP">Overtime / Supp Hours</option>
+              <option value="PONCTUEL">{t.obsOnTime}</option>
+              <option value="RETARD">{t.obsLate}</option>
+              <option value="SUPP">{t.colOvertime}</option>
               {injectedSuppCount > 0 && (
-                <option value="INJECTED_SUPP">⚡ Injected Supp Hours ({injectedSuppCount})</option>
+                <option value="INJECTED_SUPP">⚡ {t.injectedSuppHours} ({injectedSuppCount})</option>
               )}
-              <option value="MISSING">Missing Punches (Entrée / Sortie)</option>
-              <option value="VACATION">🌴 Congé payé / Paid Vacation</option>
-              <option value="ABSENCE">True Absences</option>
-              <option value="OFF">Configured OFF Days</option>
+              <option value="MISSING">{t.colMissingPunches}</option>
+              <option value="VACATION">🌴 {t.paidVacations}</option>
+              <option value="ABSENCE">{t.obsAbsent}</option>
+              <option value="OFF">{t.obsOff}</option>
             </select>
 
             {/* Inject Supp Hours Quick Button */}
@@ -546,10 +579,10 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                 type="button"
                 onClick={() => onOpenInjectSupp()}
                 className="inline-flex items-center gap-1.5 rounded-lg bg-amber-500 hover:bg-amber-600 px-2.5 py-1 font-semibold text-white transition-colors shadow-2xs text-xs"
-                title="Inject / grant supplementary hours for workers"
+                title={t.injectSuppHours}
               >
                 <Zap className="h-3.5 w-3.5 fill-white" />
-                <span>Inject Supp Hours</span>
+                <span>{t.injectSuppHours}</span>
               </button>
             )}
 
@@ -559,17 +592,17 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                 id="daily-export-xlsx-btn"
                 onClick={handleExportXLSX}
                 className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-2.5 py-1 font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs"
-                title={isDateRangeFiltered ? `Export filtered records (${activePeriodLabel})` : 'Export all daily records'}
+                title={isDateRangeFiltered ? `${t.exportExcel} (${activePeriodLabel})` : t.exportExcel}
               >
-                <Download className="h-3 w-3" /> Excel
+                <Download className="h-3 w-3" /> {t.exportExcel}
               </button>
               <button
                 id="daily-export-pdf-btn"
                 onClick={handleExportPDFFile}
                 className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 font-semibold text-white hover:bg-slate-900 transition-colors shadow-2xs"
-                title={isDateRangeFiltered ? `Export filtered records (${activePeriodLabel})` : 'Export all daily records'}
+                title={isDateRangeFiltered ? `${t.exportPdf} (${activePeriodLabel})` : t.exportPdf}
               >
-                <Download className="h-3 w-3" /> PDF
+                <Download className="h-3 w-3" /> {t.exportPdf}
               </button>
             </div>
           </div>
@@ -582,17 +615,17 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
           <div className="flex items-center gap-2">
             <CalendarRange className="h-4 w-4 text-indigo-600 shrink-0" />
             <span>
-              <strong>Date Range Filter:</strong>{' '}
+              <strong>{t.filterDateRange}:</strong>{' '}
               <span className="font-mono font-semibold text-indigo-900 bg-white px-1.5 py-0.5 rounded border border-indigo-200">
                 {formatIsoToDisplay(effectiveStartDate || minAvailableDate)}
               </span>{' '}
-              <span className="text-indigo-400 font-medium">to</span>{' '}
+              <span className="text-indigo-400 font-medium">{t.toLabel}</span>{' '}
               <span className="font-mono font-semibold text-indigo-900 bg-white px-1.5 py-0.5 rounded border border-indigo-200">
                 {formatIsoToDisplay(effectiveEndDate || maxAvailableDate)}
               </span>
             </span>
             <span className="text-slate-500 font-mono text-[11px]">
-              • {filteredRecords.length} record{filteredRecords.length > 1 ? 's' : ''} across {filteredDaysCount} day{filteredDaysCount > 1 ? 's' : ''}
+              • {filteredRecords.length} {t.recordsWord} {t.acrossWord} {filteredDaysCount} {t.daysWord}
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -604,7 +637,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               }}
               className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-indigo-700 border border-indigo-200 hover:bg-indigo-100/50 transition-colors shadow-2xs"
             >
-              <RotateCcw className="h-3 w-3" /> Clear Date Filter
+              <RotateCcw className="h-3 w-3" /> {t.clearDateFilter}
             </button>
           </div>
         </div>
@@ -616,20 +649,20 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold">
-                <th className="py-3 px-3">Date</th>
-                <th className="py-3 px-3 font-mono">ID</th>
-                <th className="py-3 px-3">Employee</th>
-                <th className="py-3 px-3 text-center">First Check-in</th>
-                <th className="py-3 px-3 text-center">2nd In (Pause)</th>
-                <th className="py-3 px-3 text-center">Detected Shift</th>
-                <th className="py-3 px-3 text-center">Exit</th>
-                <th className="py-3 px-3 text-center">Delay</th>
-                <th className="py-3 px-3 text-center">Break</th>
-                <th className="py-3 px-3 text-center">Worked</th>
-                <th className="py-3 px-3 text-center font-bold text-indigo-700">Supp (OT)</th>
-                <th className="py-3 px-3">Observation</th>
+                <th className="py-3 px-3">{t.colDate}</th>
+                <th className="py-3 px-3 font-mono">{t.colId}</th>
+                <th className="py-3 px-3">{t.colName}</th>
+                <th className="py-3 px-3 text-center">{t.colIn}</th>
+                <th className="py-3 px-3 text-center">{t.secondCheckIn}</th>
+                <th className="py-3 px-3 text-center">{t.colShift}</th>
+                <th className="py-3 px-3 text-center">{t.colOut}</th>
+                <th className="py-3 px-3 text-center">{t.colLate}</th>
+                <th className="py-3 px-3 text-center">{t.colBreak}</th>
+                <th className="py-3 px-3 text-center">{t.colWorked}</th>
+                <th className="py-3 px-3 text-center font-bold text-indigo-700">{t.colSupp}</th>
+                <th className="py-3 px-3">{t.colObservation}</th>
                 {settings.activeRole !== 'Management' && (
-                  <th className="py-3 px-3 text-right">Audit Action</th>
+                  <th className="py-3 px-3 text-right">{t.colActions}</th>
                 )}
               </tr>
             </thead>
@@ -637,7 +670,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               {paginatedRecords.length === 0 ? (
                 <tr>
                   <td colSpan={13} className="py-12 text-center text-slate-400">
-                    No matching attendance records found for the selected filters.
+                    {t.noRecordsFound}
                   </td>
                 </tr>
               ) : (
@@ -655,7 +688,9 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     {/* Date */}
                     <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
                       {r.formattedDate}
-                      <span className="block text-[10px] text-slate-400">{r.dayOfWeek.slice(0, 3)}</span>
+                      <span className="block text-[10px] text-slate-400">
+                        {translateDayOfWeek(r.dayOfWeek as any, settings.language).slice(0, 3)}
+                      </span>
                     </td>
 
                     {/* ID (preserved string with leading zeros) */}
@@ -672,7 +707,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                             title={`Manually adjusted: ${r.manualAdjustment?.reason}`}
                             className="inline-flex items-center text-[10px] font-semibold text-amber-700 bg-amber-100 px-1 rounded-sm"
                           >
-                            Adjusted
+                            {t.adjustedBadge}
                           </span>
                         )}
                       </div>
@@ -692,8 +727,8 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                           }`}
                           title={
                             (r.firstCheckInDelayMinutes || 0) > 0
-                              ? `1st In: ${r.firstCheckInTime || r.entryTime} (Late: ${r.firstCheckInDelayMinutes}m)`
-                              : `1st In: ${r.firstCheckInTime || r.entryTime} (On time)`
+                              ? `1st In: ${r.firstCheckInTime || r.entryTime} (${t.obsLate}: ${r.firstCheckInDelayMinutes}m)`
+                              : `1st In: ${r.firstCheckInTime || r.entryTime} (${t.obsOnTime})`
                           }
                         >
                           {r.firstCheckInTime || r.entryTime}
@@ -714,8 +749,8 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                           }`}
                           title={
                             (r.secondCheckInDelayMinutes || 0) > 0
-                              ? `2nd In (Reprise pause): ${r.secondCheckInTime} (Retard: +${r.secondCheckInDelayMinutes}m hors 10 min de grâce)`
-                              : `2nd In: ${r.secondCheckInTime} (Ponctuel)`
+                              ? `2nd In: ${r.secondCheckInTime} (${t.obsLate}: +${r.secondCheckInDelayMinutes}m)`
+                              : `2nd In: ${r.secondCheckInTime} (${t.obsOnTime})`
                           }
                         >
                           {r.secondCheckInTime}
@@ -758,10 +793,8 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                           <span
                             title={
                               (r.secondCheckInDelayMinutes || 0) > 0 && (r.firstCheckInDelayMinutes || 0) > 0
-                                ? `Retard total: ${r.delayMinutes} min (Entrée: ${r.firstCheckInDelayMinutes}m + Pause: ${r.secondCheckInDelayMinutes}m hors 10 min de grâce)`
-                                : (r.secondCheckInDelayMinutes || 0) > 0
-                                ? `Retard reprise pause: ${r.secondCheckInDelayMinutes} min (hors 10 min de grâce)`
-                                : `Retard entrée: ${r.delayMinutes} min (hors grâce)`
+                                ? `${t.obsLate}: ${r.delayMinutes} min (In: ${r.firstCheckInDelayMinutes}m + Break: ${r.secondCheckInDelayMinutes}m)`
+                                : `${t.obsLate}: ${r.delayMinutes} min`
                             }
                             className="font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]"
                           >
@@ -797,7 +830,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                       {r.injectedSuppMinutes && r.injectedSuppMinutes > 0 ? (
                         <span
                           className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-300 px-1.5 py-0.5 text-amber-900 shadow-2xs"
-                          title={`Total Supp: ${r.suppHoursFormatted} (Includes +${formatMinutesToHoursAndMinutes(r.injectedSuppMinutes)} manually injected)`}
+                          title={`Total Supp: ${r.suppHoursFormatted}`}
                         >
                           <Zap className="h-3 w-3 fill-amber-500 text-amber-600 shrink-0" />
                           <span>{r.suppHoursFormatted}</span>
@@ -830,10 +863,10 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                                   ? 'bg-teal-100 text-teal-900 border border-teal-300 hover:bg-teal-200'
                                   : 'text-teal-700 hover:bg-teal-50 hover:text-teal-800'
                               }`}
-                              title={`Manage or record paid vacation for ${r.employeeName}`}
+                              title={`${t.paidVacations}: ${r.employeeName}`}
                             >
                               <Palmtree className="h-3 w-3 text-teal-600" />
-                              <span>{r.isPaidVacation ? 'Congé' : '+ Congé'}</span>
+                              <span>{r.isPaidVacation ? t.btnVacation : t.btnPlanVacation}</span>
                             </button>
                           )}
                           {onOpenInjectSupp && (
@@ -845,20 +878,20 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                                   ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
                                   : 'text-amber-700 hover:bg-amber-50 hover:text-amber-800'
                               }`}
-                              title={`Inject or adjust supplementary hours for ${r.employeeName} on ${r.formattedDate}`}
+                              title={`${t.injectSuppHours}: ${r.employeeName} (${r.formattedDate})`}
                             >
                               <Zap className="h-3 w-3 fill-amber-500 text-amber-600" />
-                              <span>{r.injectedSuppMinutes && r.injectedSuppMinutes > 0 ? 'Edit Supp' : '+ Supp'}</span>
+                              <span>{r.injectedSuppMinutes && r.injectedSuppMinutes > 0 ? t.btnEditSupp : t.btnAddSupp}</span>
                             </button>
                           )}
                           <button
                             id={`correct-btn-${r.id}`}
                             onClick={() => onOpenCorrection(r)}
                             className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors"
-                            title="Correct punch, resolve unclear shift, or record justification"
+                            title={r.isShiftUnclear ? t.reviewShift : t.btnAdjust}
                           >
                             <Edit3 className="h-3.5 w-3.5" />
-                            <span>{r.isShiftUnclear ? 'Review Shift' : 'Adjust'}</span>
+                            <span>{r.isShiftUnclear ? t.reviewShift : t.btnAdjust}</span>
                           </button>
                         </div>
                       </td>
@@ -873,8 +906,8 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         {/* Pagination Bar */}
         <div className="flex items-center justify-between border-t border-slate-200 bg-slate-50/50 px-4 py-2.5 text-xs text-slate-600">
           <div>
-            Showing <span className="font-semibold">{paginatedRecords.length}</span> of{' '}
-            <span className="font-semibold">{filteredRecords.length}</span> records
+            {t.showingWord} <span className="font-semibold">{paginatedRecords.length}</span> {t.ofWord}{' '}
+            <span className="font-semibold">{filteredRecords.length}</span> {t.recordsWord}
           </div>
           <div className="flex items-center gap-2">
             <button
@@ -886,7 +919,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               <ChevronLeft className="h-4 w-4" />
             </button>
             <span>
-              Page {page} of {totalPages}
+              {t.pageWord} {page} {t.ofWord} {totalPages}
             </span>
             <button
               id="next-page-btn"

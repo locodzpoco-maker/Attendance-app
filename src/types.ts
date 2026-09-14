@@ -186,6 +186,8 @@ export interface AttendanceAuditLog {
   details: string;
 }
 
+export type AppLanguage = 'en' | 'fr' | 'ar';
+
 export interface AppSettings {
   companyName: string;
   companySubtitle: string;
@@ -194,6 +196,7 @@ export interface AppSettings {
   defaultBreakGraceMinutes: number; // default 10
   allowRecalculationOnFly: boolean;
   activeRole: 'Administrator' | 'HR / Attendance User' | 'Management';
+  language?: AppLanguage;
 }
 
 export interface HistoricalPeriodRecord {

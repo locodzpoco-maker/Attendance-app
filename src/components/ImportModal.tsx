@@ -12,8 +12,9 @@ import {
 } from 'lucide-react';
 import { parseRawAttendanceFile } from '../utils/parser';
 import { generateReferenceDataset, downloadSampleAttendanceFile } from '../utils/sampleData';
-import { RawAttendanceDataset, Employee } from '../types';
+import { RawAttendanceDataset, Employee, AppLanguage } from '../types';
 import { findUnmappedEmployees, createEmployeeFromDetected } from '../utils/employees';
+import { getTranslations } from '../utils/i18n';
 
 interface ImportModalProps {
   isOpen: boolean;
@@ -21,6 +22,7 @@ interface ImportModalProps {
   onDatasetLoaded: (dataset: RawAttendanceDataset) => void;
   existingEmployees?: Employee[];
   onAddBatchEmployees?: (newEmployees: Employee[]) => void;
+  language?: AppLanguage;
 }
 
 export const ImportModal: React.FC<ImportModalProps> = ({
@@ -29,7 +31,9 @@ export const ImportModal: React.FC<ImportModalProps> = ({
   onDatasetLoaded,
   existingEmployees,
   onAddBatchEmployees,
+  language,
 }) => {
+  const t = getTranslations(language);
   const [dragOver, setDragOver] = useState(false);
   const [selectedFile, setSelectedFile] = useState<File | null>(null);
   const [previewDataset, setPreviewDataset] = useState<RawAttendanceDataset | null>(null);
@@ -43,7 +47,6 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     if (!previewDataset || !existingEmployees) return [];
     return findUnmappedEmployees(previewDataset.employees, existingEmployees);
   }, [previewDataset, existingEmployees]);
-
 
   if (!isOpen) return null;
 
@@ -104,7 +107,6 @@ export const ImportModal: React.FC<ImportModalProps> = ({
     }
   };
 
-
   return (
     <div
       id="import-modal-backdrop"
@@ -120,8 +122,8 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               <UploadCloud className="h-5 w-5" />
             </div>
             <div>
-              <h3 className="text-base font-bold text-slate-900">Import Raw Attendance Export</h3>
-              <p className="text-xs text-slate-500">Supports legacy .xls and modern .xlsx formats</p>
+              <h3 className="text-base font-bold text-slate-900">{t.importModalTitle}</h3>
+              <p className="text-xs text-slate-500">{t.importModalSubtitle}</p>
             </div>
           </div>
           <button
@@ -135,7 +137,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
 
         {/* Action helper banner */}
         <div className="my-4 flex flex-wrap items-center justify-between gap-2 rounded-xl bg-slate-50 p-3 border border-slate-200 text-xs">
-          <span className="text-slate-600">Need a sample file to test right away?</span>
+          <span className="text-slate-600">{t.needSamplePrompt}</span>
           <div className="flex items-center gap-2">
             <button
               id="download-sample-file-btn"
@@ -143,7 +145,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               className="inline-flex items-center gap-1 font-semibold text-indigo-600 hover:text-indigo-800"
             >
               <Download className="h-3.5 w-3.5" />
-              Download AttendanceRecord_0 (56).xlsx
+              {t.downloadSampleFile}
             </button>
             <span className="text-slate-300">|</span>
             <button
@@ -152,7 +154,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
               className="inline-flex items-center gap-1 font-semibold text-emerald-600 hover:text-emerald-800"
             >
               <Sparkles className="h-3.5 w-3.5" />
-              Load July 2026 Reference Data
+              {t.loadDemoData}
             </button>
           </div>
         </div>
@@ -185,11 +187,11 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           </div>
           <p className="text-sm font-semibold text-slate-700">
             {isLoading
-              ? 'Reading and validating spreadsheet...'
-              : 'Drop your attendance file here, or browse'}
+              ? t.readingSpreadsheet
+              : t.dropAttendanceFile}
           </p>
           <p className="text-xs text-slate-400 mt-1">
-            Accepts raw exports from fingerprint / biometric software (.xls or .xlsx)
+            {t.biometricFormatsNotice}
           </p>
         </div>
 
@@ -204,48 +206,48 @@ export const ImportModal: React.FC<ImportModalProps> = ({
           </div>
         )}
 
-        {/* Successful validation summary preview (PRD Section 9: Import Validation) */}
+        {/* Successful validation summary preview */}
         {previewDataset && !errorMessage && (
           <div className="mt-4 rounded-xl border border-emerald-200 bg-emerald-50/50 p-4">
             <div className="flex items-center gap-2 text-emerald-800 font-bold text-xs uppercase tracking-wider pb-2 border-b border-emerald-200">
               <CheckCircle className="h-4 w-4 text-emerald-600" />
-              File Verified & Validated Successfully
+              {t.fileValidatedSuccess}
             </div>
 
             <div className="grid grid-cols-2 sm:grid-cols-3 gap-3 mt-3 text-xs">
               <div>
-                <span className="text-slate-500">File Name:</span>
+                <span className="text-slate-500">{t.fileNameLabel}:</span>
                 <p className="font-mono font-medium text-slate-800 truncate">
                   {previewDataset.fileName}
                 </p>
               </div>
               <div>
-                <span className="text-slate-500">Worksheet Detected:</span>
+                <span className="text-slate-500">Worksheet:</span>
                 <p className="font-medium text-slate-800">{previewDataset.sheetName}</p>
               </div>
               <div>
-                <span className="text-slate-500">Attendance Period:</span>
+                <span className="text-slate-500">{t.currentPeriod}:</span>
                 <p className="font-medium text-slate-800">
                   {previewDataset.startDate} → {previewDataset.endDate}
                 </p>
               </div>
               <div>
-                <span className="text-slate-500">Employees Found:</span>
+                <span className="text-slate-500">{t.totalEmployees}:</span>
                 <p className="font-bold text-emerald-700">{previewDataset.employees.length}</p>
               </div>
               <div>
-                <span className="text-slate-500">Calendar Days:</span>
-                <p className="font-medium text-slate-800">{previewDataset.totalDays} days</p>
+                <span className="text-slate-500">{t.daysWord}:</span>
+                <p className="font-medium text-slate-800">{previewDataset.totalDays} {t.calendarDaysCount}</p>
               </div>
               <div>
-                <span className="text-slate-500">Validation Status:</span>
-                <p className="font-bold text-emerald-700">Ready for calculation</p>
+                <span className="text-slate-500">Status:</span>
+                <p className="font-bold text-emerald-700">Ready</p>
               </div>
             </div>
 
             {/* Quick Preview of parsed employees */}
             <div className="mt-3 pt-3 border-t border-emerald-200/60">
-              <span className="text-[11px] font-semibold text-slate-500">Sample of detected employees:</span>
+              <span className="text-[11px] font-semibold text-slate-500">{t.employees}:</span>
               <div className="flex flex-wrap gap-1.5 mt-1.5">
                 {previewDataset.employees.slice(0, 6).map((e) => (
                   <span
@@ -273,15 +275,15 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                   <div className="flex items-center gap-2">
                     <UserPlus className="h-4 w-4 text-amber-600 shrink-0" />
                     <span className="font-bold text-amber-950">
-                      {unmappedInPreview.length} New Workers Detected (Not in Saved Mapping)
+                      {unmappedInPreview.length} {t.unmappedWorkers}
                     </span>
                   </div>
                   <span className="rounded-full bg-amber-200/80 px-2 py-0.5 font-mono text-[11px] font-bold text-amber-900 shrink-0">
-                    {previewDataset.employees.length} in file vs {existingEmployees?.length || 0} saved
+                    {previewDataset.employees.length} vs {existingEmployees?.length || 0}
                   </span>
                 </div>
                 <p className="mt-1 text-amber-800/90 text-[11px] leading-relaxed">
-                  The uploaded file contains <strong>{unmappedInPreview.length}</strong> workers not yet saved in your Employee Mapping directory.
+                  {t.unmappedDetectedSubtitle}
                 </p>
                 {onAddBatchEmployees && (
                   <label className="mt-2.5 flex items-center gap-2 cursor-pointer select-none font-semibold text-amber-950 bg-white/70 border border-amber-200 rounded-lg p-2 hover:bg-white transition-colors">
@@ -293,7 +295,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
                       className="h-4 w-4 rounded border-amber-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
                     />
                     <span>
-                      Automatically add these <strong>{unmappedInPreview.length}</strong> new workers to Employee Mapping upon calculation
+                      {t.autoAddUnmappedLabel} ({unmappedInPreview.length})
                     </span>
                   </label>
                 )}
@@ -310,7 +312,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             onClick={onClose}
             className="rounded-xl px-4 py-2 text-xs font-semibold text-slate-600 hover:bg-slate-100 transition-colors"
           >
-            Cancel
+            {t.cancel}
           </button>
           <button
             type="button"
@@ -324,7 +326,7 @@ export const ImportModal: React.FC<ImportModalProps> = ({
             }`}
           >
             <Play className="h-4 w-4 fill-white" />
-            CALCULATE ATTENDANCE
+            {t.calculateAttendance}
           </button>
         </div>
       </div>

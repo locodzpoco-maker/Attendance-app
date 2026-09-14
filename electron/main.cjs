@@ -32,23 +32,59 @@ async function createWindow() {
       contextIsolation: true,
       nodeIntegration: false,
       sandbox: false,
+      webSecurity: false, // Prevents CORS errors when loading Vite JS modules from local file:// URL
     },
   });
 
   // Remove default menu for clean native desktop look
   mainWindow.setMenuBarVisibility(false);
 
-  // In production, load the built static HTML from dist/
-  const distHtmlPath = path.join(__dirname, '../dist/index.html');
-  const isDev = process.env.NODE_ENV === 'development' || !app.isPackaged;
+  // Enable F12 and Ctrl+Shift+I to toggle DevTools if needed
+  mainWindow.webContents.on('before-input-event', (event, input) => {
+    if ((input.control || input.meta) && input.shift && input.key.toLowerCase() === 'i') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+    if (input.key === 'F12') {
+      mainWindow.webContents.toggleDevTools();
+      event.preventDefault();
+    }
+  });
 
-  if (isDev && process.env.VITE_DEV_SERVER_URL) {
+  // Log loading errors
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL) => {
+    console.error('Window failed to load:', errorCode, errorDescription, validatedURL);
+  });
+
+  const isDev = !app.isPackaged && process.env.NODE_ENV === 'development' && Boolean(process.env.VITE_DEV_SERVER_URL);
+
+  if (isDev) {
     await mainWindow.loadURL(process.env.VITE_DEV_SERVER_URL);
-  } else if (fs.existsSync(distHtmlPath)) {
-    await mainWindow.loadFile(distHtmlPath);
   } else {
-    // Fallback URL if dist not built yet
-    await mainWindow.loadURL('http://localhost:3000');
+    // In production or packaged app, load the built static HTML from dist/
+    const candidatePaths = [
+      path.join(app.getAppPath(), 'dist', 'index.html'),
+      path.join(__dirname, '..', 'dist', 'index.html'),
+      path.join(__dirname, 'dist', 'index.html'),
+    ];
+
+    let loaded = false;
+    for (const targetPath of candidatePaths) {
+      if (fs.existsSync(targetPath)) {
+        try {
+          await mainWindow.loadFile(targetPath);
+          loaded = true;
+          break;
+        } catch (e) {
+          console.warn(`Could not loadFile at ${targetPath}:`, e);
+        }
+      }
+    }
+
+    if (!loaded) {
+      // Direct load fallback
+      await mainWindow.loadFile(path.join(app.getAppPath(), 'dist', 'index.html'));
+    }
   }
 
   mainWindow.on('closed', () => {
@@ -219,26 +255,31 @@ function registerIpcHandlers() {
 }
 
 app.whenReady().then(async () => {
-  db = new AttendanceDatabase();
-  await db.init();
-  registerIpcHandlers();
-
-  // Automatic backup on app launch
   try {
-    db.createBackup('auto_startup');
+    db = new AttendanceDatabase();
+    await db.init();
+    registerIpcHandlers();
+
+    // Automatic backup on app launch
+    try {
+      db.createBackup('auto_startup');
+    } catch (err) {
+      console.warn('Startup backup notice:', err);
+    }
+
+    // Periodic automatic backup every 4 hours while app is running
+    setInterval(() => {
+      try {
+        db.createBackup();
+      } catch (err) {
+        console.warn('Periodic backup notice:', err);
+      }
+    }, 4 * 60 * 60 * 1000);
   } catch (err) {
-    console.warn('Startup backup notice:', err);
+    console.error('Database setup initialization error:', err);
   }
 
-  // Periodic automatic backup every 4 hours while app is running
-  setInterval(() => {
-    try {
-      db.createBackup();
-    } catch (err) {
-      console.warn('Periodic backup notice:', err);
-    }
-  }, 4 * 60 * 60 * 1000);
-
+  // Ensure window is always created
   await createWindow();
 
   app.on('activate', () => {

@@ -10,11 +10,13 @@ import {
   AttendanceAuditLog,
   HistoricalPeriodRecord,
   PaidVacation,
+  AppLanguage,
 } from './types';
 import { DEFAULT_SCHEDULES } from './utils/schedules';
 import { DEFAULT_EMPLOYEES, findUnmappedEmployees } from './utils/employees';
 import { calculateAttendance } from './utils/calculator';
 import { generateReferenceDataset } from './utils/sampleData';
+import { getTranslations, isRtlLanguage } from './utils/i18n';
 import {
   exportDailyAttendanceToExcel,
   exportDailyAttendanceToPDF,
@@ -68,6 +70,7 @@ export default function App() {
       defaultBreakGraceMinutes: 10,
       allowRecalculationOnFly: true,
       activeRole: 'Administrator',
+      language: 'fr',
     };
     const saved = getStorageItem<Partial<AppSettings> | null>('ams_settings', null);
     if (saved && typeof saved === 'object') {
@@ -282,6 +285,15 @@ export default function App() {
       reloadFromDatabase();
     }
   }, [reloadFromDatabase]);
+
+  // Sync document language and RTL layout direction
+  useEffect(() => {
+    const currentLang = settings.language || 'fr';
+    if (typeof document !== 'undefined') {
+      document.documentElement.lang = currentLang;
+      document.documentElement.dir = isRtlLanguage(currentLang) ? 'rtl' : 'ltr';
+    }
+  }, [settings.language]);
 
   // Main Calculation Execution
   const { dailyRecords, monthlySummary } = useMemo(() => {
@@ -687,6 +699,7 @@ export default function App() {
         selectedPeriodId={selectedPeriodId}
         settings={settings}
         onUpdateRole={(role) => setSettings((s) => ({ ...s, activeRole: role }))}
+        onUpdateLanguage={(newLang) => handleUpdateSettings({ ...settings, language: newLang })}
         unmappedEmployeesCount={unmappedEmployeesCount}
         onOpenDatabaseModal={() => setIsDatabaseModalOpen(true)}
         onOpenVacationModal={() => handleOpenVacationModal()}
@@ -759,6 +772,7 @@ export default function App() {
             onExportBackup={handleExportBackup}
             onImportBackup={handleImportBackup}
             canEdit={settings.activeRole !== 'Management'}
+            settings={settings}
           />
         )}
 
@@ -810,6 +824,7 @@ export default function App() {
         isOpen={isDatabaseModalOpen}
         onClose={() => setIsDatabaseModalOpen(false)}
         onDataReloadNeeded={reloadFromDatabase}
+        language={settings.language}
       />
 
       {/* Import Modal */}
@@ -819,6 +834,7 @@ export default function App() {
         onDatasetLoaded={handleDatasetLoaded}
         existingEmployees={employees}
         onAddBatchEmployees={handleAddBatchEmployees}
+        language={settings.language}
       />
 
       {/* Manual Punch Correction Modal */}
@@ -828,6 +844,7 @@ export default function App() {
           onClose={() => setActiveCorrectionRecord(null)}
           onSave={handleSaveCorrection}
           currentUser={settings.activeRole}
+          language={settings.language}
         />
       )}
 

@@ -57,7 +57,35 @@ class AttendanceDatabase {
     this.ensureDirectories();
 
     if (!this.SQL) {
-      this.SQL = await initSqlJs();
+      try {
+        const wasmCandidates = [
+          path.join(__dirname, '../node_modules/sql.js/dist/sql-wasm.wasm'),
+          path.join(process.resourcesPath || '', 'sql-wasm.wasm'),
+          path.join(process.resourcesPath || '', 'app.asar.unpacked/node_modules/sql.js/dist/sql-wasm.wasm'),
+          path.join(__dirname, 'sql-wasm.wasm'),
+        ];
+        const validWasm = wasmCandidates.find((p) => p && fs.existsSync(p));
+
+        if (validWasm) {
+          this.SQL = await initSqlJs({
+            locateFile: () => validWasm,
+          });
+        } else {
+          this.SQL = await initSqlJs();
+        }
+      } catch (err) {
+        console.warn('Custom wasm resolution fallback:', err);
+        try {
+          this.SQL = await initSqlJs();
+        } catch (fatalSqlErr) {
+          console.error('Fatal SQL.js initialization error:', fatalSqlErr);
+        }
+      }
+    }
+
+    if (!this.SQL) {
+      console.warn('Running in memory-fallback mode without native SQLite WebAssembly engine.');
+      return false;
     }
 
     if (fs.existsSync(this.dbPath)) {

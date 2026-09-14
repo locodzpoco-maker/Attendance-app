@@ -3,6 +3,7 @@ import { Employee, WorkSchedule, AppSettings, RawEmployeeRecord } from '../types
 import { isStockWorker, isAdminWorker, findUnmappedEmployees, createEmployeeFromDetected } from '../utils/employees';
 import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert, UserPlus, Sparkles, Zap, Check, Palmtree } from 'lucide-react';
 import { AddDetectedWorkersModal } from './AddDetectedWorkersModal';
+import { getTranslations } from '../utils/i18n';
 
 interface EmployeesViewProps {
   employees: Employee[];
@@ -27,6 +28,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   settings,
   rawEmployeesFromDataset,
 }) => {
+  const t = getTranslations(settings.language);
   const [searchTerm, setSearchTerm] = useState('');
   const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'STOCK' | 'ADMIN'>('ALL');
   const [modalOpen, setModalOpen] = useState(false);
@@ -43,14 +45,14 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     if (!onAddBatchEmployees || unmappedWorkers.length === 0) return;
     const newEmployees = unmappedWorkers.map((w) => createEmployeeFromDetected(w));
     onAddBatchEmployees(newEmployees);
-    setToastMessage(`Successfully added all ${newEmployees.length} detected workers to Employee Mapping!`);
+    setToastMessage(`Successfully added all ${newEmployees.length} detected workers!`);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
   const handleAddBatchFromModal = (newEmps: Employee[]) => {
     if (!onAddBatchEmployees) return;
     onAddBatchEmployees(newEmps);
-    setToastMessage(`Successfully added ${newEmps.length} worker${newEmps.length > 1 ? 's' : ''} to Employee Mapping!`);
+    setToastMessage(`Successfully added ${newEmps.length} worker${newEmps.length > 1 ? 's' : ''}!`);
     setTimeout(() => setToastMessage(null), 4000);
   };
 
@@ -185,14 +187,14 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h4 className="text-sm font-bold text-amber-950">
-                  {unmappedWorkers.length} Unmapped Workers Detected in Attendance File
+                  {unmappedWorkers.length} {t.unmappedDetectedTitle}
                 </h4>
                 <span className="rounded-full bg-amber-200/80 px-2 py-0.5 text-xs font-bold text-amber-900 font-mono">
-                  {rawEmployeesFromDataset?.length || 0} in file vs {employees.length} saved
+                  {rawEmployeesFromDataset?.length || 0} / {employees.length}
                 </span>
               </div>
               <p className="text-xs text-amber-800/90 mt-0.5 max-w-2xl">
-                The imported raw attendance file contains <strong>{rawEmployeesFromDataset?.length || (employees.length + unmappedWorkers.length)}</strong> workers, but only <strong>{employees.length}</strong> are saved in your Employee Mapping. You can add the remaining <strong>{unmappedWorkers.length}</strong> workers with their auto-detected shifts.
+                {t.unmappedDetectedSubtitle}
               </p>
             </div>
           </div>
@@ -206,7 +208,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
               title="Add all detected unmapped workers with default detected shifts"
             >
               <Zap className="h-3.5 w-3.5 fill-amber-500 text-amber-600" />
-              Quick Add All ({unmappedWorkers.length})
+              {t.batchAdd} ({unmappedWorkers.length})
             </button>
 
             <button
@@ -217,7 +219,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
               title="Review, customize departments/schedules, and add selected workers"
             >
               <UserPlus className="h-4 w-4" />
-              Review & Add ({unmappedWorkers.length})
+              {t.detectMissing} ({unmappedWorkers.length})
             </button>
           </div>
         </div>
@@ -232,7 +234,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
               <input
                 id="search-employee-input"
                 type="text"
-                placeholder="Search ID (e.g. 00039) or Name..."
+                placeholder={t.searchEmployeePlaceholder}
                 value={searchTerm}
                 onChange={(e) => setSearchTerm(e.target.value)}
                 className="w-full rounded-xl border border-slate-300 pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
@@ -245,21 +247,21 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                 onClick={() => setCategoryFilter("ALL")}
                 className={`rounded-lg px-2.5 py-1 transition-all ${categoryFilter === "ALL" ? "bg-white text-slate-900 shadow-2xs font-bold" : "text-slate-600 hover:text-slate-900"}`}
               >
-                All ({employees.length})
+                {t.allWorkers} ({employees.length})
               </button>
               <button
                 type="button"
                 onClick={() => setCategoryFilter("STOCK")}
                 className={`rounded-lg px-2.5 py-1 transition-all ${categoryFilter === "STOCK" ? "bg-indigo-600 text-white shadow-2xs font-bold" : "text-slate-600 hover:text-slate-900"}`}
               >
-                Stock Workers ({stockCount})
+                {t.allStockWorkers} ({stockCount})
               </button>
               <button
                 type="button"
                 onClick={() => setCategoryFilter("ADMIN")}
                 className={`rounded-lg px-2.5 py-1 transition-all ${categoryFilter === "ADMIN" ? "bg-slate-800 text-white shadow-2xs font-bold" : "text-slate-600 hover:text-slate-900"}`}
               >
-                Admin Workers ({adminCount})
+                {t.allAdminWorkers} ({adminCount})
               </button>
             </div>
           </div>
@@ -275,7 +277,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                   title="Review and add unmapped workers detected in attendance logs"
                 >
                   <UserPlus className="h-4 w-4" />
-                  <span>Add Detected ({unmappedWorkers.length})</span>
+                  <span>{t.detectMissing} ({unmappedWorkers.length})</span>
                 </button>
               )}
               <button
@@ -283,7 +285,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                 onClick={openAddModal}
                 className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
               >
-                <Plus className="h-4 w-4" /> Add Employee
+                <Plus className="h-4 w-4" /> {t.addEmployee}
               </button>
             </div>
           )}
@@ -296,15 +298,15 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold">
-                <th className="py-3 px-4 font-mono">Employee ID</th>
-                <th className="py-3 px-4">Name</th>
-                <th className="py-3 px-4">Department</th>
-                <th className="py-3 px-4">Group</th>
-                <th className="py-3 px-4">Assigned Schedule</th>
-                <th className="py-3 px-4 text-center">Status</th>
-                <th className="py-3 px-4">Start Date</th>
+                <th className="py-3 px-4 font-mono">{t.colId}</th>
+                <th className="py-3 px-4">{t.colName}</th>
+                <th className="py-3 px-4">{t.department}</th>
+                <th className="py-3 px-4">{t.group}</th>
+                <th className="py-3 px-4">{t.assignedSchedule}</th>
+                <th className="py-3 px-4 text-center">{t.colStatus}</th>
+                <th className="py-3 px-4">{t.colStartDate}</th>
                 {settings.activeRole !== 'Management' && (
-                  <th className="py-3 px-4 text-right">Actions</th>
+                  <th className="py-3 px-4 text-right">{t.colActions}</th>
                 )}
               </tr>
             </thead>
@@ -317,11 +319,11 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                       {e.id}
                       {isStockWorker(e.id) ? (
                         <span className="ml-2 inline-flex items-center rounded-sm bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                          STOCK
+                          {t.stockRoleBadge}
                         </span>
                       ) : (
                         <span className="ml-2 inline-flex items-center rounded-sm bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                          ADMIN
+                          {t.adminRoleBadge}
                         </span>
                       )}
                     </td>
@@ -353,7 +355,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                         ) : (
                           <XCircle className="h-3 w-3" />
                         )}
-                        {e.status}
+                        {e.status === 'Active' ? t.active : t.inactive}
                       </span>
                     </td>
                     <td className="py-3 px-4 text-slate-500">{e.startDate || '-'}</td>
@@ -363,16 +365,16 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                           <button
                             onClick={() => onOpenVacationForEmployee(e.id)}
                             className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-teal-700 bg-teal-50 hover:bg-teal-100 transition-colors font-medium text-xs"
-                            title={`Planifier congé payé pour ${e.name}`}
+                            title={`${t.btnPlanVacation}: ${e.name}`}
                           >
-                            <Palmtree className="h-3.5 w-3.5 text-teal-600" /> Congé
+                            <Palmtree className="h-3.5 w-3.5 text-teal-600" /> {t.btnVacation}
                           </button>
                         )}
                         <button
                           onClick={() => openEditModal(e)}
                           className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors font-medium text-xs"
                         >
-                          <Edit2 className="h-3.5 w-3.5" /> Edit
+                          <Edit2 className="h-3.5 w-3.5" /> {t.editEmployee}
                         </button>
                       </td>
                     )}
@@ -396,7 +398,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
           >
             <div className="flex items-center justify-between pb-4 border-b border-slate-100">
               <h3 className="text-base font-bold text-slate-900">
-                {editingEmp ? 'Edit Employee' : 'Add New Employee'}
+                {editingEmp ? t.editEmployee : t.addEmployee}
               </h3>
               <button
                 onClick={() => setModalOpen(false)}
@@ -410,7 +412,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Employee ID <span className="text-rose-500">*</span>
+                    {t.colId} <span className="text-rose-500">*</span>
                   </label>
                   <input
                     type="text"
@@ -425,22 +427,22 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Status
+                    {t.colStatus}
                   </label>
                   <select
                     value={status}
                     onChange={(e) => setStatus(e.target.value as 'Active' | 'Inactive')}
                     className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 outline-none focus:border-indigo-500"
                   >
-                    <option value="Active">Active</option>
-                    <option value="Inactive">Inactive</option>
+                    <option value="Active">{t.active}</option>
+                    <option value="Inactive">{t.inactive}</option>
                   </select>
                 </div>
               </div>
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Full Name <span className="text-rose-500">*</span>
+                  {t.fullName} <span className="text-rose-500">*</span>
                 </label>
                 <input
                   type="text"
@@ -455,7 +457,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
               <div className="grid grid-cols-2 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Company Department
+                    {t.department}
                   </label>
                   <input
                     type="text"
@@ -466,7 +468,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
-                    Group Name
+                    {t.group}
                   </label>
                   <input
                     type="text"
@@ -479,7 +481,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
 
               <div>
                 <label className="block font-semibold text-slate-700 mb-1">
-                  Assigned Work Schedule <span className="text-rose-500">*</span>
+                  {t.assignedSchedule} <span className="text-rose-500">*</span>
                 </label>
                 <select
                   value={scheduleId}
@@ -497,7 +499,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
 
               <div className="grid grid-cols-2 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">Start Date</label>
+                  <label className="block font-semibold text-slate-700 mb-1">{t.colStartDate}</label>
                   <input
                     type="date"
                     value={startDate}
@@ -527,13 +529,13 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                   onClick={() => setModalOpen(false)}
                   className="rounded-lg px-4 py-1.5 text-slate-600 hover:bg-slate-100"
                 >
-                  Cancel
+                  {t.cancel}
                 </button>
                 <button
                   type="submit"
                   className="rounded-lg bg-indigo-600 px-4 py-1.5 font-bold text-white hover:bg-indigo-700"
                 >
-                  Save Employee
+                  {t.save}
                 </button>
               </div>
             </form>

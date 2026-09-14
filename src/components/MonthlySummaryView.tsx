@@ -14,6 +14,7 @@ import {
   Palmtree,
 } from 'lucide-react';
 import { generateMonthlySummaryFromDailyRecords } from '../utils/calculator';
+import { getTranslations, translateShiftName } from '../utils/i18n';
 
 interface MonthlySummaryViewProps {
   summaries: MonthlySummaryRecord[];
@@ -42,6 +43,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
   settings,
   periodLabel,
 }) => {
+  const t = getTranslations(settings.language);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('ALL');
   const [startDate, setStartDate] = useState('');
@@ -210,7 +212,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
             <input
               id="search-monthly-input"
               type="text"
-              placeholder="Search employee by ID, Name or Department..."
+              placeholder={t.searchEmployees}
               value={searchTerm}
               onChange={(e) => setSearchTerm(e.target.value)}
               className="w-full rounded-xl border border-slate-300 pl-9 pr-3 py-1.5 text-xs text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
@@ -225,7 +227,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                 
                 {/* From Date */}
                 <div className="flex items-center gap-1">
-                  <span className="text-[11px] font-medium text-slate-500">From</span>
+                  <span className="text-[11px] font-medium text-slate-500">{t.fromDate}</span>
                   <input
                     id="monthly-filter-date-from-input"
                     type="date"
@@ -234,13 +236,13 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                     max={endDate || maxAvailableDate}
                     onChange={(e) => setStartDate(e.target.value)}
                     className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-xs text-slate-700 font-mono outline-none focus:border-indigo-500"
-                    title="Filter start date"
+                    title={t.fromDate}
                   />
                 </div>
 
                 {/* To Date */}
                 <div className="flex items-center gap-1">
-                  <span className="text-[11px] font-medium text-slate-500">To</span>
+                  <span className="text-[11px] font-medium text-slate-500">{t.toDate}</span>
                   <input
                     id="monthly-filter-date-to-input"
                     type="date"
@@ -249,7 +251,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                     max={maxAvailableDate}
                     onChange={(e) => setEndDate(e.target.value)}
                     className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-xs text-slate-700 font-mono outline-none focus:border-indigo-500"
-                    title="Filter end date"
+                    title={t.toDate}
                   />
                 </div>
 
@@ -280,13 +282,13 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                     }
                   }}
                   className="rounded border border-slate-300 bg-white px-1.5 py-0.5 text-[11px] text-slate-700 outline-none cursor-pointer"
-                  title="Quick date range presets"
+                  title={t.allDatesPreset}
                 >
-                  <option value="ALL">All Dates ({dateOptions.length} days)</option>
-                  <option value="PRESET_01_08">01 to 08 (First 8 days)</option>
-                  <option value="PRESET_01_15">01 to 15 (1st half)</option>
-                  <option value="PRESET_16_END">16 to End (2nd half)</option>
-                  {isDateRangeFiltered && <option value="CUSTOM">Custom Range Selected</option>}
+                  <option value="ALL">{t.allDatesPreset} ({dateOptions.length} {t.daysWord})</option>
+                  <option value="PRESET_01_08">{t.presetFirst8}</option>
+                  <option value="PRESET_01_15">{t.presetFirst15}</option>
+                  <option value="PRESET_16_END">{t.presetSecondHalf}</option>
+                  {isDateRangeFiltered && <option value="CUSTOM">{t.customRange}</option>}
                 </select>
 
                 {isDateRangeFiltered && (
@@ -297,7 +299,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                       setEndDate('');
                     }}
                     className="text-slate-400 hover:text-rose-600 p-0.5 rounded transition-colors"
-                    title="Reset date range to all dates"
+                    title={t.resetToFullMonth}
                   >
                     <X className="h-3.5 w-3.5" />
                   </button>
@@ -311,10 +313,10 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
               onChange={(e) => setSelectedGroup(e.target.value)}
               className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-slate-700 outline-none"
             >
-              <option value="ALL">All Groups ({activeSummaries.length} employees)</option>
+              <option value="ALL">{t.allGroups} ({activeSummaries.length})</option>
               {groupOptions.map((g) => (
                 <option key={g} value={g}>
-                  {g}
+                  {translateShiftName(g, settings.language) || g}
                 </option>
               ))}
             </select>
@@ -324,17 +326,17 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                 id="monthly-export-xlsx-btn"
                 onClick={handleExportXLSX}
                 className="inline-flex items-center gap-1 rounded-lg bg-emerald-600 px-3 py-1 font-semibold text-white hover:bg-emerald-700 transition-colors shadow-2xs"
-                title={isDateRangeFiltered ? `Export summary for ${activePeriodLabel}` : 'Export summary'}
+                title={isDateRangeFiltered ? `${t.exportExcel} (${activePeriodLabel})` : t.exportExcel}
               >
-                <Download className="h-3 w-3" /> Export Excel
+                <Download className="h-3 w-3" /> {t.exportExcel}
               </button>
               <button
                 id="monthly-export-pdf-btn"
                 onClick={handleExportPDFFile}
                 className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-3 py-1 font-semibold text-white hover:bg-slate-900 transition-colors shadow-2xs"
-                title={isDateRangeFiltered ? `Export summary for ${activePeriodLabel}` : 'Print summary'}
+                title={isDateRangeFiltered ? `${t.exportPdf} (${activePeriodLabel})` : t.exportPdf}
               >
-                <Download className="h-3 w-3" /> Print PDF
+                <Download className="h-3 w-3" /> {t.exportPdf}
               </button>
             </div>
           </div>
@@ -347,17 +349,14 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
           <div className="flex items-center gap-2">
             <CalendarRange className="h-4 w-4 text-indigo-600 shrink-0" />
             <span>
-              <strong>Summary Period Filter:</strong>{' '}
+              <strong>{t.period}:</strong>{' '}
               <span className="font-mono font-semibold text-indigo-900 bg-white px-1.5 py-0.5 rounded border border-indigo-200">
                 {formatIsoToDisplay(effectiveStartDate || minAvailableDate)}
               </span>{' '}
-              <span className="text-indigo-400 font-medium">to</span>{' '}
+              <span className="text-indigo-400 font-medium">→</span>{' '}
               <span className="font-mono font-semibold text-indigo-900 bg-white px-1.5 py-0.5 rounded border border-indigo-200">
                 {formatIsoToDisplay(effectiveEndDate || maxAvailableDate)}
               </span>
-            </span>
-            <span className="text-slate-500 text-[11px]">
-              • Recalculated metrics for {filteredSummaries.length} employee{filteredSummaries.length > 1 ? 's' : ''} in this period
             </span>
           </div>
           <div className="flex items-center gap-2">
@@ -368,7 +367,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
               }}
               className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-indigo-700 border border-indigo-200 hover:bg-indigo-100/50 transition-colors shadow-2xs"
             >
-              <RotateCcw className="h-3 w-3" /> Reset to Full Month
+              <RotateCcw className="h-3 w-3" /> {t.resetToFullMonth}
             </button>
           </div>
         </div>
@@ -380,19 +379,19 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold">
-                <th className="py-3 px-3">Employee Name</th>
-                <th className="py-3 px-3 font-mono">ID</th>
-                <th className="py-3 px-3">Department</th>
-                <th className="py-3 px-3">Group & Schedule</th>
-                <th className="py-3 px-3 text-center">Present Days</th>
-                <th className="py-3 px-3 text-center text-teal-800">Congé Payé</th>
-                <th className="py-3 px-3 text-center">Absent Days</th>
-                <th className="py-3 px-3 text-center">OFF Days</th>
-                <th className="py-3 px-3 text-center">Worked Hours</th>
-                <th className="py-3 px-3 text-center font-bold text-indigo-700">Supp Hours</th>
-                <th className="py-3 px-3 text-center">Late Days</th>
-                <th className="py-3 px-3 text-center">Late Minutes</th>
-                <th className="py-3 px-3 text-center">Missing Punches</th>
+                <th className="py-3 px-3">{t.colName}</th>
+                <th className="py-3 px-3 font-mono">{t.colId}</th>
+                <th className="py-3 px-3">{t.colDept}</th>
+                <th className="py-3 px-3">{t.groupSchedule}</th>
+                <th className="py-3 px-3 text-center">{t.colPresentDays}</th>
+                <th className="py-3 px-3 text-center text-teal-800">{t.colVacationDays}</th>
+                <th className="py-3 px-3 text-center">{t.colAbsentDays}</th>
+                <th className="py-3 px-3 text-center">{t.colOffDays}</th>
+                <th className="py-3 px-3 text-center">{t.colTotalWorked}</th>
+                <th className="py-3 px-3 text-center font-bold text-indigo-700">{t.colTotalSupp}</th>
+                <th className="py-3 px-3 text-center">{t.colLateDays}</th>
+                <th className="py-3 px-3 text-center">{t.colTotalLate}</th>
+                <th className="py-3 px-3 text-center">{t.colMissingPunches}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
@@ -422,8 +421,8 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
 
                     {/* Group & Schedule */}
                     <td className="py-2.5 px-3 whitespace-nowrap">
-                      <span className="font-medium text-slate-700">{s.groupName}</span>
-                      <span className="block text-[10px] text-slate-400">{s.scheduleName}</span>
+                      <span className="font-medium text-slate-700">{translateShiftName(s.groupName, settings.language) || s.groupName}</span>
+                      <span className="block text-[10px] text-slate-400">{translateShiftName(s.scheduleName, settings.language) || s.scheduleName}</span>
                     </td>
 
                     {/* Present Days (excluding OFF) */}

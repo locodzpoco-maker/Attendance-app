@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { AppSettings, AttendanceAuditLog, HistoricalPeriodRecord } from '../types';
+import { AppSettings, AttendanceAuditLog, HistoricalPeriodRecord, AppLanguage } from '../types';
 import {
   Settings as SettingsIcon,
   Shield,
@@ -14,7 +14,9 @@ import {
   CheckCircle2,
   Download,
   Upload,
+  Languages,
 } from 'lucide-react';
+import { getTranslations } from '../utils/i18n';
 
 interface SettingsViewProps {
   settings: AppSettings;
@@ -41,12 +43,15 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   onImportBackup,
   onOpenDatabaseModal,
 }) => {
+  const t = getTranslations(settings.language);
+
   const [companyName, setCompanyName] = useState(settings.companyName);
   const [companySubtitle, setCompanySubtitle] = useState(settings.companySubtitle);
   const [overtimeGrace, setOvertimeGrace] = useState(settings.defaultOvertimeGraceMinutes);
   const [arrivalGrace, setArrivalGrace] = useState(settings.defaultArrivalGraceMinutes);
   const [breakGrace, setBreakGrace] = useState(settings.defaultBreakGraceMinutes ?? 10);
   const [activeRole, setActiveRole] = useState(settings.activeRole);
+  const [selectedLanguage, setSelectedLanguage] = useState<AppLanguage>(settings.language || 'fr');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -57,7 +62,16 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setArrivalGrace(settings.defaultArrivalGraceMinutes);
     setBreakGrace(settings.defaultBreakGraceMinutes ?? 10);
     setActiveRole(settings.activeRole);
+    setSelectedLanguage(settings.language || 'fr');
   }, [settings]);
+
+  const handleLanguageChange = (lang: AppLanguage) => {
+    setSelectedLanguage(lang);
+    onUpdateSettings({
+      ...settings,
+      language: lang,
+    });
+  };
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -69,6 +83,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       defaultArrivalGraceMinutes: Number(arrivalGrace),
       defaultBreakGraceMinutes: Number(breakGrace),
       activeRole,
+      language: selectedLanguage,
     });
     setSavedSuccess(true);
     setTimeout(() => setSavedSuccess(false), 3000);
@@ -76,13 +91,100 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
   return (
     <div className="space-y-6 pb-12">
+      {/* Language Selection Card */}
+      <div className="rounded-2xl border border-indigo-100 bg-linear-to-r from-indigo-50/70 via-white to-purple-50/70 p-6 shadow-xs">
+        <div className="flex items-center gap-3 pb-4 border-b border-indigo-100/70">
+          <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-indigo-600 text-white shadow-xs">
+            <Languages className="h-5 w-5" />
+          </div>
+          <div>
+            <h2 className="text-base font-bold text-slate-900">{t.languageSettings}</h2>
+            <p className="text-xs text-slate-500">{t.languageSettingsDesc}</p>
+          </div>
+        </div>
+
+        <div className="mt-4 grid grid-cols-1 sm:grid-cols-3 gap-3">
+          {/* French */}
+          <button
+            type="button"
+            onClick={() => handleLanguageChange('fr')}
+            className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
+              selectedLanguage === 'fr'
+                ? 'border-indigo-600 bg-white ring-2 ring-indigo-600/20 shadow-xs'
+                : 'border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-2xl">🇫🇷</span>
+              {selectedLanguage === 'fr' && (
+                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
+                  Actif
+                </span>
+              )}
+            </div>
+            <div className="mt-2">
+              <span className="font-bold text-slate-900 block text-sm">Français</span>
+              <span className="text-[11px] text-slate-500 block mt-0.5">Interface en français standard</span>
+            </div>
+          </button>
+
+          {/* English */}
+          <button
+            type="button"
+            onClick={() => handleLanguageChange('en')}
+            className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
+              selectedLanguage === 'en'
+                ? 'border-indigo-600 bg-white ring-2 ring-indigo-600/20 shadow-xs'
+                : 'border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              <span className="text-2xl">🇬🇧</span>
+              {selectedLanguage === 'en' && (
+                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
+                  Active
+                </span>
+              )}
+            </div>
+            <div className="mt-2">
+              <span className="font-bold text-slate-900 block text-sm">English</span>
+              <span className="text-[11px] text-slate-500 block mt-0.5">Standard English interface</span>
+            </div>
+          </button>
+
+          {/* Arabic */}
+          <button
+            type="button"
+            onClick={() => handleLanguageChange('ar')}
+            className={`p-4 rounded-xl border text-right transition-all flex flex-col justify-between ${
+              selectedLanguage === 'ar'
+                ? 'border-indigo-600 bg-white ring-2 ring-indigo-600/20 shadow-xs'
+                : 'border-slate-200 bg-white/70 hover:bg-white hover:border-slate-300'
+            }`}
+          >
+            <div className="flex items-center justify-between">
+              {selectedLanguage === 'ar' && (
+                <span className="inline-flex items-center rounded-full bg-indigo-100 px-2 py-0.5 text-[11px] font-bold text-indigo-700">
+                  نشط
+                </span>
+              )}
+              <span className="text-2xl">🇩🇿</span>
+            </div>
+            <div className="mt-2">
+              <span className="font-bold text-slate-900 block text-sm font-sans">العربية</span>
+              <span className="text-[11px] text-slate-500 block mt-0.5">واجهة كاملة مع دعم من اليمين لليسار (RTL)</span>
+            </div>
+          </button>
+        </div>
+      </div>
+
       {/* Settings Form */}
       <div className="rounded-2xl border border-slate-200 bg-white p-6 shadow-xs">
         <div className="flex items-center gap-2 pb-4 border-b border-slate-100">
           <Building className="h-5 w-5 text-indigo-600" />
           <div>
-            <h2 className="text-base font-bold text-slate-900">Application & Engine Settings</h2>
-            <p className="text-xs text-slate-500">PRD Section 27: Company headers, grace thresholds, and role policies</p>
+            <h2 className="text-base font-bold text-slate-900">{t.companySettings}</h2>
+            <p className="text-xs text-slate-500">{t.gracePeriods}</p>
           </div>
         </div>
 
@@ -90,7 +192,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                Company / Organization Name
+                {t.companyName}
               </label>
               <input
                 id="setting-company-name"
@@ -103,7 +205,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
 
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                Report Subtitle / Description
+                {t.companySubtitleLabel}
               </label>
               <input
                 id="setting-company-subtitle"
@@ -118,7 +220,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           <div className="grid grid-cols-1 sm:grid-cols-4 gap-4 pt-2">
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                Default Overtime Grace (Min)
+                {t.overtimeGraceMinutes}
               </label>
               <input
                 id="setting-ot-grace"
@@ -130,13 +232,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-slate-800 outline-none focus:border-indigo-500"
               />
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Default 15m. Once exceeded, count entire OT from start.
+                Default 15m.
               </span>
             </div>
 
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                Arrival Grace (1st In) (Min)
+                {t.arrivalGraceMinutes}
               </label>
               <input
                 id="setting-arrival-grace"
@@ -148,13 +250,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-slate-800 outline-none focus:border-indigo-500"
               />
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Default 10m. Grace allowed on shift start.
+                Default 10m.
               </span>
             </div>
 
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                Break Return Grace (2nd In) (Min)
+                {t.breakGraceMinutes}
               </label>
               <input
                 id="setting-break-grace"
@@ -166,13 +268,13 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 font-mono text-slate-800 outline-none focus:border-indigo-500"
               />
               <span className="text-[11px] text-slate-400 mt-1 block">
-                Default 10m. Grace allowed on return from break.
+                Default 10m.
               </span>
             </div>
 
             <div>
               <label className="block font-semibold text-slate-700 mb-1">
-                Current Access Role
+                {t.userRoles}
               </label>
               <select
                 id="setting-active-role"
@@ -180,23 +282,20 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 onChange={(e) => setActiveRole(e.target.value as AppSettings['activeRole'])}
                 className="w-full rounded-xl border border-slate-300 px-3 py-2 text-slate-800 outline-none focus:border-indigo-500"
               >
-                <option value="Administrator">Administrator (Full Access)</option>
-                <option value="HR / Attendance User">HR / Attendance User (Import & Calculate)</option>
-                <option value="Management">Management (Read-Only Dashboards)</option>
+                <option value="Administrator">{t.admin}</option>
+                <option value="HR / Attendance User">{t.hrUser}</option>
+                <option value="Management">{t.management}</option>
               </select>
-              <span className="text-[11px] text-slate-400 mt-1 block">
-                Controls edit permissions for punches and schedules
-              </span>
             </div>
           </div>
 
           <div className="flex items-center justify-between pt-4 border-t border-slate-100">
             {savedSuccess ? (
               <span className="inline-flex items-center gap-1 font-semibold text-emerald-600">
-                <CheckCircle className="h-4 w-4" /> Settings updated successfully!
+                <CheckCircle className="h-4 w-4" /> {t.save} ✓
               </span>
             ) : (
-              <span className="text-slate-400">Settings take effect immediately for calculations</span>
+              <span className="text-slate-400">{t.currentPeriod}</span>
             )}
 
             <button
@@ -204,7 +303,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
               id="save-settings-btn"
               className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-5 py-2 font-bold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
             >
-              <Save className="h-4 w-4" /> Save Configuration
+              <Save className="h-4 w-4" /> {t.save}
             </button>
           </div>
         </form>
@@ -430,9 +529,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 type="button"
                 onClick={onExportBackup}
                 className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
-                title="Download JSON file containing all settings and schedules"
+                title={t.exportBackup}
               >
-                <Download className="h-3.5 w-3.5 text-slate-500" /> Export Backup
+                <Download className="h-3.5 w-3.5 text-slate-500" /> {t.exportBackup}
               </button>
             )}
 
@@ -455,9 +554,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                   type="button"
                   onClick={() => fileInputRef.current?.click()}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
-                  title="Import previously exported JSON configuration file"
+                  title={t.importBackup}
                 >
-                  <Upload className="h-3.5 w-3.5 text-indigo-600" /> Import Backup
+                  <Upload className="h-3.5 w-3.5 text-indigo-600" /> {t.importBackup}
                 </button>
               </>
             )}
@@ -467,18 +566,18 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
         {onResetAllData && settings.activeRole === 'Administrator' && (
           <div className="mt-4 pt-4 border-t border-slate-100 flex items-center justify-between">
             <p className="text-xs text-slate-500">
-              Need to clear custom changes and restore clean factory defaults?
+              {t.resetConfirm}
             </p>
             <button
               type="button"
               onClick={() => {
-                if (window.confirm('Reset all settings, schedules, and custom attendance records to clean factory defaults?')) {
+                if (window.confirm(t.resetConfirm)) {
                   onResetAllData();
                 }
               }}
               className="inline-flex items-center gap-1.5 rounded-xl border border-rose-200 bg-rose-50 px-3.5 py-1.5 text-xs font-semibold text-rose-700 hover:bg-rose-100 transition-colors"
             >
-              <RotateCcw className="h-3.5 w-3.5" /> Reset All Data to Factory Defaults
+              <RotateCcw className="h-3.5 w-3.5" /> {t.resetAllData}
             </button>
           </div>
         )}

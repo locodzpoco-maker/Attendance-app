@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
-import { DailyAttendanceRecord } from '../types';
+import { DailyAttendanceRecord, AppLanguage } from '../types';
 import { Clock, ShieldAlert, Check, X, HelpCircle, Layers, Zap } from 'lucide-react';
 import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
+import { getTranslations } from '../utils/i18n';
 
 interface ManualCorrectionModalProps {
   record: DailyAttendanceRecord | null;
@@ -17,6 +18,7 @@ interface ManualCorrectionModalProps {
     injectedSuppMinutes?: number
   ) => void;
   currentUser: string;
+  language?: AppLanguage;
 }
 
 export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
@@ -24,8 +26,10 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
   onClose,
   onSave,
   currentUser,
+  language,
 }) => {
   if (!record) return null;
+  const t = getTranslations(language);
 
   const [entry, setEntry] = useState(record.entryTime || '');
   const [secondCheckIn, setSecondCheckIn] = useState(record.secondCheckInTime || '');
@@ -80,10 +84,10 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
             </div>
             <div>
               <h3 className="text-base font-semibold text-slate-900">
-                {record.isShiftUnclear ? 'Shift Review & Punch Correction' : 'Manual Punch Correction'}
+                {record.isShiftUnclear ? t.reviewShift : t.btnAdjust}
               </h3>
               <p className="text-xs text-slate-500">
-                Audited modification for {record.employeeName} ({record.employeeId}) on {record.formattedDate}
+                {record.employeeName} ({record.employeeId}) • {record.formattedDate}
               </p>
             </div>
           </div>
@@ -102,9 +106,9 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
             <div className="flex items-start gap-2">
               <HelpCircle className="h-4 w-4 text-rose-600 shrink-0 mt-0.5" />
               <div>
-                <p className="font-bold">Shift Unclear (Action Required):</p>
+                <p className="font-bold">{t.obsShiftUnclear}:</p>
                 <p className="text-rose-800/90 mt-0.5">
-                  First check-in <span className="font-mono font-bold">{record.firstCheckInTime || record.entryTime}</span> does not clearly correspond to any of the 4 Stock shifts. Please confirm the correct shift worked below.
+                  First check-in <span className="font-mono font-bold">{record.firstCheckInTime || record.entryTime}</span>. {t.obsShiftUnclearDesc}
                 </p>
               </div>
             </div>
@@ -116,10 +120,9 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
           <div className="flex items-start gap-2">
             <ShieldAlert className="h-4 w-4 text-amber-600 shrink-0 mt-0.5" />
             <div>
-              <p className="font-medium">Raw Punch Audit Safeguard:</p>
+              <p className="font-medium">Raw Punch Audit:</p>
               <p className="text-amber-800/90 mt-0.5">
-                Original punches: <span className="font-mono font-semibold">{record.rawPunches.length > 0 ? record.rawPunches.join(', ') : 'None recorded'}</span>.
-                The raw biometric log remains permanently immutable.
+                <span className="font-mono font-semibold">{record.rawPunches.length > 0 ? record.rawPunches.join(', ') : '-'}</span>
               </p>
             </div>
           </div>
@@ -131,7 +134,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1 flex items-center gap-1.5">
                 <Layers className="h-3.5 w-3.5 text-indigo-600" />
-                <span>Stock Shift Assignment for {record.formattedDate}</span>
+                <span>{t.colShift} ({record.formattedDate})</span>
               </label>
               <select
                 id="correction-shift-select"
@@ -139,14 +142,14 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 onChange={(e) => setOverrideShift(e.target.value)}
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
               >
-                <option value="">Auto-Detect (based on first check-in)</option>
-                <option value="stock_g1">Shift 1 (10:00 – 18:00, Break 13:00–14:00, OT &gt; 18:00)</option>
-                <option value="stock_g2">Shift 2 (18:00 – 02:00 Night, Break 21:00–22:00, OT &gt; 02:00)</option>
-                <option value="stock_g3">Shift 3 (08:30 – 16:30, Break 12:00–13:00, OT &gt; 16:30)</option>
-                <option value="stock_g4">Shift 4 (16:00 – 00:00 Midnight, Break 21:00–22:00, OT &gt; 00:00)</option>
+                <option value="">{t.detectFingerprints} (Auto)</option>
+                <option value="stock_g1">{t.shift1Label} (10:00 – 18:00, Break 13:00–14:00, OT &gt; 18:00)</option>
+                <option value="stock_g2">{t.shift2Label} (18:00 – 02:00, Break 21:00–22:00, OT &gt; 02:00)</option>
+                <option value="stock_g3">{t.shift3Label} (08:30 – 16:30, Break 12:00–13:00, OT &gt; 16:30)</option>
+                <option value="stock_g4">{t.shift4Label} (16:00 – 00:00, Break 21:00–22:00, OT &gt; 00:00)</option>
               </select>
               <span className="block text-[11px] text-slate-400 mt-1">
-                Detected: {record.detectedShiftName || 'None'}
+                {t.colShift}: {record.detectedShiftName || '-'}
               </span>
             </div>
           )}
@@ -154,7 +157,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
           <div className="grid grid-cols-3 gap-2.5">
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Entry (HH:MM)
+                {t.colIn} (HH:MM)
               </label>
               <input
                 id="correction-entry-input"
@@ -165,11 +168,11 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
                 className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
               />
-              <span className="text-[11px] text-slate-400">Current: {record.entryTime || 'None'}</span>
+              <span className="text-[11px] text-slate-400">{record.entryTime || '-'}</span>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                2nd In (Pause)
+                {t.secondCheckIn}
               </label>
               <input
                 id="correction-second-in-input"
@@ -180,16 +183,11 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
                 className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
               />
-              <span className="text-[11px] text-slate-400">Current: {record.secondCheckInTime || 'None'}</span>
-              {!record.isDynamicShift && (
-                <span className="block text-[10px] text-indigo-600 mt-0.5">
-                  Admin: delay past break end (&gt; 10m grace) counts in total
-                </span>
-              )}
+              <span className="text-[11px] text-slate-400">{record.secondCheckInTime || '-'}</span>
             </div>
             <div>
               <label className="block text-xs font-semibold text-slate-700 mb-1">
-                Exit (HH:MM)
+                {t.colOut} (HH:MM)
               </label>
               <input
                 id="correction-exit-input"
@@ -200,7 +198,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 pattern="^([0-1]?[0-9]|2[0-3]):[0-5][0-9]$"
                 className="w-full rounded-lg border border-slate-300 px-2.5 py-2 text-slate-800 placeholder-slate-400 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none font-mono text-xs"
               />
-              <span className="text-[11px] text-slate-400">Current: {record.exitTime || 'None'}</span>
+              <span className="text-[11px] text-slate-400">{record.exitTime || '-'}</span>
             </div>
           </div>
 
@@ -209,7 +207,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
             <div className="flex items-center justify-between mb-2">
               <label className="font-semibold text-amber-900 flex items-center gap-1.5">
                 <Zap className="h-3.5 w-3.5 text-amber-600 fill-amber-500" />
-                <span>Inject Supplementary Hours (Overtime)</span>
+                <span>{t.injectSuppHours}</span>
               </label>
               {totalInjectedMins > 0 && (
                 <button
@@ -220,14 +218,14 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                   }}
                   className="text-[11px] text-rose-600 hover:underline"
                 >
-                  Reset to 0
+                  {t.resetDefaults}
                 </button>
               )}
             </div>
 
             <div className="grid grid-cols-2 gap-2">
               <div>
-                <span className="block text-[11px] text-slate-600 mb-0.5">Hours</span>
+                <span className="block text-[11px] text-slate-600 mb-0.5">H</span>
                 <input
                   id="correction-supp-hours-input"
                   type="number"
@@ -239,7 +237,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 />
               </div>
               <div>
-                <span className="block text-[11px] text-slate-600 mb-0.5">Minutes</span>
+                <span className="block text-[11px] text-slate-600 mb-0.5">M</span>
                 <select
                   id="correction-supp-minutes-select"
                   value={injectedMinutes}
@@ -256,23 +254,23 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
 
             <div className="mt-2 flex items-center justify-between text-[11px] text-amber-900">
               <span>
-                Injected Overtime: <strong>+{formatMinutesToHoursAndMinutes(totalInjectedMins)}</strong>
+                {t.colSupp}: <strong>+{formatMinutesToHoursAndMinutes(totalInjectedMins)}</strong>
               </span>
               <span className="text-slate-500">
-                Natural Punch OT: {formatMinutesToHoursAndMinutes(Math.max(0, record.suppMinutes - (record.injectedSuppMinutes || 0)))}
+                {formatMinutesToHoursAndMinutes(Math.max(0, record.suppMinutes - (record.injectedSuppMinutes || 0)))}
               </span>
             </div>
           </div>
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Correction Justification / Reason <span className="text-rose-500">*</span>
+              {t.colObservation} / Reason <span className="text-rose-500">*</span>
             </label>
             <textarea
               id="correction-reason-input"
               rows={2}
               required
-              placeholder="e.g. Assigned to Shift 2 night shift as per supervisor planning; badge read error verified."
+              placeholder="Justification..."
               value={reason}
               onChange={(e) => {
                 setReason(e.target.value);
@@ -284,7 +282,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
 
           <div>
             <label className="block text-xs font-semibold text-slate-700 mb-1">
-              Authorized Reviewer
+              Reviewer / Role
             </label>
             <input
               id="correction-auditor-input"
@@ -306,14 +304,14 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
               onClick={onClose}
               className="rounded-lg px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100 transition-colors"
             >
-              Cancel
+              {t.btnCancel}
             </button>
             <button
               type="submit"
               id="save-correction-btn"
               className="flex items-center gap-1.5 rounded-lg bg-indigo-600 px-4 py-2 text-xs font-semibold text-white shadow-xs hover:bg-indigo-700 transition-colors"
             >
-              <Check className="h-4 w-4" /> Save & Recalculate
+              <Check className="h-4 w-4" /> {t.btnSave}
             </button>
           </div>
         </form>

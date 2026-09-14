@@ -11,8 +11,10 @@ import {
   ShieldCheck,
   Database,
   Palmtree,
+  Languages,
 } from 'lucide-react';
-import { AppSettings, HistoricalPeriodRecord } from '../types';
+import { AppSettings, HistoricalPeriodRecord, AppLanguage } from '../types';
+import { getTranslations } from '../utils/i18n';
 
 interface HeaderProps {
   activeTab: 'dashboard' | 'daily' | 'monthly' | 'employees' | 'schedules' | 'settings';
@@ -27,6 +29,7 @@ interface HeaderProps {
   selectedPeriodId: string;
   settings: AppSettings;
   onUpdateRole: (role: AppSettings['activeRole']) => void;
+  onUpdateLanguage?: (lang: AppLanguage) => void;
   unmappedEmployeesCount?: number;
   onOpenDatabaseModal?: () => void;
   onOpenVacationModal?: () => void;
@@ -46,11 +49,14 @@ export const Header: React.FC<HeaderProps> = ({
   selectedPeriodId,
   settings,
   onUpdateRole,
+  onUpdateLanguage,
   unmappedEmployeesCount = 0,
   onOpenDatabaseModal,
   onOpenVacationModal,
   vacationCount = 0,
 }) => {
+  const t = getTranslations(settings.language);
+
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
       {/* Top Banner with App Brand, Period, Role & Fast Actions */}
@@ -63,19 +69,19 @@ export const Header: React.FC<HeaderProps> = ({
             <div>
               <div className="flex items-center gap-2">
                 <h1 className="text-base font-bold text-slate-900 leading-tight">
-                  {settings.companyName || 'Attendance Management System'}
+                  {settings.companyName || t.appTitle}
                 </h1>
                 <span className="hidden sm:inline-flex items-center rounded-md bg-emerald-50 px-2 py-0.5 text-[11px] font-medium text-emerald-700 ring-1 ring-inset ring-emerald-600/20">
                   v1.0 Ready
                 </span>
               </div>
               <p className="text-xs text-slate-500 hidden sm:block">
-                Fingerprint & Raw Biometric Time Engine
+                {settings.companySubtitle || t.appSubtitle}
               </p>
             </div>
           </div>
 
-          {/* Period selector & Quick action buttons */}
+          {/* Period selector, Language & Quick action buttons */}
           <div className="flex items-center gap-2 sm:gap-3">
             {/* Period Selector Dropdown if multiple exist */}
             {historicalPeriods.length > 0 && (
@@ -96,19 +102,35 @@ export const Header: React.FC<HeaderProps> = ({
               </div>
             )}
 
-            {/* Role Switcher (Section 3: Target Users & Permissions) */}
+            {/* Language Switcher Dropdown */}
+            <div className="flex items-center gap-1.5 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs shadow-xs hover:border-slate-300 transition-colors">
+              <Languages className="h-3.5 w-3.5 text-indigo-600" />
+              <select
+                id="header-language-select"
+                value={settings.language || 'fr'}
+                onChange={(e) => onUpdateLanguage?.(e.target.value as AppLanguage)}
+                className="bg-transparent font-semibold text-slate-800 outline-none cursor-pointer text-xs"
+                title={t.switchLanguage}
+              >
+                <option value="fr">🇫🇷 Français</option>
+                <option value="en">🇬🇧 English</option>
+                <option value="ar">🇩🇿 العربية</option>
+              </select>
+            </div>
+
+            {/* Role Switcher */}
             <div className="hidden lg:flex items-center gap-1 rounded-lg border border-slate-200 bg-white px-2 py-1 text-xs">
               <ShieldCheck className="h-3.5 w-3.5 text-slate-400" />
-              <span className="text-slate-400">Role:</span>
+              <span className="text-slate-400">{t.activeRole}:</span>
               <select
                 id="role-switch-dropdown"
                 value={settings.activeRole}
                 onChange={(e) => onUpdateRole(e.target.value as AppSettings['activeRole'])}
                 className="bg-transparent font-medium text-slate-800 outline-none cursor-pointer"
               >
-                <option value="Administrator">Administrator</option>
-                <option value="HR / Attendance User">HR / Attendance User</option>
-                <option value="Management">Management (Read-Only)</option>
+                <option value="Administrator">{t.admin}</option>
+                <option value="HR / Attendance User">{t.hrUser}</option>
+                <option value="Management">{t.management}</option>
               </select>
             </div>
 
@@ -118,10 +140,10 @@ export const Header: React.FC<HeaderProps> = ({
                 id="header-database-btn"
                 onClick={onOpenDatabaseModal}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"
-                title="Manage local SQLite database, snapshots, and backups"
+                title={t.desktopDatabaseDesc}
               >
                 <Database className="h-4 w-4 text-blue-600" />
-                <span className="hidden sm:inline">Database & Backups</span>
+                <span className="hidden sm:inline">{t.databaseBackups}</span>
               </button>
             )}
 
@@ -131,10 +153,10 @@ export const Header: React.FC<HeaderProps> = ({
                 id="header-vacation-btn"
                 onClick={onOpenVacationModal}
                 className="inline-flex items-center gap-1.5 rounded-lg border border-teal-300 bg-teal-50/70 px-3 py-1.5 text-xs font-semibold text-teal-800 shadow-xs hover:bg-teal-100 transition-colors"
-                title="Manage paid vacation and approved leave ranges for workers"
+                title={t.vacationModalSubtitle}
               >
                 <Palmtree className="h-4 w-4 text-teal-600" />
-                <span className="hidden sm:inline">Paid Vacation</span>
+                <span className="hidden sm:inline">{t.paidVacations}</span>
                 {vacationCount > 0 && (
                   <span className="rounded-full bg-teal-600 text-white text-[10px] font-bold px-1.5 py-0.2 leading-none">
                     {vacationCount}
@@ -151,11 +173,11 @@ export const Header: React.FC<HeaderProps> = ({
                 className="inline-flex items-center gap-1.5 rounded-lg border border-slate-300 bg-white px-3 py-1.5 text-xs font-semibold text-slate-700 shadow-xs hover:bg-slate-50 transition-colors"
               >
                 <UploadCloud className="h-4 w-4 text-slate-500" />
-                <span className="hidden sm:inline">Import Raw File</span>
+                <span className="hidden sm:inline">{t.importFingerprints}</span>
               </button>
             )}
 
-            {/* Large CALCULATE Button (PRD Section 32: "Large, obvious CALCULATE button") */}
+            {/* Large CALCULATE Button */}
             <button
               id="header-calculate-btn"
               onClick={onCalculate}
@@ -167,7 +189,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Play className={`h-4 w-4 ${isCalculating ? 'animate-spin' : 'fill-white'}`} />
-              <span>{isCalculating ? 'Calculating...' : 'CALCULATE'}</span>
+              <span>{isCalculating ? t.calculating : t.calculate}</span>
             </button>
           </div>
         </div>
@@ -187,7 +209,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <LayoutDashboard className="h-3.5 w-3.5" />
-              Dashboard
+              {t.dashboard}
             </button>
 
             <button
@@ -200,7 +222,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <FileSpreadsheet className="h-3.5 w-3.5" />
-              Daily Attendance
+              {t.dailyAttendance}
             </button>
 
             <button
@@ -213,7 +235,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Calendar className="h-3.5 w-3.5" />
-              Monthly Summary
+              {t.monthlySummary}
             </button>
 
             <button
@@ -226,7 +248,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Users className="h-3.5 w-3.5" />
-              <span>Employees & Mapping</span>
+              <span>{t.employees}</span>
               {unmappedEmployeesCount > 0 && (
                 <span
                   className="inline-flex items-center rounded-full bg-amber-100 px-1.5 py-0.2 text-[10px] font-bold text-amber-800 font-mono border border-amber-300"
@@ -247,7 +269,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <Clock className="h-3.5 w-3.5" />
-              Work Schedules & Rules
+              {t.schedules}
             </button>
 
             <button
@@ -260,7 +282,7 @@ export const Header: React.FC<HeaderProps> = ({
               }`}
             >
               <SettingsIcon className="h-3.5 w-3.5" />
-              Settings & Audit
+              {t.settings}
             </button>
           </nav>
         </div>

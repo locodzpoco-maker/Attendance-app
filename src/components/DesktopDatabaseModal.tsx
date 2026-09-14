@@ -26,19 +26,23 @@ import {
   detectLocalStorageData,
   migrateLocalStorageToSQLite,
 } from '../utils/storageAdapter';
-import { DatabaseStats, BackupItem } from '../types';
+import { DatabaseStats, BackupItem, AppLanguage } from '../types';
+import { getTranslations } from '../utils/i18n';
 
 interface DesktopDatabaseModalProps {
   isOpen: boolean;
   onClose: () => void;
   onDataReloadNeeded?: () => void;
+  language?: AppLanguage;
 }
 
 export const DesktopDatabaseModal: React.FC<DesktopDatabaseModalProps> = ({
   isOpen,
   onClose,
   onDataReloadNeeded,
+  language,
 }) => {
+  const t = getTranslations(language);
   const [stats, setStats] = useState<DatabaseStats | null>(null);
   const [backups, setBackups] = useState<BackupItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
@@ -258,7 +262,7 @@ export const DesktopDatabaseModal: React.FC<DesktopDatabaseModalProps> = ({
                 className="px-3.5 py-2 bg-blue-600 hover:bg-blue-700 text-white rounded-lg text-xs font-semibold flex items-center gap-1.5 shadow-xs transition-colors"
               >
                 <Download className="w-3.5 h-3.5" />
-                Backup Database Now
+                {t.exportBackup}
               </button>
 
               {isDesktop && (
@@ -268,7 +272,7 @@ export const DesktopDatabaseModal: React.FC<DesktopDatabaseModalProps> = ({
                     className="px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   >
                     <FolderOpen className="w-3.5 h-3.5 text-slate-500" />
-                    Open Data Folder in Explorer
+                    Explorer
                   </button>
 
                   <button
@@ -276,7 +280,7 @@ export const DesktopDatabaseModal: React.FC<DesktopDatabaseModalProps> = ({
                     className="px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   >
                     <Upload className="w-3.5 h-3.5 text-slate-500" />
-                    Export Full .db File
+                    {t.exportBackup} (.db)
                   </button>
 
                   <button
@@ -284,7 +288,7 @@ export const DesktopDatabaseModal: React.FC<DesktopDatabaseModalProps> = ({
                     className="px-3.5 py-2 bg-white hover:bg-slate-100 border border-slate-200 text-slate-700 rounded-lg text-xs font-semibold flex items-center gap-1.5 transition-colors"
                   >
                     <RefreshCw className="w-3.5 h-3.5 text-slate-500" />
-                    Import External .db File
+                    {t.importBackup} (.db)
                   </button>
                 </>
               )}
@@ -378,7 +382,7 @@ export const DesktopDatabaseModal: React.FC<DesktopDatabaseModalProps> = ({
                       onClick={() => handleRestoreBackup(b.fileName)}
                       className="px-3 py-1.5 bg-slate-100 hover:bg-slate-200 text-slate-700 font-medium rounded-lg text-xs transition-colors"
                     >
-                      Restore
+                      {t.restoreBackup}
                     </button>
                   </div>
                 ))}
@@ -391,13 +395,13 @@ export const DesktopDatabaseModal: React.FC<DesktopDatabaseModalProps> = ({
         <div className="bg-slate-50 px-6 py-4 border-t border-slate-200 flex items-center justify-between text-xs text-slate-500">
           <div className="flex items-center gap-1.5">
             <Shield className="w-4 h-4 text-emerald-600" />
-            <span>SQLite 3 Engine &bull; Automatic Safety Snapshots Before Restores</span>
+            <span>SQLite 3 Engine &bull; Automatic Safety Snapshots</span>
           </div>
           <button
             onClick={onClose}
             className="px-4 py-2 bg-slate-800 hover:bg-slate-900 text-white rounded-lg font-medium transition-colors"
           >
-            Done
+            {t.btnSave || 'OK'}
           </button>
         </div>
       </div>
