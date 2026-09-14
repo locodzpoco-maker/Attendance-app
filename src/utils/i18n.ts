@@ -290,6 +290,9 @@ export interface Translations {
   fromDate: string;
   toDate: string;
   period: string;
+  systemDocumentaryPdf: string;
+  systemDocumentaryDesc: string;
+  downloadPdf: string;
 }
 
 export const TRANSLATIONS: Record<AppLanguage, Translations> = {
@@ -568,6 +571,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     fromDate: 'Du',
     toDate: 'Au',
     period: 'Période',
+    systemDocumentaryPdf: 'Guide & Documentaire Système (PDF)',
+    systemDocumentaryDesc: 'Documentaire complet, architecture technique et guide d\'utilisation (EN / FR / AR)',
+    downloadPdf: 'Télécharger PDF',
   },
 
   en: {
@@ -845,6 +851,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     fromDate: 'From',
     toDate: 'To',
     period: 'Period',
+    systemDocumentaryPdf: 'System Documentary & Manual (PDF)',
+    systemDocumentaryDesc: 'Complete technical architecture, capabilities & operator manual (EN / FR / AR)',
+    downloadPdf: 'Download PDF',
   },
 
   ar: {
@@ -1122,6 +1131,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     fromDate: 'من',
     toDate: 'إلى',
     period: 'الفترة',
+    systemDocumentaryPdf: 'الدليل المرجعي والتوثيق الشامل (PDF)',
+    systemDocumentaryDesc: 'التوثيق الفني الشامل، المعمارية، ودليل التشغيل خطوة بخطوة (عربي / إنجليزي / فرنسي)',
+    downloadPdf: 'تحميل PDF',
   },
 };
 

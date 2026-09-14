@@ -12,6 +12,7 @@ import {
   ArrowRight,
   ShieldCheck,
   UserPlus,
+  FileText,
 } from 'lucide-react';
 import {
   DailyAttendanceRecord,
@@ -352,6 +353,29 @@ export const Dashboard: React.FC<DashboardProps> = ({
                     PDF
                   </button>
                 </div>
+              </div>
+
+              {/* System Documentary & Manual (PDF) */}
+              <div className="flex items-center justify-between gap-2 p-2.5 rounded-xl border border-indigo-200 bg-indigo-50/50">
+                <div>
+                  <p className="text-xs font-semibold text-indigo-900 flex items-center gap-1.5">
+                    <FileText className="h-3.5 w-3.5 text-indigo-600" />
+                    {t.systemDocumentaryPdf}
+                  </p>
+                  <p className="text-[11px] text-indigo-700/80">
+                    Trilingual handbook & architecture (EN / FR / AR)
+                  </p>
+                </div>
+                <a
+                  id="download-doc-dashboard-btn"
+                  href="/Attendance_Management_System_Documentary_EN_FR_AR.pdf"
+                  download="Attendance_Management_System_Documentary_EN_FR_AR.pdf"
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  className="rounded-lg bg-indigo-600 px-2.5 py-1 text-[11px] font-semibold text-white hover:bg-indigo-700 shadow-2xs whitespace-nowrap transition-colors"
+                >
+                  {t.downloadPdf}
+                </a>
               </div>
             </div>
           </div>

@@ -12,6 +12,7 @@ import {
   Database,
   Palmtree,
   Languages,
+  FileText,
 } from 'lucide-react';
 import { AppSettings, HistoricalPeriodRecord, AppLanguage } from '../types';
 import { getTranslations } from '../utils/i18n';
@@ -284,6 +285,20 @@ export const Header: React.FC<HeaderProps> = ({
               <SettingsIcon className="h-3.5 w-3.5" />
               {t.settings}
             </button>
+
+            {/* Comprehensive Documentary & Manual PDF */}
+            <a
+              id="nav-documentary-pdf"
+              href="/Attendance_Management_System_Documentary_EN_FR_AR.pdf"
+              download="Attendance_Management_System_Documentary_EN_FR_AR.pdf"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="inline-flex items-center gap-1.5 px-3 py-2 text-xs font-semibold rounded-lg text-indigo-700 bg-indigo-50/80 hover:bg-indigo-100/90 border border-indigo-200/80 transition-colors sm:ml-auto whitespace-nowrap shadow-2xs"
+              title={t.systemDocumentaryDesc}
+            >
+              <FileText className="h-3.5 w-3.5 text-indigo-600" />
+              <span>{t.systemDocumentaryPdf}</span>
+            </a>
           </nav>
         </div>
       </div>
