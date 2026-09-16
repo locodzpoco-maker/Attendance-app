@@ -421,15 +421,41 @@ export function isStockWorker(employeeId: string): boolean {
   );
 }
 
-export const DEFAULT_SATURDAY_WORKER_IDS = new Set([
+export const DEFAULT_STOCK_SATURDAY_WORKER_IDS = new Set([
   '00039', // AMARI ISLAM
   '00042', // BOUMEDIENE HICHEM
   '00043', // ZENAGUI ACHRAF
   '00044', // BENMANSOUR HOUSSAM
 ]);
 
+export const DEFAULT_ADMIN_SATURDAY_WORKER_IDS = new Set([
+  '4', '0004', '00004', '00000004', // BENSALAH ROMAISSA
+  '9', '0009', '00009', '00000009', // ARBAOUI RANIA KHAIRA
+  '11', '0011', '00011', '00000011', // BELBACHIR IBTISSEM
+  '13', '0013', '00013', '00000013', // BENGODIFA FATIMA
+]);
+
+export const DEFAULT_SATURDAY_WORKER_IDS = new Set([
+  ...Array.from(DEFAULT_STOCK_SATURDAY_WORKER_IDS),
+  ...Array.from(DEFAULT_ADMIN_SATURDAY_WORKER_IDS),
+]);
+
+export function isSaturdayWorker(workerId: string): boolean {
+  if (!workerId) return false;
+  const trimmed = workerId.trim();
+  const unpadded = trimmed.replace(/^0+/, '');
+  return (
+    DEFAULT_SATURDAY_WORKER_IDS.has(trimmed) ||
+    DEFAULT_SATURDAY_WORKER_IDS.has(unpadded) ||
+    DEFAULT_STOCK_SATURDAY_WORKER_IDS.has(trimmed) ||
+    DEFAULT_STOCK_SATURDAY_WORKER_IDS.has(unpadded) ||
+    DEFAULT_ADMIN_SATURDAY_WORKER_IDS.has(trimmed) ||
+    DEFAULT_ADMIN_SATURDAY_WORKER_IDS.has(unpadded)
+  );
+}
+
 const STOCK_EMPLOYEES: Employee[] = STOCK_WORKERS_INPUT.map((worker) => {
-  const hasSat = DEFAULT_SATURDAY_WORKER_IDS.has(worker.id);
+  const hasSat = isSaturdayWorker(worker.id);
   return {
     id: worker.id,
     name: worker.name,
@@ -446,17 +472,23 @@ const STOCK_EMPLOYEES: Employee[] = STOCK_WORKERS_INPUT.map((worker) => {
   };
 });
 
-const ADMIN_EMPLOYEES: Employee[] = ADMIN_WORKERS_INPUT.map((worker) => ({
-  id: worker.id,
-  name: worker.name,
-  rawDepartment: "Administration",
-  companyDepartment: "Administration",
-  groupName: "Admin Group 1",
-  scheduleId: "admin_g1",
-  status: "Active",
-  startDate: "2023-01-01",
-  notes: "Administration (08:30 - 17:00)",
-}));
+const ADMIN_EMPLOYEES: Employee[] = ADMIN_WORKERS_INPUT.map((worker) => {
+  const hasSat = isSaturdayWorker(worker.id);
+  return {
+    id: worker.id,
+    name: worker.name,
+    rawDepartment: "Administration",
+    companyDepartment: "Administration",
+    groupName: "Admin Group 1",
+    scheduleId: "admin_g1",
+    status: "Active",
+    startDate: "2023-01-01",
+    hasSaturdayShift: hasSat,
+    notes: hasSat
+      ? "Administration (Shift Samedi 08:30-17:00 activé + 08:30-17:00 en semaine)"
+      : "Administration (08:30 - 17:00)",
+  };
+});
 
 export const DEFAULT_EMPLOYEES: Employee[] = [
   ...ADMIN_EMPLOYEES,

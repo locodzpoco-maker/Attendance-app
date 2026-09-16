@@ -12,8 +12,8 @@ import {
   PaidVacation,
   AppLanguage,
 } from './types';
-import { DEFAULT_SCHEDULES, STOCK_SHIFT_SATURDAY } from './utils/schedules';
-import { DEFAULT_EMPLOYEES, findUnmappedEmployees, DEFAULT_SATURDAY_WORKER_IDS } from './utils/employees';
+import { DEFAULT_SCHEDULES, STOCK_SHIFT_SATURDAY, ADMIN_SHIFT_SATURDAY } from './utils/schedules';
+import { DEFAULT_EMPLOYEES, findUnmappedEmployees, DEFAULT_SATURDAY_WORKER_IDS, isSaturdayWorker } from './utils/employees';
 import { calculateAttendance } from './utils/calculator';
 import { generateReferenceDataset } from './utils/sampleData';
 import { getTranslations, isRtlLanguage } from './utils/i18n';
@@ -103,6 +103,9 @@ export default function App() {
             normalWorkedHours: 7.0,
           };
         }
+        if (s.id === 'admin_sat') {
+          return ADMIN_SHIFT_SATURDAY;
+        }
         return {
           ...s,
           normalWorkedHours: 7.0,
@@ -110,6 +113,9 @@ export default function App() {
       });
       if (!list.some((s) => s.id === 'stock_sat')) {
         list.push(STOCK_SHIFT_SATURDAY);
+      }
+      if (!list.some((s) => s.id === 'admin_sat')) {
+        list.push(ADMIN_SHIFT_SATURDAY);
       }
       return list;
     }
@@ -124,7 +130,7 @@ export default function App() {
       getStorageItem<Employee[] | null>('ams_employees_v4', null);
     if (Array.isArray(saved) && saved.length > 0) {
       return saved.map((e) => {
-        if (e.hasSaturdayShift === undefined && DEFAULT_SATURDAY_WORKER_IDS.has(e.id)) {
+        if ((e.hasSaturdayShift === undefined || !e.hasSaturdayShift) && isSaturdayWorker(e.id)) {
           return { ...e, hasSaturdayShift: true };
         }
         return e;

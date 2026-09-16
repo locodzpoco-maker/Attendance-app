@@ -142,6 +142,8 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   const stockCount = employees.filter((e) => isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock")).length;
   const adminCount = employees.length - stockCount;
   const saturdayCount = employees.filter((e) => Boolean(e.hasSaturdayShift)).length;
+  const stockSaturdayCount = employees.filter((e) => Boolean(e.hasSaturdayShift) && (isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock"))).length;
+  const adminSaturdayCount = saturdayCount - stockSaturdayCount;
 
   const filteredEmployees = employees.filter((e) => {
     const isStock = isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock");
@@ -273,9 +275,17 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                 type="button"
                 onClick={() => setCategoryFilter("SATURDAY")}
                 className={`rounded-lg px-2.5 py-1 transition-all ${categoryFilter === "SATURDAY" ? "bg-teal-600 text-white shadow-2xs font-bold" : "text-slate-600 hover:text-slate-900"}`}
+                title={`${stockSaturdayCount} Stock, ${adminSaturdayCount} Administration`}
               >
                 📅 {t.filterSaturdayWorkers} ({saturdayCount})
               </button>
+              {categoryFilter === "SATURDAY" && (
+                <span className="text-[11px] text-teal-800 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1 font-semibold flex items-center gap-1.5 shadow-2xs">
+                  <span>{stockSaturdayCount} {t.stockRoleBadge} (10:00–17:00)</span>
+                  <span className="text-teal-400">•</span>
+                  <span>{adminSaturdayCount} {t.adminRoleBadge} (08:30–17:00)</span>
+                </span>
+              )}
             </div>
           </div>
 
@@ -373,25 +383,31 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <button
-                        type="button"
-                        disabled={settings.activeRole === 'Management'}
-                        onClick={() => {
-                          onUpdateEmployee({
-                            ...e,
-                            hasSaturdayShift: !e.hasSaturdayShift,
-                          });
-                        }}
-                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all border ${
-                          e.hasSaturdayShift
-                            ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-100 shadow-2xs'
-                            : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
-                        } ${settings.activeRole === 'Management' ? 'cursor-default' : 'cursor-pointer'}`}
-                        title={e.hasSaturdayShift ? t.saturdayActive : t.saturdayOff}
-                      >
-                        <span className={`h-1.5 w-1.5 rounded-full ${e.hasSaturdayShift ? 'bg-teal-500' : 'bg-slate-300'}`} />
-                        {e.hasSaturdayShift ? '10:00–17:00' : 'OFF'}
-                      </button>
+                      {(() => {
+                        const isStockEmp = isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock");
+                        const satShiftTime = isStockEmp ? '10:00–17:00' : '08:30–17:00';
+                        return (
+                          <button
+                            type="button"
+                            disabled={settings.activeRole === 'Management'}
+                            onClick={() => {
+                              onUpdateEmployee({
+                                ...e,
+                                hasSaturdayShift: !e.hasSaturdayShift,
+                              });
+                            }}
+                            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all border ${
+                              e.hasSaturdayShift
+                                ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-100 shadow-2xs'
+                                : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
+                            } ${settings.activeRole === 'Management' ? 'cursor-default' : 'cursor-pointer'}`}
+                            title={e.hasSaturdayShift ? `${t.saturdayActive} (${satShiftTime})` : t.saturdayOff}
+                          >
+                            <span className={`h-1.5 w-1.5 rounded-full ${e.hasSaturdayShift ? 'bg-teal-500' : 'bg-slate-300'}`} />
+                            {e.hasSaturdayShift ? satShiftTime : 'OFF'}
+                          </button>
+                        );
+                      })()}
                     </td>
                     <td className="py-3 px-4 text-slate-500">{e.startDate || '-'}</td>
                     {settings.activeRole !== 'Management' && (
@@ -566,9 +582,14 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                   <div className="text-xs">
                     <span className="font-bold text-teal-950 flex items-center gap-1.5">
                       <span>📅</span> {t.hasSaturdayShift}
+                      <span className="ml-1 text-[11px] font-semibold text-teal-700 bg-teal-100/80 rounded px-1.5 py-0.5">
+                        {(isStockWorker(empId) || companyDept.toLowerCase().includes('stock')) ? '10:00–17:00' : '08:30–17:00'}
+                      </span>
                     </span>
                     <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
-                      {t.saturdayShiftDesc}
+                      {(isStockWorker(empId) || companyDept.toLowerCase().includes('stock'))
+                        ? 'Stock : Shift Samedi (10:00 – 17:00, Pause 13:00–14:00, HS > 17:00)'
+                        : 'Administration : Shift Samedi identique aux horaires normaux (08:30 – 17:00, Pause 12:30–14:00, Sans HS / No Overtime)'}
                     </p>
                   </div>
                 </label>

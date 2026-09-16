@@ -16,6 +16,7 @@ import {
   STOCK_SHIFT_3,
   STOCK_SHIFT_4,
   STOCK_SHIFT_SATURDAY,
+  ADMIN_SHIFT_SATURDAY,
   STOCK_DYNAMIC_SCHEDULE,
   detectStockShift,
   isEarlyMorningTime,
@@ -223,12 +224,26 @@ export function calculateAttendance(
         }
       } else {
         // ADMIN EMPLOYEE: Standard schedule
-        if (dayOfWeek === 'Saturday' && hasSaturdayShift && assignedSchedule.id !== 'admin_g2') {
-          // If this employee is specifically assigned to Saturday shift
-          assignedSchedule = STOCK_SHIFT_SATURDAY;
-          detectedShiftId = 'stock_sat';
+        if (manualAdj?.overrideShiftId) {
+          const over =
+            scheduleMap.get(manualAdj.overrideShiftId) ||
+            (manualAdj.overrideShiftId === 'admin_sat'
+              ? ADMIN_SHIFT_SATURDAY
+              : manualAdj.overrideShiftId === 'stock_sat'
+              ? STOCK_SHIFT_SATURDAY
+              : undefined);
+          if (over) {
+            assignedSchedule = over;
+            detectedShiftId = over.id;
+            detectedShiftName = over.name.split(' (')[0];
+            dayGroupName = over.groupName;
+          }
+        } else if (dayOfWeek === 'Saturday' && hasSaturdayShift && assignedSchedule.id !== 'admin_g2') {
+          // If this employee is specifically assigned to Saturday shift (Admin: 08:30 - 17:00)
+          assignedSchedule = scheduleMap.get('admin_sat') || ADMIN_SHIFT_SATURDAY;
+          detectedShiftId = assignedSchedule.id;
           detectedShiftName = 'Shift Samedi';
-          dayGroupName = 'Shift Samedi';
+          dayGroupName = assignedSchedule.groupName;
         } else {
           detectedShiftId = assignedSchedule.id;
           detectedShiftName = assignedSchedule.groupName;

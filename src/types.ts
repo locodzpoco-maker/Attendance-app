@@ -32,7 +32,7 @@ export interface Employee {
   status: 'Active' | 'Inactive';
   startDate: string;
   notes?: string;
-  hasSaturdayShift?: boolean; // When enabled, employee works Saturday Shift (10:00 - 17:00) on Saturdays
+  hasSaturdayShift?: boolean; // When enabled, employee works Saturday Shift (08:30 - 17:00 for Admin, 10:00 - 17:00 for Stock) on Saturdays
 }
 
 export interface RawDayAttendance {

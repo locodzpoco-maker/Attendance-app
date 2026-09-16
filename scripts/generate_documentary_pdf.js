@@ -422,7 +422,8 @@ const shiftTableData = [
   ['Shift 2 (Stock Night)', '18:00 – 02:00 (+1)', '21:00 – 22:00 (60m)', 'After 02:00 (+15m grace)', 'Crosses midnight into next day'],
   ['Shift 3 (Stock Morning)', '08:30 – 16:30', '12:00 – 13:00 (60m)', 'After 16:30 (+15m grace)', 'Standard logistics morning shift'],
   ['Shift 4 (Stock Mid/Midnight)', '16:00 – 00:00', '21:00 – 22:00 (60m)', 'After 00:00 (+15m grace)', 'Ends precisely at midnight'],
-  ['Saturday Shift (Stock Sat)', '10:00 – 17:00', '13:00 – 14:00 (60m)', 'After 17:00 (+15m grace)', 'Saturdays only; designated workers (00039, 00042, 00043, 00044)'],
+  ['Saturday Shift (Stock)', '10:00 – 17:00', '13:00 – 14:00 (60m)', 'After 17:00 (+15m grace)', 'Saturdays only; designated Stock workers (00039, 00042, 00043, 00044)'],
+  ['Saturday Shift (Admin)', '08:30 – 17:00', '12:30 – 14:00 (90m)', 'None (Not eligible for extra time)', 'Matches normal admin hours; designated Admin staff (4, 9, 11, 13)'],
 ];
 
 autoTable(doc, {
@@ -542,7 +543,8 @@ const shiftTableFr = [
   ['Shift 2 (Stock Nuit)', '18:00 – 02:00 (+1)', '21:00 – 22:00 (60 min)', 'Au-delà de 02:00 (+15 min grâce)', 'Franchit minuit (J+1)'],
   ['Shift 3 (Stock Matin)', '08:30 – 16:30', '12:00 – 13:00 (60 min)', 'Au-delà de 16:30 (+15 min grâce)', 'Shift logistique du matin'],
   ['Shift 4 (Stock Soir/Minuit)', '16:00 – 00:00', '21:00 – 22:00 (60 min)', 'Au-delà de 00:00 (+15 min grâce)', 'Termine exactement à minuit'],
-  ['Shift Samedi (Stock Samedi)', '10:00 – 17:00', '13:00 – 14:00 (60 min)', 'Au-delà de 17:00 (+15 min grâce)', 'Uniquement le samedi pour agents désignés (00039, 00042, etc.)'],
+  ['Shift Samedi (Stock)', '10:00 – 17:00', '13:00 – 14:00 (60 min)', 'Au-delà de 17:00 (+15 min grâce)', 'Le samedi pour agents Stock désignés (00039, 00042, etc.)'],
+  ['Shift Samedi (Admin)', '08:30 – 17:00', '12:30 – 14:00 (90 min)', 'Aucune (Non éligible aux heures supp.)', 'Identique aux horaires normaux; agents Admin (4, 9, 11, 13)'],
 ];
 
 autoTable(doc, {
@@ -656,7 +658,8 @@ const shiftTableAr = [
   ['وردية 2 (مخزن ليلية)', '18:00 – 02:00 (+1)', '21:00 – 22:00 (60 دقيقة)', 'بعد 02:00 (عتبة 15 دقيقة)', 'تتجاوز منتصف الليل لليوم التالي'],
   ['وردية 3 (مخزن صباحية)', '08:30 – 16:30', '12:00 – 13:00 (60 دقيقة)', 'بعد 16:30 (عتبة 15 دقيقة)', 'وردية صباحية لوجستية'],
   ['وردية 4 (مخزن منتصف الليل)', '16:00 – 00:00', '21:00 – 22:00 (60 دقيقة)', 'بعد 00:00 (عتبة 15 دقيقة)', 'تنتهي تماماً عند منتصف الليل'],
-  ['وردية السبت (10:00 إلى 17:00)', '10:00 – 17:00', '13:00 – 14:00 (60 دقيقة)', 'بعد 17:00 (عتبة 15 دقيقة)', 'خاصة بأيام السبت فقط للعمال المحددين (00039، 00042، 00043، 00044)'],
+  ['وردية السبت (المخزن)', '10:00 – 17:00', '13:00 – 14:00 (60 دقيقة)', 'بعد 17:00 (عتبة 15 دقيقة)', 'أيام السبت لعمال المخزن المحددين (00039، إلخ)'],
+  ['وردية السبت (الإدارة)', '08:30 – 17:00', '12:30 – 14:00 (90 دقيقة)', 'لا توجد (غير مؤهل للعمل الإضافي)', 'مطابقة لساعات العمل العادية لموظفي الإدارة (4، 9، 11، 13)'],
 ];
 
 autoTable(doc, {

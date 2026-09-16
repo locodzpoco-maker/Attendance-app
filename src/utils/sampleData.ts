@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { RawAttendanceDataset, RawEmployeeRecord } from "../types";
-import { STOCK_WORKERS_INPUT, ADMIN_WORKERS_INPUT, DEFAULT_SATURDAY_WORKER_IDS } from "./employees";
+import { STOCK_WORKERS_INPUT, ADMIN_WORKERS_INPUT, DEFAULT_SATURDAY_WORKER_IDS, isSaturdayWorker } from "./employees";
 
 /**
  * Creates a complete, realistic reference dataset matching AttendanceRecord_0 (56).xls
@@ -138,9 +138,33 @@ export function generateReferenceDataset(): RawAttendanceDataset {
     const days: Record<number, { dayNumber: number; dateStr: string; rawPunchesText: string; rawPunches: string[] }> = {};
     for (let d = 1; d <= totalDays; d++) {
       const dayOfWeek = new Date(`${dStr(d)}T12:00:00Z`).getUTCDay();
-      if (dayOfWeek === 5 || dayOfWeek === 6) {
+
+      // Friday is always OFF
+      if (dayOfWeek === 5) {
         days[d] = { dayNumber: d, dateStr: dStr(d), rawPunchesText: "", rawPunches: [] };
-      } else if (d === 1) {
+        continue;
+      }
+
+      // Saturday (6): ONLY Admin workers assigned to Saturday shift have punches (08:30 - 17:00, Break 12:30 - 14:00)
+      if (dayOfWeek === 6) {
+        if (isSaturdayWorker(worker.id)) {
+          const inMin = 24 + ((d + idx) % 5); // 08:24 to 08:28
+          const inStr = `08:${inMin}`;
+          const outStr = (d + idx) % 3 === 0 ? "17:15" : "17:02";
+          days[d] = {
+            dayNumber: d,
+            dateStr: dStr(d),
+            rawPunchesText: `${inStr}\n12:30\n14:00\n${outStr}`,
+            rawPunches: [inStr, "12:30", "14:00", outStr],
+          };
+        } else {
+          // Off on Saturday
+          days[d] = { dayNumber: d, dateStr: dStr(d), rawPunchesText: "", rawPunches: [] };
+        }
+        continue;
+      }
+
+      if (d === 1) {
         days[d] = {
           dayNumber: d,
           dateStr: dStr(d),

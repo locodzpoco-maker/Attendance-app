@@ -110,6 +110,27 @@ export const STOCK_SHIFT_SATURDAY: WorkSchedule = {
   overtimeGraceMinutes: 15,
 };
 
+export const ADMIN_SHIFT_SATURDAY: WorkSchedule = {
+  id: 'admin_sat',
+  name: 'Admin Samedi (08:30 - 17:00)',
+  groupName: 'Admin Shift Samedi',
+  department: 'Administration',
+  startTime: '08:30',
+  endTime: '17:00',
+  crossesMidnight: false,
+  hasBreak: true,
+  breakStart: '12:30',
+  breakEnd: '14:00',
+  breakDurationMinutes: 90,
+  overtimeAllowed: false,
+  normalWorkedHours: 7.0,
+  workingDays: ['Saturday'],
+  arrivalGraceMinutes: 10,
+  breakGraceMinutes: 10,
+  earlyExitGraceMinutes: 5,
+  overtimeGraceMinutes: 15,
+};
+
 export const STOCK_DYNAMIC_SCHEDULE: WorkSchedule = {
   id: 'stock_dynamic',
   name: 'Stock (Dynamic Daily Shift)',
@@ -168,6 +189,7 @@ export const DEFAULT_SCHEDULES: WorkSchedule[] = [
     earlyExitGraceMinutes: 5,
     overtimeGraceMinutes: 15,
   },
+  ADMIN_SHIFT_SATURDAY,
   STOCK_DYNAMIC_SCHEDULE,
   STOCK_SHIFT_1,
   STOCK_SHIFT_2,
