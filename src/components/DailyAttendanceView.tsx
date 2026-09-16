@@ -303,7 +303,11 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
       let icon = null;
       let label = shiftName;
 
-      if (shiftName.includes('Shift 1')) {
+      if (shiftName.includes('Samedi') || shiftName.includes('Saturday') || record.detectedShiftId === 'stock_sat') {
+        color = 'bg-teal-50 text-teal-800 border-teal-200';
+        icon = <span className="text-[10px]">📅</span>;
+        label = t.shiftSatLabel;
+      } else if (shiftName.includes('Shift 1')) {
         color = 'bg-indigo-50 text-indigo-700 border-indigo-200';
         label = t.shift1Label;
       } else if (shiftName.includes('Shift 2')) {
@@ -773,14 +777,26 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     {/* Exit */}
                     <td className="py-2.5 px-3 text-center font-mono font-medium text-slate-800">
                       {r.exitTime ? (
-                        <span className="inline-flex items-center gap-1">
-                          {r.exitTime}
-                          {r.isOvernightPunch && (
-                            <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
-                              +1d
+                        <div className="inline-flex flex-col items-center">
+                          <span className="inline-flex items-center gap-1">
+                            <span className={(r.earlyExitMinutes || 0) > 0 ? 'text-amber-800 font-semibold' : ''}>
+                              {r.exitTime}
+                            </span>
+                            {r.isOvernightPunch && (
+                              <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
+                                +1d
+                              </span>
+                            )}
+                          </span>
+                          {(r.earlyExitMinutes || 0) > 0 && (
+                            <span
+                              className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1 rounded font-semibold whitespace-nowrap mt-0.5"
+                              title={`${t.earlyExitLabel}: -${r.earlyExitMinutes}m`}
+                            >
+                              -{r.earlyExitMinutes}m
                             </span>
                           )}
-                        </span>
+                        </div>
                       ) : (
                         <span className="text-slate-300">--:--</span>
                       )}
@@ -791,18 +807,30 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                       {r.delayMinutes > 0 ? (
                         <div>
                           <span
-                            title={
-                              (r.secondCheckInDelayMinutes || 0) > 0 && (r.firstCheckInDelayMinutes || 0) > 0
-                                ? `${t.obsLate}: ${r.delayMinutes} min (In: ${r.firstCheckInDelayMinutes}m + Break: ${r.secondCheckInDelayMinutes}m)`
-                                : `${t.obsLate}: ${r.delayMinutes} min`
-                            }
+                            title={r.observationDetail}
                             className="font-semibold text-amber-700 bg-amber-50 px-1.5 py-0.5 rounded text-[11px]"
                           >
                             {r.delayMinutes} min
                           </span>
-                          {(r.firstCheckInDelayMinutes || 0) > 0 && (r.secondCheckInDelayMinutes || 0) > 0 && (
+                          {/* Breakdown subtext if multiple delays or early departure */}
+                          {(((r.firstCheckInDelayMinutes || 0) > 0 ? 1 : 0) +
+                            ((r.secondCheckInDelayMinutes || 0) > 0 ? 1 : 0) +
+                            ((r.earlyExitMinutes || 0) > 0 ? 1 : 0) > 1 ||
+                            (r.earlyExitMinutes || 0) > 0) && (
                             <span className="block text-[9px] text-slate-400 mt-0.5 whitespace-nowrap">
-                              {r.firstCheckInDelayMinutes}m in + {r.secondCheckInDelayMinutes}m brk
+                              {[
+                                (r.firstCheckInDelayMinutes || 0) > 0
+                                  ? `${r.firstCheckInDelayMinutes}m ${t.inWord}`
+                                  : null,
+                                (r.secondCheckInDelayMinutes || 0) > 0
+                                  ? `${r.secondCheckInDelayMinutes}m ${t.breakWord}`
+                                  : null,
+                                (r.earlyExitMinutes || 0) > 0
+                                  ? `${r.earlyExitMinutes}m ${t.exitWord}`
+                                  : null,
+                              ]
+                                .filter(Boolean)
+                                .join(' + ')}
                             </span>
                           )}
                         </div>

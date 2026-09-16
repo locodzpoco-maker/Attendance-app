@@ -1,6 +1,6 @@
 import * as XLSX from "xlsx";
 import { RawAttendanceDataset, RawEmployeeRecord } from "../types";
-import { STOCK_WORKERS_INPUT, ADMIN_WORKERS_INPUT } from "./employees";
+import { STOCK_WORKERS_INPUT, ADMIN_WORKERS_INPUT, DEFAULT_SATURDAY_WORKER_IDS } from "./employees";
 
 /**
  * Creates a complete, realistic reference dataset matching AttendanceRecord_0 (56).xls
@@ -26,9 +26,30 @@ export function generateReferenceDataset(): RawAttendanceDataset {
 
     for (let d = 1; d <= totalDays; d++) {
       const dayOfWeek = new Date(`${dStr(d)}T12:00:00Z`).getUTCDay(); // 0: Sun, 5: Fri, 6: Sat
-      if (dayOfWeek === 5 || dayOfWeek === 6) {
-        // Weekend / OFF
+
+      // Friday is always OFF
+      if (dayOfWeek === 5) {
         days[d] = { dayNumber: d, dateStr: dStr(d), rawPunchesText: "", rawPunches: [] };
+        continue;
+      }
+
+      // Saturday (6): ONLY workers assigned to Saturday shift have punches (10:00 - 17:00)
+      if (dayOfWeek === 6) {
+        if (DEFAULT_SATURDAY_WORKER_IDS.has(worker.id)) {
+          const inMin = 56 + ((d + idx) % 5); // 09:56 to 10:00
+          const inStr = inMin >= 60 ? `10:0${inMin - 60}` : `09:${inMin}`;
+          // Early departure case: leaves at 16:00 instead of 17:00 (1h early departure)
+          const outStr = d === 11 && idx === 0 ? "16:00" : (d + idx) % 3 === 0 ? "17:28" : "17:03";
+          days[d] = {
+            dayNumber: d,
+            dateStr: dStr(d),
+            rawPunchesText: `${inStr}\n${outStr}`,
+            rawPunches: [inStr, outStr],
+          };
+        } else {
+          // Off on Saturday
+          days[d] = { dayNumber: d, dateStr: dStr(d), rawPunchesText: "", rawPunches: [] };
+        }
         continue;
       }
 
@@ -132,6 +153,30 @@ export function generateReferenceDataset(): RawAttendanceDataset {
           dateStr: dStr(d),
           rawPunchesText: "08:44\n12:35\n14:05\n17:02",
           rawPunches: ["08:44", "12:35", "14:05", "17:02"],
+        };
+      } else if (d === 9 && idx === 1) {
+        // Early departure: shift ends at 17:00, leaves at 16:54 (6 min early -> 1 min late with 5m grace)
+        days[d] = {
+          dayNumber: d,
+          dateStr: dStr(d),
+          rawPunchesText: "08:25\n12:30\n14:00\n16:54",
+          rawPunches: ["08:25", "12:30", "14:00", "16:54"],
+        };
+      } else if (d === 13 && idx === 1) {
+        // Exit within 5 min grace: shift ends at 17:00, leaves at 16:55 -> 0 min early exit (Ponctuel)
+        days[d] = {
+          dayNumber: d,
+          dateStr: dStr(d),
+          rawPunchesText: "08:25\n12:30\n14:00\n16:55",
+          rawPunches: ["08:25", "12:30", "14:00", "16:55"],
+        };
+      } else if (d === 14 && idx === 1) {
+        // Early departure: shift ends at 17:00, leaves at 16:00 (60 min early -> 55 min late with 5m grace)
+        days[d] = {
+          dayNumber: d,
+          dateStr: dStr(d),
+          rawPunchesText: "08:25\n12:30\n14:00\n16:00",
+          rawPunches: ["08:25", "12:30", "14:00", "16:00"],
         };
       } else if (d === 15 && idx === 0) {
         days[d] = {

@@ -56,6 +56,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   ]);
   const [arrivalGraceMinutes, setArrivalGraceMinutes] = useState(10);
   const [breakGraceMinutes, setBreakGraceMinutes] = useState(10);
+  const [earlyExitGraceMinutes, setEarlyExitGraceMinutes] = useState(5);
   const [overtimeGraceMinutes, setOvertimeGraceMinutes] = useState(15);
 
   const openAdd = () => {
@@ -76,6 +77,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     setWorkingDays(['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']);
     setArrivalGraceMinutes(10);
     setBreakGraceMinutes(10);
+    setEarlyExitGraceMinutes(5);
     setOvertimeGraceMinutes(15);
     setModalOpen(true);
   };
@@ -98,6 +100,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
     setWorkingDays(s.workingDays);
     setArrivalGraceMinutes(s.arrivalGraceMinutes ?? 10);
     setBreakGraceMinutes(s.breakGraceMinutes ?? 10);
+    setEarlyExitGraceMinutes(s.earlyExitGraceMinutes ?? 5);
     setOvertimeGraceMinutes(s.overtimeGraceMinutes ?? 15);
     setModalOpen(true);
   };
@@ -130,6 +133,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
       workingDays,
       arrivalGraceMinutes: Number(arrivalGraceMinutes),
       breakGraceMinutes: Number(breakGraceMinutes),
+      earlyExitGraceMinutes: Number(earlyExitGraceMinutes),
       overtimeGraceMinutes: Number(overtimeGraceMinutes),
     };
 
@@ -329,8 +333,10 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                 </div>
 
                 <div className="flex items-center justify-between">
-                  <span className="text-slate-500">{t.overtimeGraceMinutesLabel}:</span>
-                  <span className="font-semibold text-slate-800">{s.overtimeGraceMinutes} m</span>
+                  <span className="text-slate-500">{t.earlyExitGraceMinutesLabel} / {t.overtimeGraceMinutesLabel}:</span>
+                  <span className="font-semibold text-slate-800">
+                    {s.earlyExitGraceMinutes ?? 5}m / {s.overtimeGraceMinutes}m
+                  </span>
                 </div>
 
                 {/* Working days pill list */}
@@ -548,6 +554,17 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     type="number"
                     value={breakGraceMinutes}
                     onChange={(e) => setBreakGraceMinutes(Number(e.target.value))}
+                    className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none"
+                  />
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {t.earlyExitGraceMinutesLabel}
+                  </label>
+                  <input
+                    type="number"
+                    value={earlyExitGraceMinutes}
+                    onChange={(e) => setEarlyExitGraceMinutes(Number(e.target.value))}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none"
                   />
                 </div>

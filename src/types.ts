@@ -18,6 +18,7 @@ export interface WorkSchedule {
   workingDays: DayOfWeek[]; // default ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday']
   arrivalGraceMinutes: number; // default 10
   breakGraceMinutes?: number; // default 10
+  earlyExitGraceMinutes?: number; // default 5 (e.g. exiting 5m before end is forgiven; 6m before end is 1m early exit)
   overtimeGraceMinutes: number; // default 15
 }
 
@@ -31,6 +32,7 @@ export interface Employee {
   status: 'Active' | 'Inactive';
   startDate: string;
   notes?: string;
+  hasSaturdayShift?: boolean; // When enabled, employee works Saturday Shift (10:00 - 17:00) on Saturdays
 }
 
 export interface RawDayAttendance {
@@ -133,7 +135,8 @@ export interface DailyAttendanceRecord {
   // Calculated figures
   firstCheckInDelayMinutes: number; // delay on shift entry past grace
   secondCheckInDelayMinutes: number; // delay on 2nd check-in (after break) past grace for admin workers (excludes 10m grace)
-  delayMinutes: number; // total delay (firstCheckInDelayMinutes + secondCheckInDelayMinutes)
+  earlyExitMinutes?: number; // early departure minutes before scheduled shift end time (excluding 5m grace)
+  delayMinutes: number; // total delay (firstCheckInDelayMinutes + secondCheckInDelayMinutes + earlyExitMinutes)
   breakDurationMinutes: number; // break deducted
   workedMinutes: number; // normal worked minutes
   workedHoursFormatted: string; // e.g. "7h 12"
@@ -194,6 +197,7 @@ export interface AppSettings {
   defaultOvertimeGraceMinutes: number; // 15
   defaultArrivalGraceMinutes: number; // default 10
   defaultBreakGraceMinutes: number; // default 10
+  defaultEarlyExitGraceMinutes?: number; // default 5
   allowRecalculationOnFly: boolean;
   activeRole: 'Administrator' | 'HR / Attendance User' | 'Management';
   language?: AppLanguage;

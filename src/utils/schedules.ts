@@ -18,6 +18,7 @@ export const STOCK_SHIFT_1: WorkSchedule = {
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
   arrivalGraceMinutes: 10,
   breakGraceMinutes: 10,
+  earlyExitGraceMinutes: 5,
   overtimeGraceMinutes: 15,
 };
 
@@ -39,6 +40,7 @@ export const STOCK_SHIFT_2: WorkSchedule = {
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
   arrivalGraceMinutes: 10,
   breakGraceMinutes: 10,
+  earlyExitGraceMinutes: 5,
   overtimeGraceMinutes: 15,
 };
 
@@ -60,6 +62,7 @@ export const STOCK_SHIFT_3: WorkSchedule = {
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
   arrivalGraceMinutes: 10,
   breakGraceMinutes: 10,
+  earlyExitGraceMinutes: 5,
   overtimeGraceMinutes: 15,
 };
 
@@ -81,6 +84,29 @@ export const STOCK_SHIFT_4: WorkSchedule = {
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
   arrivalGraceMinutes: 10,
   breakGraceMinutes: 10,
+  earlyExitGraceMinutes: 5,
+  overtimeGraceMinutes: 15,
+};
+
+export const STOCK_SHIFT_SATURDAY: WorkSchedule = {
+  id: 'stock_sat',
+  name: 'Shift Samedi (10:00 - 17:00)',
+  groupName: 'Stock Shift Samedi',
+  department: 'Stock & Logistique',
+  startTime: '10:00',
+  endTime: '17:00',
+  crossesMidnight: false,
+  hasBreak: true,
+  breakStart: '13:00',
+  breakEnd: '14:00',
+  breakDurationMinutes: 60,
+  overtimeAllowed: true,
+  overtimeStartTime: '17:00',
+  normalWorkedHours: 6.0,
+  workingDays: ['Saturday'],
+  arrivalGraceMinutes: 10,
+  breakGraceMinutes: 10,
+  earlyExitGraceMinutes: 5,
   overtimeGraceMinutes: 15,
 };
 
@@ -99,6 +125,7 @@ export const STOCK_DYNAMIC_SCHEDULE: WorkSchedule = {
   workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
   arrivalGraceMinutes: 10,
   breakGraceMinutes: 10,
+  earlyExitGraceMinutes: 5,
   overtimeGraceMinutes: 15,
 };
 
@@ -120,6 +147,7 @@ export const DEFAULT_SCHEDULES: WorkSchedule[] = [
     workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
     arrivalGraceMinutes: 10,
     breakGraceMinutes: 10,
+    earlyExitGraceMinutes: 5,
     overtimeGraceMinutes: 15,
   },
   {
@@ -137,6 +165,7 @@ export const DEFAULT_SCHEDULES: WorkSchedule[] = [
     workingDays: ['Saturday', 'Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday'],
     arrivalGraceMinutes: 10,
     breakGraceMinutes: 10,
+    earlyExitGraceMinutes: 5,
     overtimeGraceMinutes: 15,
   },
   STOCK_DYNAMIC_SCHEDULE,
@@ -144,6 +173,7 @@ export const DEFAULT_SCHEDULES: WorkSchedule[] = [
   STOCK_SHIFT_2,
   STOCK_SHIFT_3,
   STOCK_SHIFT_4,
+  STOCK_SHIFT_SATURDAY,
 ];
 
 export interface DetectedShiftResult {
@@ -155,17 +185,22 @@ export interface DetectedShiftResult {
 
 /**
  * Automatically determines which shift a Stock employee worked on a given date
- * based on their actual first check-in time.
+ * based on their actual first check-in time and day of week.
  *
  * Expected Stock shift check-in targets:
- * - Shift 3: 08:30 (Window: 07:00 - 09:14, e.g. 08:35)
- * - Shift 1: 10:00 (Window: 09:15 - 12:30, e.g. 09:57)
- * - Shift 4: 16:00 (Window: 14:30 - 17:00, e.g. 16:02)
- * - Shift 2: 18:00 (Window: 17:01 - 20:00, e.g. 18:04)
+ * - Saturday Shift: 10:00 (10:00 - 17:00) -> ONLY on Saturdays for designated workers! (Window: 08:00 - 13:00)
+ * - Shift 3: 08:30 (Window: 07:00 - 09:14, e.g. 08:35) [Sunday - Thursday]
+ * - Shift 1: 10:00 (Window: 09:15 - 12:30, e.g. 09:57) [Sunday - Thursday]
+ * - Shift 4: 16:00 (Window: 14:30 - 16:45, e.g. 16:02) [Sunday - Thursday]
+ * - Shift 2: 18:00 (Window: 16:46 - 21:00, e.g. 18:04) [Sunday - Thursday]
  *
  * If outside these clear windows, returns isUnclear: true ("SHIFT UNCLEAR").
  */
-export function detectStockShift(firstCheckInTime: string | null): DetectedShiftResult {
+export function detectStockShift(
+  firstCheckInTime: string | null,
+  dayOfWeek?: DayOfWeek,
+  hasSaturdayShift?: boolean
+): DetectedShiftResult {
   if (!firstCheckInTime) {
     return {
       schedule: null,
@@ -187,6 +222,38 @@ export function detectStockShift(firstCheckInTime: string | null): DetectedShift
     };
   }
 
+  // SATURDAY SPECIFIC AUTO-DETECTION:
+  // Saturday shift (10:00 - 17:00) ONLY activates on Saturdays, and only for designated workers!
+  if (dayOfWeek === 'Saturday') {
+    if (hasSaturdayShift) {
+      // Check-in around 10:00 (Window: 08:00 to 13:00)
+      if (mins >= 480 && mins <= 780) {
+        return {
+          schedule: STOCK_SHIFT_SATURDAY,
+          shiftId: 'stock_sat',
+          shiftName: 'Shift Samedi',
+          isUnclear: false,
+        };
+      }
+      return {
+        schedule: null,
+        shiftId: 'UNCLEAR',
+        shiftName: 'SHIFT UNCLEAR',
+        isUnclear: true,
+      };
+    } else {
+      // Worker not authorized/assigned to work on Saturday
+      return {
+        schedule: null,
+        shiftId: 'UNCLEAR',
+        shiftName: 'SHIFT UNCLEAR',
+        isUnclear: true,
+      };
+    }
+  }
+
+  // WEEKDAYS (Sunday - Thursday):
+  // Notice Saturday shift (10:00 - 17:00) is NEVER detected on weekdays!
   // Shift 3: Check-in 08:30 (Window: 07:00 to 09:14)
   if (mins >= 420 && mins <= 554) {
     return {

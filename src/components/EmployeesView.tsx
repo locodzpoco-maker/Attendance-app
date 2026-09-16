@@ -30,7 +30,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
 }) => {
   const t = getTranslations(settings.language);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'STOCK' | 'ADMIN'>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'STOCK' | 'ADMIN' | 'SATURDAY'>('ALL');
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
   const [detectedModalOpen, setDetectedModalOpen] = useState(false);
@@ -65,6 +65,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   const [scheduleId, setScheduleId] = useState('stock_g1');
   const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
+  const [hasSaturdayShift, setHasSaturdayShift] = useState(false);
   const [notes, setNotes] = useState('');
   const [formError, setFormError] = useState('');
 
@@ -77,6 +78,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setScheduleId(schedules[0]?.id || 'stock_g1');
     setStatus('Active');
     setStartDate(new Date().toISOString().slice(0, 10));
+    setHasSaturdayShift(false);
     setNotes('');
     setFormError('');
     setModalOpen(true);
@@ -91,6 +93,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setScheduleId(emp.scheduleId);
     setStatus(emp.status);
     setStartDate(emp.startDate);
+    setHasSaturdayShift(Boolean(emp.hasSaturdayShift));
     setNotes(emp.notes || '');
     setFormError('');
     setModalOpen(true);
@@ -124,6 +127,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       scheduleId,
       status,
       startDate,
+      hasSaturdayShift,
       notes: notes.trim() || undefined,
     };
 
@@ -137,11 +141,13 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
 
   const stockCount = employees.filter((e) => isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock")).length;
   const adminCount = employees.length - stockCount;
+  const saturdayCount = employees.filter((e) => Boolean(e.hasSaturdayShift)).length;
 
   const filteredEmployees = employees.filter((e) => {
     const isStock = isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock");
     if (categoryFilter === "STOCK" && !isStock) return false;
     if (categoryFilter === "ADMIN" && isStock) return false;
+    if (categoryFilter === "SATURDAY" && !e.hasSaturdayShift) return false;
 
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
@@ -263,6 +269,13 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
               >
                 {t.allAdminWorkers} ({adminCount})
               </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter("SATURDAY")}
+                className={`rounded-lg px-2.5 py-1 transition-all ${categoryFilter === "SATURDAY" ? "bg-teal-600 text-white shadow-2xs font-bold" : "text-slate-600 hover:text-slate-900"}`}
+              >
+                📅 {t.filterSaturdayWorkers} ({saturdayCount})
+              </button>
             </div>
           </div>
 
@@ -304,6 +317,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                 <th className="py-3 px-4">{t.group}</th>
                 <th className="py-3 px-4">{t.assignedSchedule}</th>
                 <th className="py-3 px-4 text-center">{t.colStatus}</th>
+                <th className="py-3 px-4 text-center">{t.shiftSatLabel}</th>
                 <th className="py-3 px-4">{t.colStartDate}</th>
                 {settings.activeRole !== 'Management' && (
                   <th className="py-3 px-4 text-right">{t.colActions}</th>
@@ -357,6 +371,27 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                         )}
                         {e.status === 'Active' ? t.active : t.inactive}
                       </span>
+                    </td>
+                    <td className="py-3 px-4 text-center">
+                      <button
+                        type="button"
+                        disabled={settings.activeRole === 'Management'}
+                        onClick={() => {
+                          onUpdateEmployee({
+                            ...e,
+                            hasSaturdayShift: !e.hasSaturdayShift,
+                          });
+                        }}
+                        className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-semibold transition-all border ${
+                          e.hasSaturdayShift
+                            ? 'bg-teal-50 text-teal-700 border-teal-300 hover:bg-teal-100 shadow-2xs'
+                            : 'bg-slate-50 text-slate-400 border-slate-200 hover:bg-slate-100'
+                        } ${settings.activeRole === 'Management' ? 'cursor-default' : 'cursor-pointer'}`}
+                        title={e.hasSaturdayShift ? t.saturdayActive : t.saturdayOff}
+                      >
+                        <span className={`h-1.5 w-1.5 rounded-full ${e.hasSaturdayShift ? 'bg-teal-500' : 'bg-slate-300'}`} />
+                        {e.hasSaturdayShift ? '10:00–17:00' : 'OFF'}
+                      </button>
                     </td>
                     <td className="py-3 px-4 text-slate-500">{e.startDate || '-'}</td>
                     {settings.activeRole !== 'Management' && (
@@ -517,6 +552,26 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 text-slate-800 outline-none"
                   />
                 </div>
+              </div>
+
+              {/* Saturday Shift Toggle */}
+              <div className="rounded-xl border border-teal-200 bg-teal-50/60 p-3">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={hasSaturdayShift}
+                    onChange={(e) => setHasSaturdayShift(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
+                  />
+                  <div className="text-xs">
+                    <span className="font-bold text-teal-950 flex items-center gap-1.5">
+                      <span>📅</span> {t.hasSaturdayShift}
+                    </span>
+                    <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
+                      {t.saturdayShiftDesc}
+                    </p>
+                  </div>
+                </label>
               </div>
 
               {formError && (

@@ -12,8 +12,8 @@ import {
   PaidVacation,
   AppLanguage,
 } from './types';
-import { DEFAULT_SCHEDULES } from './utils/schedules';
-import { DEFAULT_EMPLOYEES, findUnmappedEmployees } from './utils/employees';
+import { DEFAULT_SCHEDULES, STOCK_SHIFT_SATURDAY } from './utils/schedules';
+import { DEFAULT_EMPLOYEES, findUnmappedEmployees, DEFAULT_SATURDAY_WORKER_IDS } from './utils/employees';
 import { calculateAttendance } from './utils/calculator';
 import { generateReferenceDataset } from './utils/sampleData';
 import { getTranslations, isRtlLanguage } from './utils/i18n';
@@ -90,7 +90,7 @@ export default function App() {
       getStorageItem<WorkSchedule[] | null>('ams_schedules_v3', null) ||
       getStorageItem<WorkSchedule[] | null>('ams_schedules_v2', null);
     if (Array.isArray(saved) && saved.length > 0) {
-      return saved.map((s) => {
+      const list = saved.map((s) => {
         if (s.id === 'admin_g2' || s.groupName === 'Admin Group 2' || s.name.includes('Admin Group 2')) {
           return s;
         }
@@ -108,6 +108,10 @@ export default function App() {
           normalWorkedHours: 7.0,
         };
       });
+      if (!list.some((s) => s.id === 'stock_sat')) {
+        list.push(STOCK_SHIFT_SATURDAY);
+      }
+      return list;
     }
     return DEFAULT_SCHEDULES;
   });
@@ -119,7 +123,12 @@ export default function App() {
       getStorageItem<Employee[] | null>('ams_employees_v5', null) ||
       getStorageItem<Employee[] | null>('ams_employees_v4', null);
     if (Array.isArray(saved) && saved.length > 0) {
-      return saved;
+      return saved.map((e) => {
+        if (e.hasSaturdayShift === undefined && DEFAULT_SATURDAY_WORKER_IDS.has(e.id)) {
+          return { ...e, hasSaturdayShift: true };
+        }
+        return e;
+      });
     }
     return DEFAULT_EMPLOYEES;
   });

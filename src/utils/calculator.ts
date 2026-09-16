@@ -15,6 +15,7 @@ import {
   STOCK_SHIFT_2,
   STOCK_SHIFT_3,
   STOCK_SHIFT_4,
+  STOCK_SHIFT_SATURDAY,
   STOCK_DYNAMIC_SCHEDULE,
   detectStockShift,
   isEarlyMorningTime,
@@ -63,6 +64,7 @@ export function calculateAttendance(
   const globalOvertimeGrace = options?.settings?.defaultOvertimeGraceMinutes ?? 15;
   const globalArrivalGrace = options?.settings?.defaultArrivalGraceMinutes ?? 10;
   const globalBreakGrace = options?.settings?.defaultBreakGraceMinutes ?? 10;
+  const globalEarlyExitGrace = options?.settings?.defaultEarlyExitGraceMinutes ?? 5;
 
   const dailyRecords: DailyAttendanceRecord[] = [];
   const daysInMonth = dataset.totalDays;
@@ -173,18 +175,26 @@ export function calculateAttendance(
       let isShiftUnclear = false;
       let dayGroupName = defaultGroupName;
 
+      const hasSaturdayShift = Boolean(
+        dbEmp?.hasSaturdayShift ||
+        (dbEmp?.scheduleId === 'stock_sat') ||
+        (baseSchedule.id === 'stock_sat')
+      );
+
       if (isStock) {
         // STOCK EMPLOYEE: Dynamic Shift Detection per individual day!
         if (manualAdj?.overrideShiftId) {
           // Manual supervisor override
-          const over = scheduleMap.get(manualAdj.overrideShiftId) || STOCK_SHIFT_1;
+          const over =
+            scheduleMap.get(manualAdj.overrideShiftId) ||
+            (manualAdj.overrideShiftId === 'stock_sat' ? STOCK_SHIFT_SATURDAY : STOCK_SHIFT_1);
           assignedSchedule = over;
           detectedShiftId = over.id;
           detectedShiftName = over.name.split(' (')[0];
           dayGroupName = `Stock ${detectedShiftName}`;
         } else if (firstCheckInTime) {
-          // Auto-detect based on first check-in time
-          const detected = detectStockShift(firstCheckInTime);
+          // Auto-detect based on first check-in time and day of week
+          const detected = detectStockShift(firstCheckInTime, dayOfWeek, hasSaturdayShift);
           detectedShiftId = detected.shiftId;
           detectedShiftName = detected.shiftName;
           isShiftUnclear = detected.isUnclear;
@@ -194,26 +204,42 @@ export function calculateAttendance(
             dayGroupName = `Stock ${detected.shiftName}`;
           } else {
             // Unclear shift
-            assignedSchedule = STOCK_SHIFT_1; // fallback baseline for work hours
+            assignedSchedule = (dayOfWeek === 'Saturday' && hasSaturdayShift) ? STOCK_SHIFT_SATURDAY : STOCK_SHIFT_1;
             dayGroupName = 'Stock (Shift Unclear)';
           }
         } else {
           // No regular check-in today (e.g. rest day, or day after night shift with only 02:00 exit)
-          assignedSchedule = STOCK_SHIFT_1;
-          detectedShiftId = 'NONE';
-          detectedShiftName = '-';
-          dayGroupName = 'Stock';
+          if (dayOfWeek === 'Saturday' && hasSaturdayShift) {
+            assignedSchedule = STOCK_SHIFT_SATURDAY;
+            detectedShiftId = 'stock_sat';
+            detectedShiftName = 'Shift Samedi';
+            dayGroupName = 'Stock Shift Samedi';
+          } else {
+            assignedSchedule = STOCK_SHIFT_1;
+            detectedShiftId = 'NONE';
+            detectedShiftName = '-';
+            dayGroupName = 'Stock';
+          }
         }
       } else {
         // ADMIN EMPLOYEE: Standard schedule
-        detectedShiftId = assignedSchedule.id;
-        detectedShiftName = assignedSchedule.groupName;
-        dayGroupName = defaultGroupName;
+        if (dayOfWeek === 'Saturday' && hasSaturdayShift && assignedSchedule.id !== 'admin_g2') {
+          // If this employee is specifically assigned to Saturday shift
+          assignedSchedule = STOCK_SHIFT_SATURDAY;
+          detectedShiftId = 'stock_sat';
+          detectedShiftName = 'Shift Samedi';
+          dayGroupName = 'Shift Samedi';
+        } else {
+          detectedShiftId = assignedSchedule.id;
+          detectedShiftName = assignedSchedule.groupName;
+          dayGroupName = defaultGroupName;
+        }
       }
 
       const isWorkingDay = assignedSchedule.workingDays.includes(dayOfWeek);
       const arrivalGrace = assignedSchedule.arrivalGraceMinutes ?? globalArrivalGrace;
       const breakGrace = assignedSchedule.breakGraceMinutes ?? globalBreakGrace;
+      const earlyExitGrace = assignedSchedule.earlyExitGraceMinutes ?? globalEarlyExitGrace;
       const overtimeGrace = assignedSchedule.overtimeGraceMinutes ?? globalOvertimeGrace;
 
       // Check if employee is on approved Paid Vacation for this date
@@ -292,6 +318,7 @@ export function calculateAttendance(
           injectedSuppMinutes: injectedSupp > 0 ? injectedSupp : undefined,
           firstCheckInDelayMinutes: 0,
           secondCheckInDelayMinutes: 0,
+          earlyExitMinutes: 0,
           delayMinutes: 0,
           breakDurationMinutes: assignedSchedule.hasBreak ? assignedSchedule.breakDurationMinutes : 0,
           workedMinutes,
@@ -449,6 +476,32 @@ export function calculateAttendance(
         return rawSecondDelay > breakGrace ? rawSecondDelay - breakGrace : 0;
       };
 
+      // Helper to calculate early departure before scheduled shift end time with 5-minute grace period
+      // E.g. shift ends at 17:00 (5 PM):
+      // - Exits at 16:55 (4:55): raw diff 5 min <= 5 min grace -> 0 min early exit (not late)
+      // - Exits at 16:54 (4:54): raw diff 6 min > 5 min grace -> 6 - 5 = 1 min early exit added to late time
+      // - Exits at 16:00 (4:00): raw diff 60 min > 5 min grace -> 60 - 5 = 55 min early exit added to late time
+      const computeEarlyExit = (outTime: string): number => {
+        if (!assignedSchedule.endTime || assignedSchedule.endTime === 'Dynamic') return 0;
+        let schedEndMins = parseTimeToMinutes(assignedSchedule.endTime);
+        let outMins = parseTimeToMinutes(outTime);
+
+        if (assignedSchedule.crossesMidnight || isOvernightPunch) {
+          if (schedEndMins <= schedStartMins) {
+            schedEndMins += 24 * 60;
+          }
+          if (outMins < schedStartMins || outMins <= 8 * 60) {
+            outMins += 24 * 60;
+          }
+        }
+
+        if (outMins < schedEndMins) {
+          const rawEarlyMins = schedEndMins - outMins;
+          return rawEarlyMins > earlyExitGrace ? rawEarlyMins - earlyExitGrace : 0;
+        }
+        return 0;
+      };
+
       if (entryTime) {
         firstCheckInDelayMinutes = computeFirstCheckInDelay(entryTime);
       }
@@ -461,9 +514,18 @@ export function calculateAttendance(
         secondCheckInDelayMinutes = 0;
       }
 
-      delayMinutes = firstCheckInDelayMinutes + secondCheckInDelayMinutes;
+      let earlyExitMinutes = 0;
+      if (exitTime) {
+        earlyExitMinutes = computeEarlyExit(exitTime);
+      }
+
+      delayMinutes = firstCheckInDelayMinutes + secondCheckInDelayMinutes + earlyExitMinutes;
 
       if (isShiftUnclear) {
+        firstCheckInDelayMinutes = 0;
+        secondCheckInDelayMinutes = 0;
+        earlyExitMinutes = 0;
+        delayMinutes = 0;
         // Shift could not be clearly identified
         observation = 'SHIFT UNCLEAR';
         observationDetail = `Pointage ${firstCheckInTime} ne correspond à aucun shift (Révision requise)`;
@@ -510,8 +572,11 @@ export function calculateAttendance(
       } else if (!entryTime && exitTime) {
         // Missing entry
         observation = 'Entrée non pointée';
-        if (secondCheckInDelayMinutes > 0) {
-          observationDetail = `Entrée non pointée (Retard reprise pause: ${secondCheckInDelayMinutes} min)`;
+        if (delayMinutes > 0) {
+          const breakdownParts: string[] = [];
+          if (secondCheckInDelayMinutes > 0) breakdownParts.push(`Pause ${secondCheckInDelayMinutes}m`);
+          if (earlyExitMinutes > 0) breakdownParts.push(`Sortie anticipée ${earlyExitMinutes}m`);
+          observationDetail = `Entrée non pointée (Retard: ${delayMinutes} min [${breakdownParts.join(' + ')}])`;
         } else {
           observationDetail = 'Entrée non pointée';
         }
@@ -561,10 +626,19 @@ export function calculateAttendance(
         // Observation
         if (delayMinutes > 0) {
           observation = 'Retard';
-          if (firstCheckInDelayMinutes > 0 && secondCheckInDelayMinutes > 0) {
-            observationDetail = `Retard ${delayMinutes} min (Entrée ${firstCheckInDelayMinutes}m + Pause ${secondCheckInDelayMinutes}m)`;
+          const breakdownParts: string[] = [];
+          if (firstCheckInDelayMinutes > 0) breakdownParts.push(`Entrée ${firstCheckInDelayMinutes}m`);
+          if (secondCheckInDelayMinutes > 0) breakdownParts.push(`Pause ${secondCheckInDelayMinutes}m`);
+          if (earlyExitMinutes > 0) breakdownParts.push(`Sortie anticipée ${earlyExitMinutes}m`);
+
+          if (breakdownParts.length > 1) {
+            observationDetail = `Retard ${delayMinutes} min (${breakdownParts.join(' + ')})`;
+          } else if (firstCheckInDelayMinutes > 0) {
+            observationDetail = `Retard ${delayMinutes} min`;
           } else if (secondCheckInDelayMinutes > 0) {
             observationDetail = `Retard ${secondCheckInDelayMinutes} min (Reprise pause)`;
+          } else if (earlyExitMinutes > 0) {
+            observationDetail = `Retard ${earlyExitMinutes} min (Sortie anticipée)`;
           } else {
             observationDetail = `Retard ${delayMinutes} min`;
           }
@@ -635,6 +709,7 @@ export function calculateAttendance(
         injectedSuppMinutes: injectedSuppMinutes > 0 ? injectedSuppMinutes : undefined,
         firstCheckInDelayMinutes,
         secondCheckInDelayMinutes,
+        earlyExitMinutes,
         delayMinutes,
         breakDurationMinutes: assignedSchedule.hasBreak ? assignedSchedule.breakDurationMinutes : 0,
         workedMinutes,

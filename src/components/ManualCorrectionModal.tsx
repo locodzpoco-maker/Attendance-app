@@ -143,6 +143,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
               >
                 <option value="">{t.detectFingerprints} (Auto)</option>
+                <option value="stock_sat">{t.shiftSatLabel} (10:00 – 17:00, Break 13:00–14:00, OT &gt; 17:00)</option>
                 <option value="stock_g1">{t.shift1Label} (10:00 – 18:00, Break 13:00–14:00, OT &gt; 18:00)</option>
                 <option value="stock_g2">{t.shift2Label} (18:00 – 02:00, Break 21:00–22:00, OT &gt; 02:00)</option>
                 <option value="stock_g3">{t.shift3Label} (08:30 – 16:30, Break 12:00–13:00, OT &gt; 16:30)</option>

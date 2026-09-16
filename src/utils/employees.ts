@@ -421,17 +421,30 @@ export function isStockWorker(employeeId: string): boolean {
   );
 }
 
-const STOCK_EMPLOYEES: Employee[] = STOCK_WORKERS_INPUT.map((worker) => ({
-  id: worker.id,
-  name: worker.name,
-  rawDepartment: "Stock",
-  companyDepartment: "Stock & Logistique",
-  groupName: "Stock",
-  scheduleId: "stock_dynamic",
-  status: "Active",
-  startDate: "2023-01-01",
-  notes: "Stock (Dynamic shift: Shift 1, 2, 3, or 4 auto-detected daily)",
-}));
+export const DEFAULT_SATURDAY_WORKER_IDS = new Set([
+  '00039', // AMARI ISLAM
+  '00042', // BOUMEDIENE HICHEM
+  '00043', // ZENAGUI ACHRAF
+  '00044', // BENMANSOUR HOUSSAM
+]);
+
+const STOCK_EMPLOYEES: Employee[] = STOCK_WORKERS_INPUT.map((worker) => {
+  const hasSat = DEFAULT_SATURDAY_WORKER_IDS.has(worker.id);
+  return {
+    id: worker.id,
+    name: worker.name,
+    rawDepartment: "Stock",
+    companyDepartment: "Stock & Logistique",
+    groupName: "Stock",
+    scheduleId: "stock_dynamic",
+    status: "Active",
+    startDate: "2023-01-01",
+    hasSaturdayShift: hasSat,
+    notes: hasSat
+      ? "Stock (Shift Samedi 10:00-17:00 activé + Shifts 1-4 en semaine)"
+      : "Stock (Dynamic shift: Shift 1, 2, 3, or 4 auto-detected daily)",
+  };
+});
 
 const ADMIN_EMPLOYEES: Employee[] = ADMIN_WORKERS_INPUT.map((worker) => ({
   id: worker.id,

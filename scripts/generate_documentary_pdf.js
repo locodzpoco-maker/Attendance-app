@@ -422,6 +422,7 @@ const shiftTableData = [
   ['Shift 2 (Stock Night)', '18:00 – 02:00 (+1)', '21:00 – 22:00 (60m)', 'After 02:00 (+15m grace)', 'Crosses midnight into next day'],
   ['Shift 3 (Stock Morning)', '08:30 – 16:30', '12:00 – 13:00 (60m)', 'After 16:30 (+15m grace)', 'Standard logistics morning shift'],
   ['Shift 4 (Stock Mid/Midnight)', '16:00 – 00:00', '21:00 – 22:00 (60m)', 'After 00:00 (+15m grace)', 'Ends precisely at midnight'],
+  ['Saturday Shift (Stock Sat)', '10:00 – 17:00', '13:00 – 14:00 (60m)', 'After 17:00 (+15m grace)', 'Saturdays only; designated workers (00039, 00042, 00043, 00044)'],
 ];
 
 autoTable(doc, {
@@ -450,6 +451,7 @@ addBullet('Admin Group 2 (08:30 – 16:30)', 'Fixed standard office schedule wit
 addBullet('Mid-Day Pause Grace Threshold', 'For administrative schedules, employees who punch out and return from lunch after the scheduled break window are granted a 10-minute grace period. If their break delay exceeds 10 minutes, the excess minutes are automatically counted against their daily worked hours.', 'en');
 
 addSubheading('Overtime & Delay Calculation Precision', 'en');
+addBullet('5-Minute Early Exit Grace Period', 'If an employee leaves before their scheduled shift end time, a 5-minute grace period is granted. For example, if a shift ends at 17:00 and they exit at 16:55, it is forgiven (0 min early exit). If they exit at 16:54 (6 min deficit), 1 minute is calculated as early exit and added to their late time.', 'en');
 addBullet('15-Minute Overtime Grace Rule', 'Overtime (Heures Supplémentaires) does not accumulate for trivial departures. The system requires an employee to work at least 15 minutes beyond their scheduled shift end before overtime begins accumulating.', 'en');
 addBullet('Overnight Shift Day-Off Protection', 'Employees finishing Shift 2 at 02:00 AM have their rest day following the night shift properly accounted for. The engine ensures they are not falsely marked absent on the subsequent day.', 'en');
 addBullet('Weekly Rest Days & Friday Exclusions', 'Configurable weekly rest days (defaulting to Friday in accordance with regional labor conventions) are classified as "OFF" and never penalized as unexcused absences.', 'en');
@@ -540,6 +542,7 @@ const shiftTableFr = [
   ['Shift 2 (Stock Nuit)', '18:00 – 02:00 (+1)', '21:00 – 22:00 (60 min)', 'Au-delà de 02:00 (+15 min grâce)', 'Franchit minuit (J+1)'],
   ['Shift 3 (Stock Matin)', '08:30 – 16:30', '12:00 – 13:00 (60 min)', 'Au-delà de 16:30 (+15 min grâce)', 'Shift logistique du matin'],
   ['Shift 4 (Stock Soir/Minuit)', '16:00 – 00:00', '21:00 – 22:00 (60 min)', 'Au-delà de 00:00 (+15 min grâce)', 'Termine exactement à minuit'],
+  ['Shift Samedi (Stock Samedi)', '10:00 – 17:00', '13:00 – 14:00 (60 min)', 'Au-delà de 17:00 (+15 min grâce)', 'Uniquement le samedi pour agents désignés (00039, 00042, etc.)'],
 ];
 
 autoTable(doc, {
@@ -568,6 +571,7 @@ addBullet('Admin Groupe 2 (08:30 – 16:30)', 'Horaire standard pour le personne
 addBullet('Pénalité de Dépassement de Pause', 'Pour le personnel administratif, un retour de déjeuner avec plus de 10 minutes de retard au-delà de la fin de pause prévue est automatiquement décompté du temps de travail effectif.', 'fr');
 
 addSubheading('Règles d\'Exactitude des Calculs (Heures Sup & Retards)', 'fr');
+addBullet('Tolérance de 5 Minutes sur Sortie Anticipée', 'Si un employé quitte son poste avant la fin officielle de sa vacation, une tolérance de 5 minutes s\'applique. Par exemple, si la vacation finit à 17h00 et qu\'il sort à 16h55, aucun retard n\'est comptabilisé. S\'il sort à 16h54 (6 min de déficit), 1 minute est calculée en retard de sortie anticipée.', 'fr');
 addBullet('Seuil de Grâce de 15 Minutes pour les HS', 'Les départs décalés de quelques minutes ne génèrent pas d\'heures supplémentaires indues. Le temps supplémentaire n\'est comptabilisé que si le salarié reste au moins 15 minutes après l\'heure de fin planifiée.', 'fr');
 addBullet('Protection du Repos Post-Garde de Nuit', 'Pour un salarié terminant le Shift 2 à 02h00 du matin, la journée de repos qui suit est protégée contre tout faux signalement d\'absence injustifiée.', 'fr');
 addBullet('Neutralisation des Vendredis et Jours Fériés', 'Les jours de repos hebdomadaires sont étiquetés "OFF" et ne sont jamais pénalisés comme absences.', 'fr');
@@ -652,6 +656,7 @@ const shiftTableAr = [
   ['وردية 2 (مخزن ليلية)', '18:00 – 02:00 (+1)', '21:00 – 22:00 (60 دقيقة)', 'بعد 02:00 (عتبة 15 دقيقة)', 'تتجاوز منتصف الليل لليوم التالي'],
   ['وردية 3 (مخزن صباحية)', '08:30 – 16:30', '12:00 – 13:00 (60 دقيقة)', 'بعد 16:30 (عتبة 15 دقيقة)', 'وردية صباحية لوجستية'],
   ['وردية 4 (مخزن منتصف الليل)', '16:00 – 00:00', '21:00 – 22:00 (60 دقيقة)', 'بعد 00:00 (عتبة 15 دقيقة)', 'تنتهي تماماً عند منتصف الليل'],
+  ['وردية السبت (10:00 إلى 17:00)', '10:00 – 17:00', '13:00 – 14:00 (60 دقيقة)', 'بعد 17:00 (عتبة 15 دقيقة)', 'خاصة بأيام السبت فقط للعمال المحددين (00039، 00042، 00043، 00044)'],
 ];
 
 autoTable(doc, {
@@ -680,6 +685,7 @@ addBullet('المجموعة الإدارية 2 (08:30 – 16:30)', 'جدول ا�
 addBullet('عتبة استراحة الغداء', 'يمنح النظام الموظف الإداري مهلة 10 دقائق بعد انتهاء فترة الاستراحة المحددة، وأي تأخير يتجاوز ذلك يتم خصمه تلقائياً من ساعات العمل اليومية الفعلية.', 'ar');
 
 addSubheading('قواعد دقة الاحتساب (الساعات الإضافية والتأخيرات)', 'ar');
+addBullet('مهلة 5 دقائق للخروج المبكر', 'عند مغادرة الموظف قبل نهاية ورديته، تُمنح مهلة سماح قدرها 5 دقائق. مثلاً، إذا انتهت الوردية في 17:00 وغادر في 16:55 لا يُحسب خروج مبكر، أما إذا غادر في 16:54 (فارق 6 دقائق)، فيُحسب دقيقة واحدة تأخير خروج مبكر.', 'ar');
 addBullet('عتبة الـ 15 دقيقة للساعات الإضافية', 'لا يتم احتساب دقائق البقاء البسيطة كساعات إضافية. يشترط النظام أن يتجاوز الموظف موعد نهاية ورديته بـ 15 دقيقة على الأقل حتى يبدأ عداد الساعات الإضافية.', 'ar');
 addBullet('حماية راحة ما بعد الوردية الليلية', 'العامل الذي ينهي الوردية الثانية الساعة 02:00 فجراً يحصل على راحة مستحقة في اليوم التالي، ويمنع النظام تسجيله كغائب دون عذر في ذلك اليوم.', 'ar');
 addBullet('استبعاد أيام الجمعة والعطلات', 'تعتبر أيام العطلات الأسبوعية الرسمية أيام راحة (OFF) ولا تؤثر على استحقاق الرواتب أو تقييم الحضور.', 'ar');

@@ -121,7 +121,18 @@ export interface Translations {
   shift2Label: string;
   shift3Label: string;
   shift4Label: string;
+  shiftSatLabel: string;
   adminFixedSchedule: string;
+  hasSaturdayShift: string;
+  saturdayShiftDesc: string;
+  filterSaturdayWorkers: string;
+  saturdayActive: string;
+  saturdayOff: string;
+  earlyExitLabel: string;
+  obsEarlyExit: string;
+  inWord: string;
+  breakWord: string;
+  exitWord: string;
 
   // Observations
   obsOnTime: string;
@@ -206,6 +217,7 @@ export interface Translations {
   breakEnd: string;
   breakGraceMinutesLabel: string;
   arrivalGraceMinutesLabel: string;
+  earlyExitGraceMinutesLabel: string;
   overtimeGraceMinutesLabel: string;
   overtimeAllowed: string;
   workingDaysLabel: string;
@@ -411,7 +423,18 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     shift2Label: 'Shift 2 (18:00–02:00)',
     shift3Label: 'Shift 3 (08:30–16:30)',
     shift4Label: 'Shift 4 (16:00–00:00)',
+    shiftSatLabel: 'Shift Samedi (10:00–17:00)',
     adminFixedSchedule: 'Administratif / Horaire Fixe',
+    hasSaturdayShift: 'Travail le Samedi (10:00–17:00)',
+    saturdayShiftDesc: 'Active la détection automatique du shift Samedi (10:00–17:00) uniquement les samedis pour cet employé',
+    filterSaturdayWorkers: 'Samedi Travaillé',
+    saturdayActive: 'Samedi Actif',
+    saturdayOff: 'Samedi Repos',
+    earlyExitLabel: 'Sortie anticipée',
+    obsEarlyExit: 'Sortie anticipée',
+    inWord: 'entrée',
+    breakWord: 'pause',
+    exitWord: 'sortie',
 
     obsOnTime: 'Ponctuel',
     obsLate: 'Retard',
@@ -492,6 +515,7 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     breakEnd: 'Fin Pause',
     breakGraceMinutesLabel: 'Tolérance Pause (min)',
     arrivalGraceMinutesLabel: 'Tolérance Retard Entrée (min)',
+    earlyExitGraceMinutesLabel: 'Tolérance Sortie Anticipée (min)',
     overtimeGraceMinutesLabel: 'Seuil Déclenchement H. Supp. (min)',
     overtimeAllowed: 'Heures Supplémentaires Autorisées',
     workingDaysLabel: 'Jours Travaillés',
@@ -691,7 +715,18 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     shift2Label: 'Shift 2 (18:00–02:00)',
     shift3Label: 'Shift 3 (08:30–16:30)',
     shift4Label: 'Shift 4 (16:00–00:00)',
+    shiftSatLabel: 'Saturday Shift (10:00–17:00)',
     adminFixedSchedule: 'Admin / Fixed schedule',
+    hasSaturdayShift: 'Works Saturday (10:00–17:00)',
+    saturdayShiftDesc: 'Enables auto-detection of Saturday shift (10:00–17:00) only on Saturdays for this worker',
+    filterSaturdayWorkers: 'Saturday Shift',
+    saturdayActive: 'Saturday Active',
+    saturdayOff: 'Saturday Off',
+    earlyExitLabel: 'Early Departure',
+    obsEarlyExit: 'Early Exit',
+    inWord: 'in',
+    breakWord: 'break',
+    exitWord: 'exit',
 
     obsOnTime: 'On Time',
     obsLate: 'Late',
@@ -772,6 +807,7 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     breakEnd: 'Break End',
     breakGraceMinutesLabel: 'Break Grace (min)',
     arrivalGraceMinutesLabel: 'Arrival Grace (min)',
+    earlyExitGraceMinutesLabel: 'Early Exit Grace (min)',
     overtimeGraceMinutesLabel: 'Overtime Threshold (min)',
     overtimeAllowed: 'Overtime Allowed',
     workingDaysLabel: 'Working Days',
@@ -971,7 +1007,18 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     shift2Label: 'وردية 2 (18:00–02:00)',
     shift3Label: 'وردية 3 (08:30–16:30)',
     shift4Label: 'وردية 4 (16:00–00:00)',
+    shiftSatLabel: 'وردية السبت (10:00–17:00)',
     adminFixedSchedule: 'إداري / جدول ثابت',
+    hasSaturdayShift: 'العمل يوم السبت (10:00–17:00)',
+    saturdayShiftDesc: 'تفعيل الكشف التلقائي لوردية السبت (10:00–17:00) فقط أيام السبت لهذا العامل',
+    filterSaturdayWorkers: 'عمال السبت',
+    saturdayActive: 'السبت مفعّل',
+    saturdayOff: 'السبت راحة',
+    earlyExitLabel: 'خروج مبكر',
+    obsEarlyExit: 'خروج مبكر',
+    inWord: 'دخول',
+    breakWord: 'استراحة',
+    exitWord: 'خروج',
 
     obsOnTime: 'في الوقت',
     obsLate: 'متأخر',
@@ -1052,6 +1099,7 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     breakEnd: 'نهاية الاستراحة',
     breakGraceMinutesLabel: 'سماحية الاستراحة (دقيقة)',
     arrivalGraceMinutesLabel: 'سماحية تأخير الدخول (دقيقة)',
+    earlyExitGraceMinutesLabel: 'سماحية الخروج المبكر (دقيقة)',
     overtimeGraceMinutesLabel: 'حد احتساب الإضافي (دقيقة)',
     overtimeAllowed: 'العمل الإضافي مسموح',
     workingDaysLabel: 'أيام العمل',
@@ -1179,6 +1227,7 @@ export function translateDayOfWeek(day: string, lang?: AppLanguage): string {
 export function translateShiftName(name: string, lang?: AppLanguage): string {
   const t = getTranslations(lang);
   if (!name) return '';
+  if (name.includes('Samedi') || name.includes('Saturday') || name.includes('stock_sat')) return t.shiftSatLabel;
   if (name.includes('Shift 1') || name.includes('stock_g1')) return t.shift1Label;
   if (name.includes('Shift 2') || name.includes('stock_g2')) return t.shift2Label;
   if (name.includes('Shift 3') || name.includes('stock_g3')) return t.shift3Label;
