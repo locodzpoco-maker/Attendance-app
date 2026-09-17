@@ -77,6 +77,8 @@ export interface Translations {
   // Daily Attendance View
   searchWorker: string;
   allDepartments: string;
+  dailyFilterAdminOption: string;
+  dailyFilterStockOption: string;
   allStatuses: string;
   startDate: string;
   endDate: string;
@@ -160,6 +162,9 @@ export interface Translations {
   colTotalPaid: string;
   monthlyTotals: string;
   searchMonthlyPlaceholder: string;
+  viewDailyAttendance: string;
+  filteringByEmployee: string;
+  viewAllEmployees: string;
 
   // Employees View
   addEmployee: string;
@@ -172,6 +177,15 @@ export interface Translations {
   active: string;
   inactive: string;
   suspended: string;
+  archived: string;
+  archiveEmployee: string;
+  unarchiveEmployee: string;
+  excludeArchived: string;
+  includeArchived: string;
+  archivedExcludedBadge: string;
+  tabArchived: string;
+  totalArchived: string;
+  archiveStatusExpl: string;
   employeeFormTitle: string;
   fullName: string;
   department: string;
@@ -380,6 +394,8 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
 
     searchWorker: 'Rechercher par nom, ID ou département...',
     allDepartments: 'Tous les Départements',
+    dailyFilterAdminOption: 'Administration (Employés & Shifts Admin)',
+    dailyFilterStockOption: 'Stock & Logistique (Travailleurs & Shifts Stock)',
     allStatuses: 'Tous les Statuts',
     startDate: 'Date Début',
     endDate: 'Date Fin',
@@ -460,6 +476,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colTotalPaid: 'Total Heures Payées',
     monthlyTotals: 'Totaux Mensuels',
     searchMonthlyPlaceholder: 'Rechercher par ID, Nom ou Département...',
+    viewDailyAttendance: 'Voir la fiche quotidienne',
+    filteringByEmployee: 'Filtré par employé',
+    viewAllEmployees: 'Voir tous les employés',
 
     addEmployee: 'Ajouter un Employé',
     editEmployee: 'Modifier l’Employé',
@@ -471,6 +490,15 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     active: 'Actif',
     inactive: 'Inactif',
     suspended: 'Suspendu',
+    archived: 'Archivé',
+    archiveEmployee: 'Archiver',
+    unarchiveEmployee: 'Désarchiver',
+    excludeArchived: 'Masquer les archivés',
+    includeArchived: 'Afficher les archivés',
+    archivedExcludedBadge: 'archivé(s) exclu(s)',
+    tabArchived: 'Archivés',
+    totalArchived: 'Employés Archivés',
+    archiveStatusExpl: 'A quitté l’entreprise (exclu des calculs)',
     employeeFormTitle: 'Fiche de l’Employé',
     fullName: 'Nom Complet',
     department: 'Département',
@@ -672,6 +700,8 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
 
     searchWorker: 'Search by worker name, ID, or department...',
     allDepartments: 'All Departments',
+    dailyFilterAdminOption: 'Administration (Admin Workers & Shifts)',
+    dailyFilterStockOption: 'Stock & Logistics (Stock Workers & Shifts)',
     allStatuses: 'All Statuses',
     startDate: 'Start Date',
     endDate: 'End Date',
@@ -752,6 +782,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colTotalPaid: 'Total Paid Hours',
     monthlyTotals: 'Monthly Totals',
     searchMonthlyPlaceholder: 'Search employee by ID, Name or Department...',
+    viewDailyAttendance: 'View Daily Attendance',
+    filteringByEmployee: 'Filtered by Employee',
+    viewAllEmployees: 'View All Employees',
 
     addEmployee: 'Add Employee',
     editEmployee: 'Edit Employee',
@@ -763,6 +796,15 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     active: 'Active',
     inactive: 'Inactive',
     suspended: 'Suspended',
+    archived: 'Archived',
+    archiveEmployee: 'Archive',
+    unarchiveEmployee: 'Restore / Unarchive',
+    excludeArchived: 'Hide Archived',
+    includeArchived: 'Show Archived',
+    archivedExcludedBadge: 'archived excluded',
+    tabArchived: 'Archived',
+    totalArchived: 'Archived Employees',
+    archiveStatusExpl: 'Stopped working for company (excluded from reports)',
     employeeFormTitle: 'Employee Details',
     fullName: 'Full Name',
     department: 'Department',
@@ -964,6 +1006,8 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
 
     searchWorker: 'بحث باسم الموظف، الرقم التعريفي أو القسم...',
     allDepartments: 'جميع الأقسام',
+    dailyFilterAdminOption: 'الإدارة (موظفو ومناوبات الإدارة)',
+    dailyFilterStockOption: 'المخزن واللوجستيات (عمال ومناوبات المخزن)',
     allStatuses: 'جميع الحالات',
     startDate: 'تاريخ البدء',
     endDate: 'تاريخ الانتهاء',
@@ -1044,6 +1088,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colTotalPaid: 'إجمالي الساعات المدفوعة',
     monthlyTotals: 'المجاميع الشهرية',
     searchMonthlyPlaceholder: 'بحث بالمعرف، الاسم أو القسم...',
+    viewDailyAttendance: 'عرض الحضور اليومي',
+    filteringByEmployee: 'مصفى حسب الموظف',
+    viewAllEmployees: 'عرض جميع الموظفين',
 
     addEmployee: 'إضافة موظف',
     editEmployee: 'تعديل الموظف',
@@ -1055,6 +1102,15 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     active: 'نشط',
     inactive: 'غير نشط',
     suspended: 'موقوف',
+    archived: 'مؤرشف',
+    archiveEmployee: 'أرشفة',
+    unarchiveEmployee: 'إلغاء الأرشفة / استعادة',
+    excludeArchived: 'إخفاء المؤرشفين',
+    includeArchived: 'إظهار المؤرشفين',
+    archivedExcludedBadge: 'مؤرشف(ين) مستبعد(ين)',
+    tabArchived: 'المؤرشفون',
+    totalArchived: 'الموظفون المؤرشفون',
+    archiveStatusExpl: 'توقف عن العمل معنا (مستبعد من التقارير)',
     employeeFormTitle: 'بيانات الموظف',
     fullName: 'الاسم الكامل',
     department: 'القسم',

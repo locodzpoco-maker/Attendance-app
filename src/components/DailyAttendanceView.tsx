@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import {
   DailyAttendanceRecord,
   AppSettings,
@@ -22,9 +22,12 @@ import {
   CalendarRange,
   Zap,
   Palmtree,
+  Archive,
+  Users,
 } from 'lucide-react';
 import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
 import { getTranslations, translateDayOfWeek, Translations } from '../utils/i18n';
+import { isAdminWorker, isStockWorker } from '../utils/employees';
 
 interface DailyAttendanceViewProps {
   records: DailyAttendanceRecord[];
@@ -34,6 +37,29 @@ interface DailyAttendanceViewProps {
   onExportExcel: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   onExportPDF: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   settings: AppSettings;
+  selectedEmployeeId?: string | null;
+  onClearSelectedEmployee?: () => void;
+}
+
+// Helpers to classify records strictly into Admin vs Stock
+export function isDailyRecordStock(r: DailyAttendanceRecord): boolean {
+  if (isAdminWorker(r.employeeId)) return false;
+  if (isStockWorker(r.employeeId)) return true;
+  if (r.isDynamicShift) return true;
+  const dept = (r.companyDepartment || '').toLowerCase();
+  const grp = (r.groupName || '').toLowerCase();
+  const sched = (r.scheduleId || '').toLowerCase();
+  return (
+    dept.includes('stock') ||
+    dept.includes('depot') ||
+    dept.includes('dépôt') ||
+    grp.includes('stock') ||
+    sched.includes('stock')
+  );
+}
+
+export function isDailyRecordAdmin(r: DailyAttendanceRecord): boolean {
+  return !isDailyRecordStock(r);
 }
 
 // Helper to format ISO date YYYY-MM-DD to display DD/MM/YYYY
@@ -64,15 +90,50 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   onExportExcel,
   onExportPDF,
   settings,
+  selectedEmployeeId,
+  onClearSelectedEmployee,
 }) => {
   const t = getTranslations(settings.language);
   const [searchTerm, setSearchTerm] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState('ALL');
+  const [selectedGroup, setSelectedGroup] = useState<'ADMIN' | 'STOCK'>('ADMIN');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
+  const [excludeArchived, setExcludeArchived] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
   const pageSize = 25;
+
+  // Sync selected employee from props (e.g., when drilled down from Monthly Summary)
+  useEffect(() => {
+    if (selectedEmployeeId) {
+      const empRecords = records.filter((r) => r.employeeId === selectedEmployeeId);
+      const isStock = empRecords.length > 0
+        ? isDailyRecordStock(empRecords[0])
+        : isStockWorker(selectedEmployeeId);
+
+      setSelectedGroup(isStock ? 'STOCK' : 'ADMIN');
+
+      const isArchived = empRecords.some((r) => r.isArchived);
+      if (isArchived) {
+        setExcludeArchived(false);
+      }
+      setPage(1);
+    }
+  }, [selectedEmployeeId, records]);
+
+  // Selected employee information for the active filter banner
+  const selectedEmployeeInfo = useMemo(() => {
+    if (!selectedEmployeeId) return null;
+    const rec = records.find((r) => r.employeeId === selectedEmployeeId);
+    return rec
+      ? { id: rec.employeeId, name: rec.employeeName, dept: rec.companyDepartment }
+      : { id: selectedEmployeeId, name: selectedEmployeeId, dept: '' };
+  }, [selectedEmployeeId, records]);
+
+  // Count archived records
+  const archivedRecordsCount = useMemo(() => {
+    return records.filter((r) => r.isArchived).length;
+  }, [records]);
 
   // Count unclear shifts needing review
   const unclearCount = useMemo(() => {
@@ -84,14 +145,26 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
     return records.filter((r) => (r.injectedSuppMinutes || 0) > 0).length;
   }, [records]);
 
-  // Extract unique departments/groups
-  const groupOptions = useMemo(() => {
+  // Count unique workers in Admin and Stock groups
+  const adminWorkersCount = useMemo(() => {
     const set = new Set<string>();
     records.forEach((r) => {
-      if (r.groupName) set.add(r.groupName);
+      if (isDailyRecordAdmin(r) && (!excludeArchived || !r.isArchived)) {
+        set.add(r.employeeId);
+      }
     });
-    return Array.from(set).sort();
-  }, [records]);
+    return set.size;
+  }, [records, excludeArchived]);
+
+  const stockWorkersCount = useMemo(() => {
+    const set = new Set<string>();
+    records.forEach((r) => {
+      if (isDailyRecordStock(r) && (!excludeArchived || !r.isArchived)) {
+        set.add(r.employeeId);
+      }
+    });
+    return set.size;
+  }, [records, excludeArchived]);
 
   // Extract unique sorted dates from dataset
   const dateOptions = useMemo(() => {
@@ -154,6 +227,11 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   // Filtered records
   const filteredRecords = useMemo(() => {
     return records.filter((r) => {
+      // Drilldown employee filter from Monthly Summary
+      if (selectedEmployeeId && r.employeeId !== selectedEmployeeId) {
+        return false;
+      }
+
       // Search term
       if (searchTerm) {
         // Support searching with slashes, backslashes (e.g. 01\09\26 or 01/09/2026)
@@ -181,8 +259,11 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         }
       }
 
-      // Group filter
-      if (selectedGroup !== 'ALL' && r.groupName !== selectedGroup) {
+      // Group filter: Strictly 2 options (ADMIN: all admin workers with admin shifts; STOCK: all stock workers with stock shifts)
+      if (selectedGroup === 'ADMIN' && !isDailyRecordAdmin(r)) {
+        return false;
+      }
+      if (selectedGroup === 'STOCK' && !isDailyRecordStock(r)) {
         return false;
       }
 
@@ -213,9 +294,14 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
           return false;
       }
 
+      // Exclude archived employees if toggle is active
+      if (excludeArchived && r.isArchived) {
+        return false;
+      }
+
       return true;
     });
-  }, [records, searchTerm, selectedGroup, effectiveStartDate, effectiveEndDate, selectedStatus]);
+  }, [records, searchTerm, selectedGroup, effectiveStartDate, effectiveEndDate, selectedStatus, excludeArchived, selectedEmployeeId]);
 
   // Count distinct days present in filtered set
   const filteredDaysCount = useMemo(() => {
@@ -337,9 +423,23 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
     }
 
     // Admin / Fixed schedule
+    const isSat =
+      record.dayOfWeek === 'Saturday' &&
+      (record.scheduleId === 'admin_sat' ||
+        record.detectedShiftName?.includes('Samedi') ||
+        record.groupName?.includes('Samedi'));
+    const adminLabel = record.scheduleName || record.groupName || t.adminFixedSchedule;
     return (
-      <span className="inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-medium border bg-slate-100 text-slate-700 border-slate-200">
-        {record.groupName || t.adminFixedSchedule}
+      <span
+        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold border ${
+          isSat
+            ? 'bg-teal-50 text-teal-800 border-teal-200'
+            : 'bg-indigo-50 text-indigo-700 border-indigo-200'
+        }`}
+        title={record.scheduleName || record.groupName}
+      >
+        {isSat && <span className="text-[10px]">📅</span>}
+        {adminLabel}
       </span>
     );
   };
@@ -430,6 +530,9 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               placeholder={t.searchWorker}
               value={searchTerm}
               onChange={(e) => {
+                if (selectedEmployeeId && onClearSelectedEmployee) {
+                  onClearSelectedEmployee();
+                }
                 setSearchTerm(e.target.value);
                 setPage(1);
               }}
@@ -532,22 +635,22 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               )}
             </div>
 
-            {/* Group filter */}
+            {/* Group filter: Exactly 2 options (Admin & Stock) */}
             <select
               id="filter-group-select"
               value={selectedGroup}
               onChange={(e) => {
-                setSelectedGroup(e.target.value);
+                setSelectedGroup(e.target.value as 'ADMIN' | 'STOCK');
                 setPage(1);
               }}
-              className="rounded-lg border border-slate-300 bg-white px-2 py-1 text-slate-700 outline-none"
+              className="rounded-lg border border-slate-300 bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 shadow-2xs cursor-pointer"
             >
-              <option value="ALL">{t.allGroups}</option>
-              {groupOptions.map((g) => (
-                <option key={g} value={g}>
-                  {g}
-                </option>
-              ))}
+              <option value="ADMIN">
+                🏢 {t.dailyFilterAdminOption} ({adminWorkersCount})
+              </option>
+              <option value="STOCK">
+                📦 {t.dailyFilterStockOption} ({stockWorkersCount})
+              </option>
             </select>
 
             {/* Status filter */}
@@ -575,6 +678,34 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               <option value="ABSENCE">{t.obsAbsent}</option>
               <option value="OFF">{t.obsOff}</option>
             </select>
+
+            {/* Exclude / Include Archived Toggle */}
+            <button
+              id="daily-exclude-archived-toggle"
+              type="button"
+              onClick={() => {
+                setExcludeArchived((prev) => !prev);
+                setPage(1);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border transition-all shadow-2xs ${
+                excludeArchived
+                  ? 'bg-slate-800 text-white border-slate-900 hover:bg-slate-900'
+                  : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+              }`}
+              title={excludeArchived ? t.includeArchived : t.excludeArchived}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              <span>{excludeArchived ? t.excludeArchived : t.includeArchived}</span>
+              {archivedRecordsCount > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    excludeArchived ? 'bg-slate-700 text-slate-200' : 'bg-amber-200 text-amber-900'
+                  }`}
+                >
+                  {excludeArchived ? `${archivedRecordsCount} ${t.archivedExcludedBadge}` : archivedRecordsCount}
+                </span>
+              )}
+            </button>
 
             {/* Inject Supp Hours Quick Button */}
             {settings.activeRole !== 'Management' && onOpenInjectSupp && (
@@ -647,6 +778,40 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         </div>
       )}
 
+      {/* Active Employee Drilldown Filter Banner */}
+      {selectedEmployeeInfo && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-indigo-50/90 border border-indigo-200 px-3.5 py-2.5 text-xs text-indigo-950 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-indigo-600 text-white font-bold text-xs shadow-xs">
+              <Users className="h-4 w-4" />
+            </div>
+            <span>
+              <strong>{t.filteringByEmployee}:</strong>{' '}
+              <span className="font-bold text-indigo-950 text-sm">{selectedEmployeeInfo.name}</span>{' '}
+              <span className="font-mono font-semibold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200">
+                ID: {selectedEmployeeInfo.id}
+              </span>
+              {selectedEmployeeInfo.dept && (
+                <span className="text-slate-600 ml-1.5 font-medium">({selectedEmployeeInfo.dept})</span>
+              )}
+              <span className="text-slate-500 font-mono text-[11px] ml-2">
+                • {filteredRecords.length} {t.recordsWord}
+              </span>
+            </span>
+          </div>
+          <button
+            type="button"
+            id="clear-selected-employee-btn"
+            onClick={() => onClearSelectedEmployee?.()}
+            className="inline-flex items-center gap-1.5 rounded-lg bg-white px-3 py-1 text-xs font-semibold text-indigo-700 border border-indigo-200 hover:bg-indigo-100/70 transition-colors shadow-2xs cursor-pointer"
+            title={t.viewAllEmployees}
+          >
+            <X className="h-3.5 w-3.5 text-indigo-600" />
+            <span>{t.viewAllEmployees}</span>
+          </button>
+        </div>
+      )}
+
       {/* Suggested Columns Table (PRD Section 21 + Dynamic Shift Specification) */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -706,6 +871,15 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     <td className="py-2.5 px-3 font-medium text-slate-900 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         {r.employeeName}
+                        {r.isArchived && (
+                          <span
+                            title={t.archived}
+                            className="inline-flex items-center gap-0.5 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-300"
+                          >
+                            <Archive className="h-2.5 w-2.5" />
+                            {t.archived}
+                          </span>
+                        )}
                         {r.isManuallyAdjusted && (
                           <span
                             title={`Manually adjusted: ${r.manualAdjustment?.reason}`}

@@ -206,6 +206,14 @@ export default function App() {
   const [vacationModalPreSelectedEmp, setVacationModalPreSelectedEmp] = useState<Employee | null>(null);
   const [vacationModalPreSelectedDate, setVacationModalPreSelectedDate] = useState<string | undefined>(undefined);
 
+  // Drilldown filter: specific employee selected from Monthly Summary to view in Daily Attendance
+  const [selectedEmployeeIdForDaily, setSelectedEmployeeIdForDaily] = useState<string | null>(null);
+
+  const handleSelectEmployeeForDaily = (employeeId: string) => {
+    setSelectedEmployeeIdForDaily(employeeId);
+    setActiveTab('daily');
+  };
+
   const handleOpenInjectSupp = (record?: DailyAttendanceRecord) => {
     setInjectSuppTargetRecord(record || null);
     setIsInjectSuppModalOpen(true);
@@ -541,11 +549,33 @@ export default function App() {
   };
 
   const handleUpdateEmployee = (updatedEmp: Employee) => {
+    const prevEmp = employees.find((e) => e.id === updatedEmp.id);
     setEmployees((prev) => {
       const next = prev.map((e) => (e.id === updatedEmp.id ? updatedEmp : e));
       saveStorageItem('ams_employees', next);
       return next;
     });
+
+    if (prevEmp && (Boolean(prevEmp.isArchived) !== Boolean(updatedEmp.isArchived) || prevEmp.status !== updatedEmp.status)) {
+      const isNowArchived = Boolean(updatedEmp.isArchived || updatedEmp.status === 'Archived');
+      const newLog: AttendanceAuditLog = {
+        id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+        timestamp: new Date().toISOString(),
+        user: settings.activeRole,
+        employeeId: updatedEmp.id,
+        employeeName: updatedEmp.name,
+        date: new Date().toISOString().slice(0, 10),
+        action: isNowArchived ? 'ARCHIVE_EMPLOYEE' : 'UNARCHIVE_EMPLOYEE',
+        details: isNowArchived
+          ? `Archived employee ${updatedEmp.name} (${updatedEmp.id}). Excluded from daily attendance & monthly summaries.`
+          : `Re-activated archived employee ${updatedEmp.name} (${updatedEmp.id}).`,
+      };
+      setAuditLogs((prev) => {
+        const next = [newLog, ...prev];
+        saveStorageItem('ams_audit_logs', next);
+        return next;
+      });
+    }
   };
 
   // Schedule modifications with immediate synchronous storage persistence
@@ -749,6 +779,8 @@ export default function App() {
             onExportExcel={handleExportDailyExcel}
             onExportPDF={handleExportDailyPDF}
             settings={settings}
+            selectedEmployeeId={selectedEmployeeIdForDaily}
+            onClearSelectedEmployee={() => setSelectedEmployeeIdForDaily(null)}
           />
         )}
 
@@ -760,6 +792,7 @@ export default function App() {
             onExportPDF={handleExportMonthlyPDF}
             settings={settings}
             periodLabel={currentPeriodLabel}
+            onSelectEmployeeForDaily={handleSelectEmployeeForDaily}
           />
         )}
 

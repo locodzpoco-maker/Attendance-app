@@ -1,7 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import { Employee, WorkSchedule, AppSettings, RawEmployeeRecord } from '../types';
 import { isStockWorker, isAdminWorker, findUnmappedEmployees, createEmployeeFromDetected } from '../utils/employees';
-import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert, UserPlus, Sparkles, Zap, Check, Palmtree } from 'lucide-react';
+import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert, UserPlus, Sparkles, Zap, Check, Palmtree, Archive, ArchiveRestore } from 'lucide-react';
 import { AddDetectedWorkersModal } from './AddDetectedWorkersModal';
 import { getTranslations } from '../utils/i18n';
 
@@ -30,7 +30,8 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
 }) => {
   const t = getTranslations(settings.language);
   const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'STOCK' | 'ADMIN' | 'SATURDAY'>('ALL');
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'STOCK' | 'ADMIN' | 'SATURDAY' | 'ARCHIVED'>('ALL');
+  const [showArchived, setShowArchived] = useState(false);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
   const [detectedModalOpen, setDetectedModalOpen] = useState(false);
@@ -63,7 +64,8 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   const [companyDept, setCompanyDept] = useState('Stock & Logistique');
   const [groupName, setGroupName] = useState('Stock Group 1');
   const [scheduleId, setScheduleId] = useState('stock_g1');
-  const [status, setStatus] = useState<'Active' | 'Inactive'>('Active');
+  const [status, setStatus] = useState<'Active' | 'Inactive' | 'Archived'>('Active');
+  const [isArchived, setIsArchived] = useState(false);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [hasSaturdayShift, setHasSaturdayShift] = useState(false);
   const [notes, setNotes] = useState('');
@@ -77,6 +79,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setGroupName('Stock Group 1');
     setScheduleId(schedules[0]?.id || 'stock_g1');
     setStatus('Active');
+    setIsArchived(false);
     setStartDate(new Date().toISOString().slice(0, 10));
     setHasSaturdayShift(false);
     setNotes('');
@@ -92,11 +95,36 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setGroupName(emp.groupName);
     setScheduleId(emp.scheduleId);
     setStatus(emp.status);
+    setIsArchived(Boolean(emp.isArchived || emp.status === 'Archived'));
     setStartDate(emp.startDate);
     setHasSaturdayShift(Boolean(emp.hasSaturdayShift));
     setNotes(emp.notes || '');
     setFormError('');
     setModalOpen(true);
+  };
+
+  const handleArchiveEmployee = (emp: Employee) => {
+    const updated: Employee = {
+      ...emp,
+      status: 'Archived',
+      isArchived: true,
+      archivedAt: new Date().toISOString(),
+    };
+    onUpdateEmployee(updated);
+    setToastMessage(`${emp.name} (${emp.id}) — ${t.archiveEmployee} (${t.archivedExcludedBadge})`);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleUnarchiveEmployee = (emp: Employee) => {
+    const updated: Employee = {
+      ...emp,
+      status: 'Active',
+      isArchived: false,
+      archivedAt: undefined,
+    };
+    onUpdateEmployee(updated);
+    setToastMessage(`${emp.name} (${emp.id}) — ${t.unarchiveEmployee}`);
+    setTimeout(() => setToastMessage(null), 4000);
   };
 
   const handleSubmit = (e: React.FormEvent) => {
@@ -119,15 +147,18 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       }
     }
 
+    const archivedFlag = isArchived || status === 'Archived';
     const payload: Employee = {
       id: empId.trim(),
       name: name.trim(),
       companyDepartment: companyDept.trim(),
       groupName: groupName.trim(),
       scheduleId,
-      status,
+      status: archivedFlag ? 'Archived' : status,
       startDate,
       hasSaturdayShift,
+      isArchived: archivedFlag,
+      archivedAt: archivedFlag ? (editingEmp?.archivedAt || new Date().toISOString()) : undefined,
       notes: notes.trim() || undefined,
     };
 
@@ -139,6 +170,8 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setModalOpen(false);
   };
 
+  const archivedCount = employees.filter((e) => Boolean(e.isArchived || e.status === 'Archived')).length;
+  const activeEmployees = employees.filter((e) => !e.isArchived && e.status !== 'Archived');
   const stockCount = employees.filter((e) => isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock")).length;
   const adminCount = employees.length - stockCount;
   const saturdayCount = employees.filter((e) => Boolean(e.hasSaturdayShift)).length;
@@ -146,10 +179,19 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   const adminSaturdayCount = saturdayCount - stockSaturdayCount;
 
   const filteredEmployees = employees.filter((e) => {
-    const isStock = isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock");
-    if (categoryFilter === "STOCK" && !isStock) return false;
-    if (categoryFilter === "ADMIN" && isStock) return false;
-    if (categoryFilter === "SATURDAY" && !e.hasSaturdayShift) return false;
+    const isEmpArchived = Boolean(e.isArchived || e.status === 'Archived');
+
+    if (categoryFilter === "ARCHIVED") {
+      if (!isEmpArchived) return false;
+    } else {
+      // If browsing active categories and not explicitly showing archived, exclude them
+      if (!showArchived && isEmpArchived) return false;
+
+      const isStock = isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock");
+      if (categoryFilter === "STOCK" && !isStock) return false;
+      if (categoryFilter === "ADMIN" && isStock) return false;
+      if (categoryFilter === "SATURDAY" && !e.hasSaturdayShift) return false;
+    }
 
     if (searchTerm) {
       const q = searchTerm.toLowerCase();
@@ -279,6 +321,18 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
               >
                 📅 {t.filterSaturdayWorkers} ({saturdayCount})
               </button>
+              <button
+                type="button"
+                onClick={() => setCategoryFilter("ARCHIVED")}
+                className={`rounded-lg px-2.5 py-1 transition-all ${
+                  categoryFilter === "ARCHIVED"
+                    ? "bg-amber-600 text-white shadow-2xs font-bold"
+                    : "text-slate-600 hover:text-slate-900"
+                }`}
+                title={t.totalArchived}
+              >
+                📁 {t.tabArchived} ({archivedCount})
+              </button>
               {categoryFilter === "SATURDAY" && (
                 <span className="text-[11px] text-teal-800 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1 font-semibold flex items-center gap-1.5 shadow-2xs">
                   <span>{stockSaturdayCount} {t.stockRoleBadge} (10:00–17:00)</span>
@@ -287,6 +341,29 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                 </span>
               )}
             </div>
+
+            {/* Toggle show/hide archived when in standard categories */}
+            {categoryFilter !== "ARCHIVED" && archivedCount > 0 && (
+              <button
+                id="employees-toggle-show-archived-btn"
+                type="button"
+                onClick={() => setShowArchived((prev) => !prev)}
+                className={`inline-flex items-center gap-1.5 rounded-xl border px-2.5 py-1 text-xs font-semibold transition-all shadow-2xs ${
+                  showArchived
+                    ? 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+                    : 'bg-white text-slate-600 border-slate-200 hover:bg-slate-50'
+                }`}
+                title={showArchived ? t.excludeArchived : t.includeArchived}
+              >
+                <Archive className="h-3.5 w-3.5 text-amber-600" />
+                <span>{showArchived ? t.includeArchived : t.excludeArchived}</span>
+                {!showArchived && (
+                  <span className="rounded-full bg-slate-200 px-1.5 py-0.2 text-[10px] text-slate-700 font-mono">
+                    {archivedCount} {t.archivedExcludedBadge}
+                  </span>
+                )}
+              </button>
+            )}
           </div>
 
           {settings.activeRole !== 'Management' && (
@@ -367,20 +444,30 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                       </span>
                     </td>
                     <td className="py-3 px-4 text-center">
-                      <span
-                        className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                          e.status === 'Active'
-                            ? 'bg-emerald-50 text-emerald-700'
-                            : 'bg-slate-100 text-slate-500'
-                        }`}
-                      >
-                        {e.status === 'Active' ? (
-                          <CheckCircle className="h-3 w-3" />
-                        ) : (
-                          <XCircle className="h-3 w-3" />
-                        )}
-                        {e.status === 'Active' ? t.active : t.inactive}
-                      </span>
+                      {e.isArchived || e.status === 'Archived' ? (
+                        <span
+                          className="inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium bg-amber-50 text-amber-800 border border-amber-200"
+                          title={t.archiveStatusExpl}
+                        >
+                          <Archive className="h-3 w-3 text-amber-600" />
+                          {t.archived}
+                        </span>
+                      ) : (
+                        <span
+                          className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                            e.status === 'Active'
+                              ? 'bg-emerald-50 text-emerald-700'
+                              : 'bg-slate-100 text-slate-500'
+                          }`}
+                        >
+                          {e.status === 'Active' ? (
+                            <CheckCircle className="h-3 w-3" />
+                          ) : (
+                            <XCircle className="h-3 w-3" />
+                          )}
+                          {e.status === 'Active' ? t.active : t.inactive}
+                        </span>
+                      )}
                     </td>
                     <td className="py-3 px-4 text-center">
                       {(() => {
@@ -411,7 +498,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-slate-500">{e.startDate || '-'}</td>
                     {settings.activeRole !== 'Management' && (
-                      <td className="py-3 px-4 text-right space-x-1">
+                      <td className="py-3 px-4 text-right space-x-1 whitespace-nowrap">
                         {onOpenVacationForEmployee && (
                           <button
                             onClick={() => onOpenVacationForEmployee(e.id)}
@@ -427,6 +514,25 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                         >
                           <Edit2 className="h-3.5 w-3.5" /> {t.editEmployee}
                         </button>
+                        {e.isArchived || e.status === 'Archived' ? (
+                          <button
+                            onClick={() => handleUnarchiveEmployee(e)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-emerald-700 bg-emerald-50 hover:bg-emerald-100 transition-colors font-semibold text-xs"
+                            title={t.unarchiveEmployee}
+                          >
+                            <ArchiveRestore className="h-3.5 w-3.5 text-emerald-600" />
+                            <span>{t.unarchiveEmployee}</span>
+                          </button>
+                        ) : (
+                          <button
+                            onClick={() => handleArchiveEmployee(e)}
+                            className="inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-slate-500 hover:text-amber-800 hover:bg-amber-50 transition-colors font-medium text-xs"
+                            title={t.archiveEmployee}
+                          >
+                            <Archive className="h-3.5 w-3.5 text-amber-600" />
+                            <span>{t.archiveEmployee}</span>
+                          </button>
+                        )}
                       </td>
                     )}
                   </tr>
@@ -482,11 +588,16 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                   </label>
                   <select
                     value={status}
-                    onChange={(e) => setStatus(e.target.value as 'Active' | 'Inactive')}
+                    onChange={(e) => {
+                      const newStatus = e.target.value as 'Active' | 'Inactive' | 'Archived';
+                      setStatus(newStatus);
+                      setIsArchived(newStatus === 'Archived');
+                    }}
                     className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 outline-none focus:border-indigo-500"
                   >
                     <option value="Active">{t.active}</option>
                     <option value="Inactive">{t.inactive}</option>
+                    <option value="Archived">{t.archived} ({t.archivedExcludedBadge})</option>
                   </select>
                 </div>
               </div>
@@ -590,6 +701,44 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                       {(isStockWorker(empId) || companyDept.toLowerCase().includes('stock'))
                         ? 'Stock : Shift Samedi (10:00 – 17:00, Pause 13:00–14:00, HS > 17:00)'
                         : 'Administration : Shift Samedi identique aux horaires normaux (08:30 – 17:00, Pause 12:30–14:00, Sans HS / No Overtime)'}
+                    </p>
+                  </div>
+                </label>
+              </div>
+
+              {/* Archive Toggle / Status */}
+              <div className={`rounded-xl border p-3 transition-colors ${
+                isArchived || status === 'Archived'
+                  ? 'border-amber-300 bg-amber-50/80 shadow-2xs'
+                  : 'border-slate-200 bg-slate-50/60'
+              }`}>
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={isArchived || status === 'Archived'}
+                    onChange={(e) => {
+                      const checked = e.target.checked;
+                      setIsArchived(checked);
+                      if (checked) {
+                        setStatus('Archived');
+                      } else if (status === 'Archived') {
+                        setStatus('Active');
+                      }
+                    }}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-amber-600 focus:ring-amber-500"
+                  />
+                  <div className="text-xs">
+                    <span className="font-bold text-slate-900 flex items-center gap-1.5">
+                      <Archive className="h-3.5 w-3.5 text-amber-600" />
+                      {t.archiveEmployee}
+                      {(isArchived || status === 'Archived') && (
+                        <span className="rounded bg-amber-200/80 px-1.5 py-0.2 text-[10px] font-bold text-amber-900">
+                          {t.archivedExcludedBadge}
+                        </span>
+                      )}
+                    </span>
+                    <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
+                      {t.archiveStatusExpl}
                     </p>
                   </div>
                 </label>

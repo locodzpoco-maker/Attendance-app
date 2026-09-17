@@ -12,6 +12,8 @@ import {
   X,
   RotateCcw,
   Palmtree,
+  Archive,
+  ArrowRight,
 } from 'lucide-react';
 import { generateMonthlySummaryFromDailyRecords } from '../utils/calculator';
 import { getTranslations, translateShiftName } from '../utils/i18n';
@@ -23,6 +25,7 @@ interface MonthlySummaryViewProps {
   onExportPDF: (summariesToExport?: MonthlySummaryRecord[], customPeriodLabel?: string) => void;
   settings: AppSettings;
   periodLabel: string;
+  onSelectEmployeeForDaily?: (employeeId: string) => void;
 }
 
 // Helper to format ISO date YYYY-MM-DD to display DD/MM/YYYY
@@ -42,10 +45,12 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
   onExportPDF,
   settings,
   periodLabel,
+  onSelectEmployeeForDaily,
 }) => {
   const t = getTranslations(settings.language);
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('ALL');
+  const [excludeArchived, setExcludeArchived] = useState(true);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -129,7 +134,12 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
     return Array.from(set).sort();
   }, [activeSummaries]);
 
-  // Filtered summaries by search and group
+  // Count archived employees present in summaries
+  const archivedCount = useMemo(() => {
+    return activeSummaries.filter((s) => s.isArchived).length;
+  }, [activeSummaries]);
+
+  // Filtered summaries by search, group, and archive status
   const filteredSummaries = useMemo(() => {
     return activeSummaries.filter((s) => {
       if (searchTerm) {
@@ -144,9 +154,14 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
         return false;
       }
 
+      // Exclude archived employees if toggle is active
+      if (excludeArchived && s.isArchived) {
+        return false;
+      }
+
       return true;
     });
-  }, [activeSummaries, searchTerm, selectedGroup]);
+  }, [activeSummaries, searchTerm, selectedGroup, excludeArchived]);
 
   // Aggregate totals
   const aggregates = useMemo(() => {
@@ -321,6 +336,31 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
               ))}
             </select>
 
+            {/* Exclude / Include Archived Toggle */}
+            <button
+              id="monthly-exclude-archived-toggle"
+              type="button"
+              onClick={() => setExcludeArchived((prev) => !prev)}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border transition-all shadow-2xs ${
+                excludeArchived
+                  ? 'bg-slate-800 text-white border-slate-900 hover:bg-slate-900'
+                  : 'bg-amber-50 text-amber-900 border-amber-300 hover:bg-amber-100'
+              }`}
+              title={excludeArchived ? t.includeArchived : t.excludeArchived}
+            >
+              <Archive className="h-3.5 w-3.5" />
+              <span>{excludeArchived ? t.excludeArchived : t.includeArchived}</span>
+              {archivedCount > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    excludeArchived ? 'bg-slate-700 text-slate-200' : 'bg-amber-200 text-amber-900'
+                  }`}
+                >
+                  {excludeArchived ? `${archivedCount} ${t.archivedExcludedBadge}` : archivedCount}
+                </span>
+              )}
+            </button>
+
             <div className="flex items-center gap-1 border-l border-slate-200 pl-2">
               <button
                 id="monthly-export-xlsx-btn"
@@ -392,12 +432,13 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                 <th className="py-3 px-3 text-center">{t.colLateDays}</th>
                 <th className="py-3 px-3 text-center">{t.colTotalLate}</th>
                 <th className="py-3 px-3 text-center">{t.colMissingPunches}</th>
+                <th className="py-3 px-3 text-center">{t.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredSummaries.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="py-12 text-center text-slate-400">
+                  <td colSpan={14} className="py-12 text-center text-slate-400">
                     No matching monthly summary data found.
                   </td>
                 </tr>
@@ -406,12 +447,40 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                   <tr key={s.employeeId} className="hover:bg-slate-50/70 transition-colors">
                     {/* Employee Name */}
                     <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
-                      {s.employeeName}
+                      <div className="flex items-center gap-1.5">
+                        <button
+                          type="button"
+                          id={`monthly-emp-name-btn-${s.employeeId}`}
+                          onClick={() => onSelectEmployeeForDaily?.(s.employeeId)}
+                          className="group/emp inline-flex items-center gap-1.5 text-left font-semibold text-slate-900 hover:text-indigo-600 transition-colors cursor-pointer"
+                          title={`${t.viewDailyAttendance}: ${s.employeeName}`}
+                        >
+                          <span className="group-hover/emp:underline">{s.employeeName}</span>
+                          <ArrowRight className="h-3 w-3 text-indigo-500 opacity-0 group-hover/emp:opacity-100 group-hover/emp:translate-x-0.5 transition-all" />
+                        </button>
+                        {s.isArchived && (
+                          <span
+                            title={t.archived}
+                            className="inline-flex items-center gap-0.5 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-300"
+                          >
+                            <Archive className="h-2.5 w-2.5" />
+                            {t.archived}
+                          </span>
+                        )}
+                      </div>
                     </td>
 
                     {/* ID (preserved string) */}
                     <td className="py-2.5 px-3 font-mono font-semibold text-slate-700 whitespace-nowrap">
-                      {s.employeeId}
+                      <button
+                        type="button"
+                        id={`monthly-emp-id-btn-${s.employeeId}`}
+                        onClick={() => onSelectEmployeeForDaily?.(s.employeeId)}
+                        className="hover:text-indigo-600 hover:underline transition-colors cursor-pointer font-mono"
+                        title={`${t.viewDailyAttendance}: ID ${s.employeeId}`}
+                      >
+                        {s.employeeId}
+                      </button>
                     </td>
 
                     {/* Department */}
@@ -494,6 +563,21 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                         <span className="text-slate-400">0</span>
                       )}
                     </td>
+
+                    {/* Actions: View Daily Attendance */}
+                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                      <button
+                        type="button"
+                        id={`monthly-view-daily-btn-${s.employeeId}`}
+                        onClick={() => onSelectEmployeeForDaily?.(s.employeeId)}
+                        className="inline-flex items-center gap-1.5 rounded-lg bg-indigo-50 hover:bg-indigo-100 text-indigo-700 px-2.5 py-1 font-semibold text-[11px] transition-colors border border-indigo-200 shadow-2xs cursor-pointer"
+                        title={`${t.viewDailyAttendance}: ${s.employeeName}`}
+                      >
+                        <Calendar className="h-3.5 w-3.5 text-indigo-600" />
+                        <span>{t.viewDailyAttendance}</span>
+                        <ArrowRight className="h-3 w-3 text-indigo-500" />
+                      </button>
+                    </td>
                   </tr>
                 ))
               )}
@@ -514,6 +598,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                   <td className="py-3 px-3 text-center text-amber-700">{aggregates.lateDays}</td>
                   <td className="py-3 px-3 text-center text-amber-800">{aggregates.lateMins} m</td>
                   <td className="py-3 px-3 text-center text-orange-700">{aggregates.missing}</td>
+                  <td className="py-3 px-3"></td>
                 </tr>
               </tfoot>
             )}

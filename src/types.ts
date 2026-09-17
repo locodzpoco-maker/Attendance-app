@@ -29,7 +29,9 @@ export interface Employee {
   companyDepartment: string;
   groupName: string;
   scheduleId: string;
-  status: 'Active' | 'Inactive';
+  status: 'Active' | 'Inactive' | 'Archived';
+  isArchived?: boolean; // When true, employee stopped working for the company and is archived
+  archivedAt?: string; // ISO date string when employee was archived
   startDate: string;
   notes?: string;
   hasSaturdayShift?: boolean; // When enabled, employee works Saturday Shift (08:30 - 17:00 for Admin, 10:00 - 17:00 for Stock) on Saturdays
@@ -154,6 +156,7 @@ export interface DailyAttendanceRecord {
   observation: AttendanceObservation;
   observationDetail: string; // e.g. "Retard 8 min", "Sortie non pointée", "OFF", etc.
   statusType: 'success' | 'warning' | 'danger' | 'info' | 'neutral';
+  isArchived?: boolean; // True if employee was marked archived (stopped working)
 }
 
 export interface MonthlySummaryRecord {
@@ -162,6 +165,7 @@ export interface MonthlySummaryRecord {
   companyDepartment: string;
   groupName: string;
   scheduleName: string;
+  isArchived?: boolean; // True if employee was marked archived
   scheduledWorkingDays: number;
   presentDays: number;
   paidVacationDays?: number; // Count of paid vacation working days credited

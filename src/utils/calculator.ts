@@ -32,6 +32,7 @@ export interface CalculationOptions {
   manualAdjustments?: Record<string, ManualAdjustment>; // key: "empId_date"
   paidVacations?: PaidVacation[];
   settings?: AppSettings;
+  excludeArchived?: boolean;
 }
 
 /**
@@ -78,6 +79,11 @@ export function calculateAttendance(
       employeeMap.get(empId.trim()) ||
       employeeMap.get(empId.trim().replace(/^0+/, '')) ||
       employeeMap.get(empId.toLowerCase());
+
+    const isArchived = Boolean(dbEmp?.isArchived || dbEmp?.status === 'Archived');
+    if (options?.excludeArchived && isArchived) {
+      continue;
+    }
 
     // Resolve employee category:
     // 1. Explicit ADMIN designation
@@ -345,6 +351,7 @@ export function calculateAttendance(
           observation,
           observationDetail,
           statusType,
+          isArchived,
           isPaidVacation: true,
           vacationReason: activeVacation.reason,
         });
@@ -736,6 +743,7 @@ export function calculateAttendance(
         observation,
         observationDetail,
         statusType,
+        isArchived,
       });
     }
   }
@@ -764,6 +772,7 @@ export function generateMonthlySummaryFromDailyRecords(
         companyDepartment: record.companyDepartment,
         groupName: record.isDynamicShift ? 'Stock' : record.groupName,
         scheduleName: record.isDynamicShift ? 'Stock (Dynamic Daily Shifts)' : record.scheduleName,
+        isArchived: record.isArchived,
         scheduledWorkingDays: 0,
         presentDays: 0,
         paidVacationDays: 0,
