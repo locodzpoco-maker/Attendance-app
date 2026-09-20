@@ -470,7 +470,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
 
       return (
         <span
-          className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold border ${color}`}
+          className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold border whitespace-nowrap ${color}`}
           title={`Check-in ${record.firstCheckInTime || record.entryTime || '-'}`}
         >
           {icon}
@@ -488,7 +488,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
     const adminLabel = record.scheduleName || record.groupName || t.adminFixedSchedule;
     return (
       <span
-        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold border ${
+        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold border whitespace-nowrap ${
           isSat
             ? 'bg-teal-50 text-teal-800 border-teal-200'
             : 'bg-indigo-50 text-indigo-700 border-indigo-200'
@@ -544,7 +544,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
 
     return (
       <span
-        className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-xs font-semibold border ${bg}`}
+        className={`inline-flex items-center gap-1 rounded px-1.5 py-0.5 text-[11px] font-semibold border whitespace-nowrap ${bg}`}
       >
         {icon}
         {getObservationDisplay(record)}
@@ -973,29 +973,29 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
-              <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold">
+              <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold text-[11px]">
                 <th
-                  className="py-3 px-2 text-center w-10 font-bold"
+                  className="py-2.5 px-1 text-center w-8 font-bold"
                   title={t.colExactPunchTooltip}
                 >
                   <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                     {t.colExactPunchShort}
                   </span>
                 </th>
-                <th className="py-3 px-3">{t.colDate}</th>
-                <th className="py-3 px-3 font-mono">{t.colId}</th>
-                <th className="py-3 px-3">{t.colName}</th>
-                <th className="py-3 px-3 text-center">{t.colIn}</th>
-                <th className="py-3 px-3 text-center">{t.secondCheckIn}</th>
-                <th className="py-3 px-3 text-center">{t.colShift}</th>
-                <th className="py-3 px-3 text-center">{t.colOut}</th>
-                <th className="py-3 px-3 text-center">{t.colLate}</th>
-                <th className="py-3 px-3 text-center">{t.colBreak}</th>
-                <th className="py-3 px-3 text-center">{t.colWorked}</th>
-                <th className="py-3 px-3 text-center font-bold text-indigo-700">{t.colSupp}</th>
-                <th className="py-3 px-3">{t.colObservation}</th>
+                <th className="py-2.5 px-2">{t.colDate}</th>
+                <th className="py-2.5 px-2 font-mono">{t.colId}</th>
+                <th className="py-2.5 px-2">{t.colName}</th>
+                <th className="py-2.5 px-1.5 text-center">{t.colIn}</th>
+                <th className="py-2.5 px-1.5 text-center">{t.secondCheckIn}</th>
+                <th className="py-2.5 px-1.5 text-center">{t.colShift}</th>
+                <th className="py-2.5 px-1.5 text-center">{t.colOut}</th>
+                <th className="py-2.5 px-1.5 text-center">{t.colLate}</th>
+                <th className="py-2.5 px-1.5 text-center">{t.colBreak}</th>
+                <th className="py-2.5 px-1.5 text-center">{t.colWorked}</th>
+                <th className="py-2.5 px-1.5 text-center font-bold text-indigo-700">{t.colSupp}</th>
+                <th className="py-2.5 px-2">{t.colObservation}</th>
                 {settings.activeRole !== 'Management' && (
-                  <th className="py-3 px-3 text-right">{t.colActions}</th>
+                  <th className="py-2.5 px-2 text-right">{t.colActions}</th>
                 )}
               </tr>
             </thead>
@@ -1019,10 +1019,10 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     }`}
                   >
                     {/* Ignore Late / On Time Checkbox */}
-                    <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                    <td className="py-2 px-1 text-center whitespace-nowrap">
                       <label
                         htmlFor={`check-exact-punch-${r.id}`}
-                        className="inline-flex items-center justify-center p-1 rounded hover:bg-slate-100 cursor-pointer transition-colors"
+                        className="inline-flex items-center justify-center p-0.5 rounded hover:bg-slate-100 cursor-pointer transition-colors"
                         title={
                           r.exactPunchOnly
                             ? t.exactPunchEnabledTitle
@@ -1035,65 +1035,67 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                           checked={Boolean(r.exactPunchOnly)}
                           onChange={() => onToggleExactPunchOnly?.(r.id)}
                           disabled={settings.activeRole === 'Management'}
-                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:cursor-not-allowed transition-transform hover:scale-110"
+                          className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:cursor-not-allowed transition-transform hover:scale-110"
                         />
                       </label>
                     </td>
 
                     {/* Date */}
-                    <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
-                      <span>{r.formattedDate}</span>
-                      <span className="block text-[10px] text-slate-400">
-                        {translateDayOfWeek(r.dayOfWeek as any, settings.language).slice(0, 3)}
-                      </span>
+                    <td className="py-2 px-2 font-medium text-slate-800 whitespace-nowrap">
+                      <div className="flex items-baseline gap-1">
+                        <span>{r.formattedDate}</span>
+                        <span className="text-[10px] text-slate-400">
+                          {translateDayOfWeek(r.dayOfWeek as any, settings.language).slice(0, 3)}
+                        </span>
+                      </div>
                     </td>
 
                     {/* ID (preserved string with leading zeros) */}
-                    <td className="py-2.5 px-3 font-mono font-semibold text-slate-700 whitespace-nowrap">
+                    <td className="py-2 px-2 font-mono font-semibold text-slate-700 whitespace-nowrap text-[11px]">
                       {r.employeeId}
                     </td>
 
                     {/* Employee Name */}
-                    <td className="py-2.5 px-3 font-medium text-slate-900 whitespace-nowrap">
-                      <div className="flex items-center gap-1.5">
-                        {r.employeeName}
+                    <td className="py-2 px-2 font-medium text-slate-900 whitespace-nowrap">
+                      <div className="flex items-center gap-1">
+                        <span className="font-semibold text-slate-900">{r.employeeName}</span>
                         {zeroPunchEmployeeIds.has(r.employeeId) && (
                           <span
                             title={t.zeroPunchesBadge}
-                            className="inline-flex items-center gap-0.5 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-800 border border-rose-300"
+                            className="inline-flex items-center gap-0.5 rounded bg-rose-100 px-1 py-0.2 text-[9px] font-bold text-rose-800 border border-rose-300"
                           >
-                            <UserX className="h-2.5 w-2.5 text-rose-600" />
+                            <UserX className="h-2 w-2 text-rose-600" />
                             {t.zeroPunchesBadge}
                           </span>
                         )}
                         {r.isArchived && (
                           <span
                             title={t.archived}
-                            className="inline-flex items-center gap-0.5 rounded bg-slate-200 px-1.5 py-0.5 text-[10px] font-semibold text-slate-700 border border-slate-300"
+                            className="inline-flex items-center gap-0.5 rounded bg-slate-200 px-1 py-0.2 text-[9px] font-semibold text-slate-700 border border-slate-300"
                           >
-                            <Archive className="h-2.5 w-2.5" />
+                            <Archive className="h-2 w-2" />
                             {t.archived}
                           </span>
                         )}
                         {r.isManuallyAdjusted && (
                           <span
                             title={`Manually adjusted: ${r.manualAdjustment?.reason}`}
-                            className="inline-flex items-center text-[10px] font-semibold text-amber-700 bg-amber-100 px-1 rounded-sm"
+                            className="inline-flex items-center text-[9px] font-semibold text-amber-700 bg-amber-100 px-1 rounded-sm"
                           >
                             {t.adjustedBadge}
                           </span>
                         )}
                       </div>
-                      <span className="block text-[10px] text-slate-400">
+                      <span className="block text-[10px] text-slate-400 truncate max-w-[130px]">
                         {r.companyDepartment}
                       </span>
                     </td>
 
                     {/* First Check-in */}
-                    <td className="py-2.5 px-3 text-center font-mono font-semibold text-slate-800">
+                    <td className="py-2 px-1.5 text-center font-mono font-semibold text-slate-800 whitespace-nowrap text-[11px]">
                       {r.firstCheckInTime || r.entryTime ? (
                         <span
-                          className={`rounded px-1.5 py-0.5 ${
+                          className={`rounded px-1 py-0.5 ${
                             (r.firstCheckInDelayMinutes || 0) > 0
                               ? 'bg-amber-100 text-amber-900'
                               : 'bg-slate-100 text-slate-800'
@@ -1112,10 +1114,10 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     </td>
 
                     {/* 2nd Check-in (Pause) */}
-                    <td className="py-2.5 px-3 text-center font-mono text-slate-700">
+                    <td className="py-2 px-1.5 text-center font-mono text-slate-700 whitespace-nowrap text-[11px]">
                       {r.secondCheckInTime ? (
                         <span
-                          className={`rounded px-1.5 py-0.5 text-xs font-mono inline-flex items-center gap-1 ${
+                          className={`rounded px-1 py-0.5 text-[11px] font-mono inline-flex items-center gap-0.5 ${
                             (r.secondCheckInDelayMinutes || 0) > 0
                               ? 'bg-amber-100 text-amber-800 font-semibold border border-amber-200'
                               : 'bg-slate-100 text-slate-700'
@@ -1128,7 +1130,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                         >
                           {r.secondCheckInTime}
                           {(r.secondCheckInDelayMinutes || 0) > 0 && (
-                            <span className="text-[10px] text-amber-700 font-bold">
+                            <span className="text-[9px] text-amber-700 font-bold">
                               +{r.secondCheckInDelayMinutes}m
                             </span>
                           )}
@@ -1139,27 +1141,27 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     </td>
 
                     {/* Detected Shift (Dynamic Daily Result) */}
-                    <td className="py-2.5 px-3 text-center whitespace-nowrap">
+                    <td className="py-2 px-1.5 text-center whitespace-nowrap">
                       {renderDetectedShiftBadge(r)}
                     </td>
 
                     {/* Exit */}
-                    <td className="py-2.5 px-3 text-center font-mono font-medium text-slate-800">
+                    <td className="py-2 px-1.5 text-center font-mono font-medium text-slate-800 whitespace-nowrap text-[11px]">
                       {r.exitTime ? (
                         <div className="inline-flex flex-col items-center">
-                          <span className="inline-flex items-center gap-1">
+                          <span className="inline-flex items-center gap-0.5">
                             <span className={(r.earlyExitMinutes || 0) > 0 ? 'text-amber-800 font-semibold' : ''}>
                               {r.exitTime}
                             </span>
                             {r.isOvernightPunch && (
-                              <span className="text-[9px] text-indigo-600 font-bold bg-indigo-50 px-1 rounded">
+                              <span className="text-[8px] text-indigo-600 font-bold bg-indigo-50 px-0.5 rounded">
                                 +1d
                               </span>
                             )}
                           </span>
                           {(r.earlyExitMinutes || 0) > 0 && (
                             <span
-                              className="text-[10px] text-amber-700 bg-amber-50 border border-amber-200 px-1 rounded font-semibold whitespace-nowrap mt-0.5"
+                              className="text-[9px] text-amber-700 bg-amber-50 border border-amber-200 px-1 rounded font-semibold whitespace-nowrap"
                               title={`${t.earlyExitLabel}: -${r.earlyExitMinutes}m`}
                             >
                               -{r.earlyExitMinutes}m
@@ -1172,7 +1174,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     </td>
 
                     {/* Delay */}
-                    <td className="py-2.5 px-3 text-center">
+                    <td className="py-2 px-1.5 text-center whitespace-nowrap text-[11px]">
                       {r.delayMinutes > 0 ? (
                         <div>
                           <span
@@ -1181,25 +1183,24 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                           >
                             {r.delayMinutes} min
                           </span>
-                          {/* Breakdown subtext if multiple delays or early departure */}
                           {(((r.firstCheckInDelayMinutes || 0) > 0 ? 1 : 0) +
                             ((r.secondCheckInDelayMinutes || 0) > 0 ? 1 : 0) +
                             ((r.earlyExitMinutes || 0) > 0 ? 1 : 0) > 1 ||
                             (r.earlyExitMinutes || 0) > 0) && (
-                            <span className="block text-[9px] text-slate-400 mt-0.5 whitespace-nowrap">
+                            <span className="block text-[9px] text-slate-400 whitespace-nowrap">
                               {[
                                 (r.firstCheckInDelayMinutes || 0) > 0
-                                  ? `${r.firstCheckInDelayMinutes}m ${t.inWord}`
+                                  ? `${r.firstCheckInDelayMinutes}m`
                                   : null,
                                 (r.secondCheckInDelayMinutes || 0) > 0
-                                  ? `${r.secondCheckInDelayMinutes}m ${t.breakWord}`
+                                  ? `${r.secondCheckInDelayMinutes}m`
                                   : null,
                                 (r.earlyExitMinutes || 0) > 0
-                                  ? `${r.earlyExitMinutes}m ${t.exitWord}`
+                                  ? `-${r.earlyExitMinutes}m`
                                   : null,
                               ]
                                 .filter(Boolean)
-                                .join(' + ')}
+                                .join('+')}
                             </span>
                           )}
                         </div>
@@ -1209,7 +1210,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     </td>
 
                     {/* Break */}
-                    <td className="py-2.5 px-3 text-center text-slate-500">
+                    <td className="py-2 px-1.5 text-center text-slate-500 whitespace-nowrap text-[11px]">
                       {r.breakDurationMinutes > 0 ? (
                         `${Math.floor(r.breakDurationMinutes / 60)}h${r.breakDurationMinutes % 60 ? (r.breakDurationMinutes % 60) + 'm' : ''}`
                       ) : (
@@ -1218,25 +1219,22 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     </td>
 
                     {/* Worked Hours */}
-                    <td className="py-2.5 px-3 text-center font-semibold text-slate-800">
+                    <td className="py-2 px-1.5 text-center font-semibold text-slate-800 whitespace-nowrap text-[11px]">
                       {r.workedHoursFormatted}
                     </td>
 
                     {/* Supp (Overtime) Hours */}
-                    <td className="py-2.5 px-3 text-center font-bold">
+                    <td className="py-2 px-1.5 text-center font-bold whitespace-nowrap text-[11px]">
                       {r.injectedSuppMinutes && r.injectedSuppMinutes > 0 ? (
                         <span
-                          className="inline-flex items-center gap-1 rounded-md bg-amber-50 border border-amber-300 px-1.5 py-0.5 text-amber-900 shadow-2xs"
-                          title={`Total Supp: ${r.suppHoursFormatted}`}
+                          className="inline-flex items-center gap-0.5 rounded bg-amber-50 border border-amber-300 px-1 py-0.5 text-amber-900 shadow-2xs"
+                          title={`Total Supp: ${r.suppHoursFormatted} (+${formatMinutesToHoursAndMinutes(r.injectedSuppMinutes)})`}
                         >
-                          <Zap className="h-3 w-3 fill-amber-500 text-amber-600 shrink-0" />
+                          <Zap className="h-2.5 w-2.5 fill-amber-500 text-amber-600 shrink-0" />
                           <span>{r.suppHoursFormatted}</span>
-                          <span className="text-[10px] text-amber-700 font-mono font-medium">
-                            (+{formatMinutesToHoursAndMinutes(r.injectedSuppMinutes)})
-                          </span>
                         </span>
                       ) : r.suppMinutes > 0 ? (
-                        <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-1.5 py-0.5 text-indigo-700">
+                        <span className="inline-flex items-center gap-0.5 rounded bg-indigo-50 px-1 py-0.5 text-indigo-700">
                           {r.suppHoursFormatted}
                         </span>
                       ) : (
@@ -1245,17 +1243,17 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     </td>
 
                     {/* Observation */}
-                    <td className="py-2.5 px-3">{renderObservationBadge(r)}</td>
+                    <td className="py-2 px-2 whitespace-nowrap">{renderObservationBadge(r)}</td>
 
                     {/* Manual Audit Action */}
                     {settings.activeRole !== 'Management' && (
-                      <td className="py-2.5 px-3 text-right whitespace-nowrap">
-                        <div className="inline-flex items-center gap-1">
+                      <td className="py-2 px-2 text-right whitespace-nowrap">
+                        <div className="inline-flex items-center gap-1 justify-end">
                           {onOpenVacationForEmployee && (
                             <button
                               id={`row-vacation-btn-${r.id}`}
                               onClick={() => onOpenVacationForEmployee(r.employeeId, r.date)}
-                              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-xs transition-colors ${
+                              className={`inline-flex items-center gap-1 rounded px-1.5 py-1 font-semibold text-[11px] transition-colors ${
                                 r.isPaidVacation
                                   ? 'bg-teal-100 text-teal-900 border border-teal-300 hover:bg-teal-200'
                                   : 'text-teal-700 hover:bg-teal-50 hover:text-teal-800'
@@ -1263,14 +1261,14 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                               title={`${t.paidVacations}: ${r.employeeName}`}
                             >
                               <Palmtree className="h-3 w-3 text-teal-600" />
-                              <span>{r.isPaidVacation ? t.btnVacation : t.btnPlanVacation}</span>
+                              <span className="hidden xl:inline">{r.isPaidVacation ? t.btnVacation : t.btnPlanVacation}</span>
                             </button>
                           )}
                           {onOpenInjectSupp && (
                             <button
                               id={`row-inject-supp-btn-${r.id}`}
                               onClick={() => onOpenInjectSupp(r)}
-                              className={`inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-xs transition-colors ${
+                              className={`inline-flex items-center gap-1 rounded px-1.5 py-1 font-semibold text-[11px] transition-colors ${
                                 r.injectedSuppMinutes && r.injectedSuppMinutes > 0
                                   ? 'bg-amber-100 text-amber-900 border border-amber-300 hover:bg-amber-200'
                                   : 'text-amber-700 hover:bg-amber-50 hover:text-amber-800'
@@ -1278,17 +1276,17 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                               title={`${t.injectSuppHours}: ${r.employeeName} (${r.formattedDate})`}
                             >
                               <Zap className="h-3 w-3 fill-amber-500 text-amber-600" />
-                              <span>{r.injectedSuppMinutes && r.injectedSuppMinutes > 0 ? t.btnEditSupp : t.btnAddSupp}</span>
+                              <span className="hidden xl:inline">{r.injectedSuppMinutes && r.injectedSuppMinutes > 0 ? t.btnEditSupp : t.btnAddSupp}</span>
                             </button>
                           )}
                           <button
                             id={`correct-btn-${r.id}`}
                             onClick={() => onOpenCorrection(r)}
-                            className="inline-flex items-center gap-1 rounded-lg px-2 py-1 font-semibold text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors"
+                            className="inline-flex items-center gap-1 rounded px-1.5 py-1 font-semibold text-[11px] text-slate-600 hover:bg-slate-100 hover:text-indigo-600 transition-colors"
                             title={r.isShiftUnclear ? t.reviewShift : t.btnAdjust}
                           >
-                            <Edit3 className="h-3.5 w-3.5" />
-                            <span>{r.isShiftUnclear ? t.reviewShift : t.btnAdjust}</span>
+                            <Edit3 className="h-3 w-3" />
+                            <span className="hidden xl:inline">{r.isShiftUnclear ? t.reviewShift : t.btnAdjust}</span>
                           </button>
                         </div>
                       </td>

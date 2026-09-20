@@ -61,7 +61,7 @@ export const Header: React.FC<HeaderProps> = ({
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
       {/* Top Banner with App Brand, Period, Role & Fast Actions */}
-      <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+      <div className="max-w-[1920px] mx-auto px-2 sm:px-4 lg:px-6">
         <div className="flex h-16 items-center justify-between gap-4">
           <div className="flex items-center gap-3">
             <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-slate-900 text-white font-bold text-lg shadow-sm">
@@ -198,7 +198,7 @@ export const Header: React.FC<HeaderProps> = ({
 
       {/* Navigation Sub-bar */}
       <div className="border-t border-slate-100 bg-slate-50/60">
-        <div className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8">
+        <div className="max-w-[1920px] mx-auto px-2 sm:px-4 lg:px-6">
           <nav className="flex space-x-1 sm:space-x-4 overflow-x-auto py-1">
             <button
               id="nav-dashboard"
