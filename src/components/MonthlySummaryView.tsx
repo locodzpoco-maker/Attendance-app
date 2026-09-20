@@ -14,6 +14,11 @@ import {
   Palmtree,
   Archive,
   ArrowRight,
+  UserCheck,
+  UserX,
+  Eye,
+  EyeOff,
+  AlertCircle,
 } from 'lucide-react';
 import { generateMonthlySummaryFromDailyRecords } from '../utils/calculator';
 import { getTranslations, translateShiftName } from '../utils/i18n';
@@ -51,6 +56,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
   const [searchTerm, setSearchTerm] = useState('');
   const [selectedGroup, setSelectedGroup] = useState('ALL');
   const [excludeArchived, setExcludeArchived] = useState(true);
+  const [punchFilter, setPunchFilter] = useState<'ALL' | 'ACTIVE_ONLY' | 'ZERO_PUNCHES_ONLY'>('ALL');
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
 
@@ -139,7 +145,48 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
     return activeSummaries.filter((s) => s.isArchived).length;
   }, [activeSummaries]);
 
-  // Filtered summaries by search, group, and archive status
+  // Compute total punches per employee across the uploaded period
+  const employeePunchCounts = useMemo(() => {
+    const map = new Map<string, number>();
+    dailyRecords.forEach((r) => {
+      if (effectiveStartDate && r.date < effectiveStartDate) return;
+      if (effectiveEndDate && r.date > effectiveEndDate) return;
+
+      const count = (r.rawPunches && r.rawPunches.length > 0)
+        ? r.rawPunches.length
+        : ((r.firstCheckInTime || r.entryTime ? 1 : 0) + (r.secondCheckInTime ? 1 : 0) + (r.exitTime ? 1 : 0));
+      map.set(r.employeeId, (map.get(r.employeeId) || 0) + count);
+    });
+    return map;
+  }, [dailyRecords, effectiveStartDate, effectiveEndDate]);
+
+  // Helper to determine if an employee has 0 punches for the entire uploaded month
+  const isZeroPunchEmployee = (s: MonthlySummaryRecord): boolean => {
+    if (employeePunchCounts.has(s.employeeId)) {
+      return (employeePunchCounts.get(s.employeeId) || 0) === 0;
+    }
+    if (s.totalPunchesCount !== undefined) {
+      return s.totalPunchesCount === 0;
+    }
+    return s.presentDays === 0 && s.totalWorkedMinutes === 0 && s.lateDays === 0 && s.missingPunchesDays === 0;
+  };
+
+  // Count employees with 0 punches (respecting current excludeArchived toggle)
+  const zeroPunchCount = useMemo(() => {
+    return activeSummaries.filter((s) => {
+      if (excludeArchived && s.isArchived) return false;
+      return isZeroPunchEmployee(s);
+    }).length;
+  }, [activeSummaries, excludeArchived, employeePunchCounts]);
+
+  const activeWithPunchesCount = useMemo(() => {
+    return activeSummaries.filter((s) => {
+      if (excludeArchived && s.isArchived) return false;
+      return !isZeroPunchEmployee(s);
+    }).length;
+  }, [activeSummaries, excludeArchived, employeePunchCounts]);
+
+  // Filtered summaries by search, group, archive status, and punch activity
   const filteredSummaries = useMemo(() => {
     return activeSummaries.filter((s) => {
       if (searchTerm) {
@@ -159,9 +206,18 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
         return false;
       }
 
+      // Filter by punch activity
+      const isZero = isZeroPunchEmployee(s);
+      if (punchFilter === 'ACTIVE_ONLY' && isZero) {
+        return false;
+      }
+      if (punchFilter === 'ZERO_PUNCHES_ONLY' && !isZero) {
+        return false;
+      }
+
       return true;
     });
-  }, [activeSummaries, searchTerm, selectedGroup, excludeArchived]);
+  }, [activeSummaries, searchTerm, selectedGroup, excludeArchived, punchFilter, employeePunchCounts]);
 
   // Aggregate totals
   const aggregates = useMemo(() => {
@@ -336,6 +392,67 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
               ))}
             </select>
 
+            {/* Punch Activity Filter / Toggle */}
+            <div className="inline-flex rounded-lg border border-slate-300 bg-slate-100 p-0.5 text-xs font-medium shadow-2xs">
+              <button
+                type="button"
+                id="monthly-filter-all-workers-btn"
+                onClick={() => setPunchFilter('ALL')}
+                className={`rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                  punchFilter === 'ALL'
+                    ? 'bg-white text-slate-900 font-semibold shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title={t.filterAllWorkers}
+              >
+                {t.filterAllWorkers}
+              </button>
+              <button
+                type="button"
+                id="monthly-filter-active-workers-btn"
+                onClick={() => setPunchFilter('ACTIVE_ONLY')}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                  punchFilter === 'ACTIVE_ONLY'
+                    ? 'bg-emerald-600 text-white font-semibold shadow-2xs'
+                    : 'text-slate-600 hover:text-slate-900'
+                }`}
+                title={t.hideZeroPunches}
+              >
+                <UserCheck className="h-3.5 w-3.5" />
+                <span>{t.filterActiveWithPunches}</span>
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                    punchFilter === 'ACTIVE_ONLY' ? 'bg-emerald-700 text-white' : 'bg-slate-200 text-slate-700'
+                  }`}
+                >
+                  {activeWithPunchesCount}
+                </span>
+              </button>
+              <button
+                type="button"
+                id="monthly-filter-zero-punches-btn"
+                onClick={() => setPunchFilter('ZERO_PUNCHES_ONLY')}
+                className={`inline-flex items-center gap-1 rounded-md px-2.5 py-1 transition-all cursor-pointer ${
+                  punchFilter === 'ZERO_PUNCHES_ONLY'
+                    ? 'bg-rose-600 text-white font-semibold shadow-2xs'
+                    : 'text-slate-600 hover:text-rose-700'
+                }`}
+                title={t.showZeroPunches}
+              >
+                <UserX className="h-3.5 w-3.5" />
+                <span>{t.filterZeroPunches}</span>
+                {zeroPunchCount > 0 && (
+                  <span
+                    className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                      punchFilter === 'ZERO_PUNCHES_ONLY' ? 'bg-rose-700 text-white' : 'bg-rose-100 text-rose-700'
+                    }`}
+                  >
+                    {zeroPunchCount}
+                  </span>
+                )}
+              </button>
+            </div>
+
             {/* Exclude / Include Archived Toggle */}
             <button
               id="monthly-exclude-archived-toggle"
@@ -413,6 +530,88 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
         </div>
       )}
 
+      {/* 0-Punches Notification & Status Banners */}
+      {zeroPunchCount > 0 && punchFilter === 'ALL' && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50/90 border border-amber-200 px-3.5 py-2 text-xs text-amber-950 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <AlertCircle className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>{zeroPunchCount}</strong> {t.zeroPunchesBannerDesc}
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              id="monthly-banner-view-zero-punches-btn"
+              onClick={() => setPunchFilter('ZERO_PUNCHES_ONLY')}
+              className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 border border-rose-200 hover:bg-rose-50 transition-colors shadow-2xs cursor-pointer"
+            >
+              <Eye className="h-3 w-3" />
+              <span>{t.showZeroPunches} ({zeroPunchCount})</span>
+            </button>
+            <button
+              type="button"
+              id="monthly-banner-hide-zero-punches-btn"
+              onClick={() => setPunchFilter('ACTIVE_ONLY')}
+              className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-900 transition-colors shadow-2xs cursor-pointer"
+            >
+              <EyeOff className="h-3 w-3" />
+              <span>{t.hideZeroPunches}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {punchFilter === 'ZERO_PUNCHES_ONLY' && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2 text-xs text-rose-950 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <UserX className="h-4 w-4 text-rose-600 shrink-0" />
+            <span>
+              <strong>{t.zeroPunchesBannerTitle}:</strong>{' '}
+              <span className="font-semibold text-rose-900">{filteredSummaries.length} {t.zeroPunchesBannerDesc}</span>
+            </span>
+          </div>
+          <div className="flex items-center gap-2">
+            <button
+              type="button"
+              onClick={() => setPunchFilter('ACTIVE_ONLY')}
+              className="inline-flex items-center gap-1 rounded-lg bg-slate-800 px-2.5 py-1 text-xs font-semibold text-white hover:bg-slate-900 transition-colors shadow-2xs cursor-pointer"
+            >
+              <EyeOff className="h-3 w-3" />
+              <span>{t.hideZeroPunches}</span>
+            </button>
+            <button
+              type="button"
+              onClick={() => setPunchFilter('ALL')}
+              className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-300 hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer"
+            >
+              <RotateCcw className="h-3 w-3" />
+              <span>{t.filterAllWorkers}</span>
+            </button>
+          </div>
+        </div>
+      )}
+
+      {punchFilter === 'ACTIVE_ONLY' && zeroPunchCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-emerald-50/80 border border-emerald-200 px-3.5 py-2 text-xs text-emerald-950 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <UserCheck className="h-4 w-4 text-emerald-600 shrink-0" />
+            <span>
+              <strong>{t.filterActiveWithPunches}:</strong>{' '}
+              <span>{zeroPunchCount} {t.zeroPunchesHiddenNotice}</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setPunchFilter('ZERO_PUNCHES_ONLY')}
+            className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 border border-rose-200 hover:bg-rose-50 transition-colors shadow-2xs cursor-pointer"
+          >
+            <Eye className="h-3 w-3" />
+            <span>{t.showZeroPunches} ({zeroPunchCount})</span>
+          </button>
+        </div>
+      )}
+
       {/* Suggested Columns Table (PRD Section 23) */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
@@ -443,8 +642,17 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                   </td>
                 </tr>
               ) : (
-                filteredSummaries.map((s) => (
-                  <tr key={s.employeeId} className="hover:bg-slate-50/70 transition-colors">
+                filteredSummaries.map((s) => {
+                  const isZeroPunch = isZeroPunchEmployee(s);
+                  return (
+                  <tr
+                    key={s.employeeId}
+                    className={`transition-colors ${
+                      isZeroPunch
+                        ? 'bg-rose-50/30 hover:bg-rose-50/60'
+                        : 'hover:bg-slate-50/70'
+                    }`}
+                  >
                     {/* Employee Name */}
                     <td className="py-2.5 px-3 font-semibold text-slate-900 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
@@ -458,6 +666,15 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                           <span className="group-hover/emp:underline">{s.employeeName}</span>
                           <ArrowRight className="h-3 w-3 text-indigo-500 opacity-0 group-hover/emp:opacity-100 group-hover/emp:translate-x-0.5 transition-all" />
                         </button>
+                        {isZeroPunch && (
+                          <span
+                            title={`${t.zeroPunchesBadge} sur tout le mois`}
+                            className="inline-flex items-center gap-0.5 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-800 border border-rose-300"
+                          >
+                            <UserX className="h-2.5 w-2.5 text-rose-600" />
+                            {t.zeroPunchesBadge}
+                          </span>
+                        )}
                         {s.isArchived && (
                           <span
                             title={t.archived}
@@ -496,7 +713,13 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
 
                     {/* Present Days (excluding OFF) */}
                     <td className="py-2.5 px-3 text-center font-semibold text-emerald-600">
-                      {s.presentDays}
+                      {isZeroPunch ? (
+                        <span className="inline-flex items-center gap-1 rounded bg-slate-100 text-slate-500 px-1.5 py-0.5 text-[11px] font-mono">
+                          0 ptg
+                        </span>
+                      ) : (
+                        s.presentDays
+                      )}
                     </td>
 
                     {/* Paid Vacation Days (Congé payé) */}
@@ -579,9 +802,10 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                       </button>
                     </td>
                   </tr>
-                ))
-              )}
-            </tbody>
+                );
+              })
+            )}
+          </tbody>
             {/* Totals Summary Row */}
             {filteredSummaries.length > 0 && (
               <tfoot>

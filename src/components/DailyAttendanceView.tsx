@@ -24,6 +24,10 @@ import {
   Palmtree,
   Archive,
   Users,
+  UserX,
+  UserCheck,
+  Eye,
+  EyeOff,
 } from 'lucide-react';
 import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
 import { getTranslations, translateDayOfWeek, Translations } from '../utils/i18n';
@@ -34,6 +38,7 @@ interface DailyAttendanceViewProps {
   onOpenCorrection: (record: DailyAttendanceRecord) => void;
   onOpenInjectSupp?: (record?: DailyAttendanceRecord) => void;
   onOpenVacationForEmployee?: (empId: string, date: string) => void;
+  onToggleExactPunchOnly?: (recordId: string) => void;
   onExportExcel: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   onExportPDF: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   settings: AppSettings;
@@ -87,6 +92,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   onOpenCorrection,
   onOpenInjectSupp,
   onOpenVacationForEmployee,
+  onToggleExactPunchOnly,
   onExportExcel,
   onExportPDF,
   settings,
@@ -98,6 +104,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   const [selectedGroup, setSelectedGroup] = useState<'ADMIN' | 'STOCK'>('ADMIN');
   const [selectedStatus, setSelectedStatus] = useState('ALL');
   const [excludeArchived, setExcludeArchived] = useState(true);
+  const [excludeZeroPunches, setExcludeZeroPunches] = useState(false);
   const [startDate, setStartDate] = useState('');
   const [endDate, setEndDate] = useState('');
   const [page, setPage] = useState(1);
@@ -117,6 +124,8 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
       if (isArchived) {
         setExcludeArchived(false);
       }
+      // When a specific worker is selected, make sure they are not hidden
+      setExcludeZeroPunches(false);
       setPage(1);
     }
   }, [selectedEmployeeId, records]);
@@ -165,6 +174,47 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
     });
     return set.size;
   }, [records, excludeArchived]);
+
+  // Set of employee IDs that have 0 punches for the entire month
+  const zeroPunchEmployeeIds = useMemo(() => {
+    const punchCountMap = new Map<string, number>();
+    records.forEach((r) => {
+      const count = (r.rawPunches && r.rawPunches.length > 0)
+        ? r.rawPunches.length
+        : ((r.firstCheckInTime || r.entryTime ? 1 : 0) + (r.secondCheckInTime ? 1 : 0) + (r.exitTime ? 1 : 0));
+      punchCountMap.set(r.employeeId, (punchCountMap.get(r.employeeId) || 0) + count);
+    });
+
+    const set = new Set<string>();
+    punchCountMap.forEach((count, empId) => {
+      if (count === 0) set.add(empId);
+    });
+    return set;
+  }, [records]);
+
+  // Count of zero punch workers in the current group (Admin/Stock)
+  const zeroPunchEmployeesInGroupCount = useMemo(() => {
+    const set = new Set<string>();
+    records.forEach((r) => {
+      if (excludeArchived && r.isArchived) return;
+      if (selectedGroup === 'ADMIN' && !isDailyRecordAdmin(r)) return;
+      if (selectedGroup === 'STOCK' && !isDailyRecordStock(r)) return;
+      if (zeroPunchEmployeeIds.has(r.employeeId)) {
+        set.add(r.employeeId);
+      }
+    });
+    return set.size;
+  }, [records, excludeArchived, selectedGroup, zeroPunchEmployeeIds]);
+
+  // Count of records with Exact Punch Mode enabled in current group
+  const exactPunchCount = useMemo(() => {
+    return records.filter((r) => {
+      if (excludeArchived && r.isArchived) return false;
+      if (selectedGroup === 'ADMIN' && !isDailyRecordAdmin(r)) return false;
+      if (selectedGroup === 'STOCK' && !isDailyRecordStock(r)) return false;
+      return Boolean(r.exactPunchOnly);
+    }).length;
+  }, [records, excludeArchived, selectedGroup]);
 
   // Extract unique sorted dates from dataset
   const dateOptions = useMemo(() => {
@@ -284,6 +334,8 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         if (selectedStatus === 'VACATION' && r.observation !== 'Congé payé' && !r.isPaidVacation) return false;
         if (selectedStatus === 'SUPP' && r.suppMinutes === 0) return false;
         if (selectedStatus === 'INJECTED_SUPP' && (!r.injectedSuppMinutes || r.injectedSuppMinutes === 0)) return false;
+        if (selectedStatus === 'ZERO_PUNCHES' && !zeroPunchEmployeeIds.has(r.employeeId)) return false;
+        if (selectedStatus === 'EXACT_PUNCHES' && !r.exactPunchOnly) return false;
         if (
           selectedStatus === 'MISSING' &&
           r.observation !== 'Entrée non pointée' &&
@@ -299,9 +351,14 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         return false;
       }
 
+      // Exclude employees with 0 punches across the month if toggle is active
+      if (excludeZeroPunches && !selectedEmployeeId && zeroPunchEmployeeIds.has(r.employeeId)) {
+        return false;
+      }
+
       return true;
     });
-  }, [records, searchTerm, selectedGroup, effectiveStartDate, effectiveEndDate, selectedStatus, excludeArchived, selectedEmployeeId]);
+  }, [records, searchTerm, selectedGroup, effectiveStartDate, effectiveEndDate, selectedStatus, excludeArchived, excludeZeroPunches, selectedEmployeeId, zeroPunchEmployeeIds]);
 
   // Count distinct days present in filtered set
   const filteredDaysCount = useMemo(() => {
@@ -674,6 +731,12 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                 <option value="INJECTED_SUPP">⚡ {t.injectedSuppHours} ({injectedSuppCount})</option>
               )}
               <option value="MISSING">{t.colMissingPunches}</option>
+              {zeroPunchEmployeesInGroupCount > 0 && (
+                <option value="ZERO_PUNCHES">🚫 {t.zeroPunchesBadge} ({zeroPunchEmployeesInGroupCount})</option>
+              )}
+              {exactPunchCount > 0 && (
+                <option value="EXACT_PUNCHES">⏱️ {t.filterExactPunches} ({exactPunchCount})</option>
+              )}
               <option value="VACATION">🌴 {t.paidVacations}</option>
               <option value="ABSENCE">{t.obsAbsent}</option>
               <option value="OFF">{t.obsOff}</option>
@@ -703,6 +766,38 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                   }`}
                 >
                   {excludeArchived ? `${archivedRecordsCount} ${t.archivedExcludedBadge}` : archivedRecordsCount}
+                </span>
+              )}
+            </button>
+
+            {/* Exclude / Include Zero Punches Toggle */}
+            <button
+              id="daily-exclude-zero-punches-toggle"
+              type="button"
+              onClick={() => {
+                setExcludeZeroPunches((prev) => !prev);
+                setPage(1);
+              }}
+              className={`inline-flex items-center gap-1.5 rounded-lg px-2.5 py-1 text-xs font-semibold border transition-all shadow-2xs ${
+                excludeZeroPunches
+                  ? 'bg-rose-700 text-white border-rose-800 hover:bg-rose-800'
+                  : 'bg-white text-slate-700 border-slate-300 hover:bg-slate-100'
+              }`}
+              title={excludeZeroPunches ? t.showZeroPunches : t.hideZeroPunches}
+            >
+              {excludeZeroPunches ? (
+                <UserX className="h-3.5 w-3.5 text-rose-200" />
+              ) : (
+                <UserCheck className="h-3.5 w-3.5 text-slate-500" />
+              )}
+              <span>{excludeZeroPunches ? t.hideZeroPunches : t.showZeroPunches}</span>
+              {zeroPunchEmployeesInGroupCount > 0 && (
+                <span
+                  className={`rounded-full px-1.5 py-0.2 text-[10px] font-bold ${
+                    excludeZeroPunches ? 'bg-rose-800 text-rose-100' : 'bg-rose-100 text-rose-700'
+                  }`}
+                >
+                  {zeroPunchEmployeesInGroupCount}
                 </span>
               )}
             </button>
@@ -812,12 +907,81 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         </div>
       )}
 
+      {/* 0-Punches notification banner in Daily Attendance */}
+      {excludeZeroPunches && zeroPunchEmployeesInGroupCount > 0 && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-amber-50/90 border border-amber-200 px-3.5 py-2 text-xs text-amber-950 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <UserX className="h-4 w-4 text-amber-600 shrink-0" />
+            <span>
+              <strong>{t.filterZeroPunches}:</strong>{' '}
+              <span>{zeroPunchEmployeesInGroupCount} {t.zeroPunchesHiddenNotice}</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setExcludeZeroPunches(false)}
+            className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-rose-700 border border-rose-200 hover:bg-rose-50 transition-colors shadow-2xs cursor-pointer"
+          >
+            <Eye className="h-3 w-3" />
+            <span>{t.showZeroPunches}</span>
+          </button>
+        </div>
+      )}
+
+      {selectedStatus === 'ZERO_PUNCHES' && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-rose-50 border border-rose-200 px-3.5 py-2 text-xs text-rose-950 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <UserX className="h-4 w-4 text-rose-600 shrink-0" />
+            <span>
+              <strong>{t.zeroPunchesBannerTitle}:</strong>{' '}
+              <span className="font-semibold text-rose-900">{zeroPunchEmployeesInGroupCount} {t.zeroPunchesBannerDesc}</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedStatus('ALL')}
+            className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-300 hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer"
+          >
+            <RotateCcw className="h-3 w-3" />
+            <span>{t.filterAllWorkers}</span>
+          </button>
+        </div>
+      )}
+
+      {selectedStatus === 'EXACT_PUNCHES' && (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-xl bg-sky-50 border border-sky-200 px-3.5 py-2 text-xs text-sky-950 shadow-2xs">
+          <div className="flex items-center gap-2">
+            <CheckCircle2 className="h-4 w-4 text-sky-600 shrink-0" />
+            <span>
+              <strong>{t.exactPunchOptionTitle}:</strong>{' '}
+              <span className="font-semibold text-sky-900">{exactPunchCount} {t.exactPunchOptionDesc}</span>
+            </span>
+          </div>
+          <button
+            type="button"
+            onClick={() => setSelectedStatus('ALL')}
+            className="inline-flex items-center gap-1 rounded-lg bg-white px-2.5 py-1 text-xs font-semibold text-slate-700 border border-slate-300 hover:bg-slate-100 transition-colors shadow-2xs cursor-pointer"
+          >
+            <RotateCcw className="h-3 w-3" />
+            <span>{t.filterAllWorkers}</span>
+          </button>
+        </div>
+      )}
+
       {/* Suggested Columns Table (PRD Section 21 + Dynamic Shift Specification) */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full text-left border-collapse text-xs">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold">
+                <th
+                  className="py-3 px-2 text-center w-10 font-bold"
+                  title={t.colExactPunchTooltip}
+                >
+                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
+                    {t.colExactPunchShort}
+                  </span>
+                </th>
                 <th className="py-3 px-3">{t.colDate}</th>
                 <th className="py-3 px-3 font-mono">{t.colId}</th>
                 <th className="py-3 px-3">{t.colName}</th>
@@ -838,7 +1002,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
             <tbody className="divide-y divide-slate-100">
               {paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={13} className="py-12 text-center text-slate-400">
+                  <td colSpan={14} className="py-12 text-center text-slate-400">
                     {t.noRecordsFound}
                   </td>
                 </tr>
@@ -854,9 +1018,31 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                           : ''
                     }`}
                   >
+                    {/* Ignore Late / On Time Checkbox */}
+                    <td className="py-2.5 px-2 text-center whitespace-nowrap">
+                      <label
+                        htmlFor={`check-exact-punch-${r.id}`}
+                        className="inline-flex items-center justify-center p-1 rounded hover:bg-slate-100 cursor-pointer transition-colors"
+                        title={
+                          r.exactPunchOnly
+                            ? t.exactPunchEnabledTitle
+                            : t.exactPunchDisabledTitle
+                        }
+                      >
+                        <input
+                          id={`check-exact-punch-${r.id}`}
+                          type="checkbox"
+                          checked={Boolean(r.exactPunchOnly)}
+                          onChange={() => onToggleExactPunchOnly?.(r.id)}
+                          disabled={settings.activeRole === 'Management'}
+                          className="h-4 w-4 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:cursor-not-allowed transition-transform hover:scale-110"
+                        />
+                      </label>
+                    </td>
+
                     {/* Date */}
                     <td className="py-2.5 px-3 font-medium text-slate-800 whitespace-nowrap">
-                      {r.formattedDate}
+                      <span>{r.formattedDate}</span>
                       <span className="block text-[10px] text-slate-400">
                         {translateDayOfWeek(r.dayOfWeek as any, settings.language).slice(0, 3)}
                       </span>
@@ -871,6 +1057,15 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                     <td className="py-2.5 px-3 font-medium text-slate-900 whitespace-nowrap">
                       <div className="flex items-center gap-1.5">
                         {r.employeeName}
+                        {zeroPunchEmployeeIds.has(r.employeeId) && (
+                          <span
+                            title={t.zeroPunchesBadge}
+                            className="inline-flex items-center gap-0.5 rounded bg-rose-100 px-1.5 py-0.5 text-[10px] font-bold text-rose-800 border border-rose-300"
+                          >
+                            <UserX className="h-2.5 w-2.5 text-rose-600" />
+                            {t.zeroPunchesBadge}
+                          </span>
+                        )}
                         {r.isArchived && (
                           <span
                             title={t.archived}

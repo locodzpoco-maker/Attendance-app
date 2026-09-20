@@ -99,6 +99,16 @@ export interface Translations {
   colSupp: string;
   colObservation: string;
   colActions: string;
+  colExactPunchShort: string;
+  colExactPunchTooltip: string;
+  exactPunchEnabledTitle: string;
+  exactPunchDisabledTitle: string;
+  exactPunchBadge: string;
+  exactPunchBadgeTitle: string;
+  exactPunchOptionTitle: string;
+  exactPunchOptionDesc: string;
+  exactPunchObsDetail: string;
+  filterExactPunches: string;
   groupSchedule: string;
   btnAdjust: string;
   btnAddSupp: string;
@@ -165,6 +175,16 @@ export interface Translations {
   viewDailyAttendance: string;
   filteringByEmployee: string;
   viewAllEmployees: string;
+  filterAllWorkers: string;
+  filterActiveWithPunches: string;
+  filterZeroPunches: string;
+  hideZeroPunches: string;
+  showZeroPunches: string;
+  zeroPunchesBadge: string;
+  zeroPunchesBannerTitle: string;
+  zeroPunchesBannerDesc: string;
+  zeroPunchesHiddenNotice: string;
+  totalPunches: string;
 
   // Employees View
   addEmployee: string;
@@ -416,6 +436,16 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colSupp: 'Supp.',
     colObservation: 'Observation',
     colActions: 'Actions',
+    colExactPunchShort: 'Ign. Retard',
+    colExactPunchTooltip: 'Ignorer le retard : ne pas compter le retard ou le départ anticipé, compter uniquement les heures travaillées et marquer Ponctuel',
+    exactPunchEnabledTitle: 'Retard ignoré pour cette journée (statut Ponctuel). Cliquer pour rétablir le calcul normal du retard.',
+    exactPunchDisabledTitle: 'Ignorer le retard pour cette journée (compter uniquement les heures travaillées et marquer Ponctuel)',
+    exactPunchBadge: 'Ponctuel',
+    exactPunchBadgeTitle: 'Retard ignoré pour ce jour (statut Ponctuel)',
+    exactPunchOptionTitle: 'Retard ignoré (Statut Ponctuel)',
+    exactPunchOptionDesc: 'Journées avec retard ignoré (heures travaillées comptabilisées et statut Ponctuel).',
+    exactPunchObsDetail: 'Ponctuel',
+    filterExactPunches: 'Retard ignoré (Ponctuel)',
     groupSchedule: 'Groupe & Horaire',
     btnAdjust: 'Ajuster',
     btnAddSupp: '+ Supp',
@@ -479,6 +509,16 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     viewDailyAttendance: 'Voir la fiche quotidienne',
     filteringByEmployee: 'Filtré par employé',
     viewAllEmployees: 'Voir tous les employés',
+    filterAllWorkers: 'Tous les employés',
+    filterActiveWithPunches: 'Avec pointages (>0)',
+    filterZeroPunches: '0 pointage (Inactifs)',
+    hideZeroPunches: 'Masquer 0 pointage',
+    showZeroPunches: 'Afficher 0 pointage',
+    zeroPunchesBadge: '0 pointage',
+    zeroPunchesBannerTitle: 'Employés avec 0 pointage',
+    zeroPunchesBannerDesc: 'employé(s) n\'ont aucun pointage sur tout le mois uploadé.',
+    zeroPunchesHiddenNotice: 'employé(s) avec 0 pointage sont actuellement masqués.',
+    totalPunches: 'Total pointages',
 
     addEmployee: 'Ajouter un Employé',
     editEmployee: 'Modifier l’Employé',
@@ -722,6 +762,16 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colSupp: 'Supp',
     colObservation: 'Observation',
     colActions: 'Actions',
+    colExactPunchShort: 'Ign. Late',
+    colExactPunchTooltip: 'Ignore late time: do not count late arrival or early exit, count only worked hours, and mark status as On Time',
+    exactPunchEnabledTitle: 'Late time ignored for this day (status On Time). Click to restore normal late penalty calculation.',
+    exactPunchDisabledTitle: 'Ignore late time for this day (count only worked hours and set status to On Time)',
+    exactPunchBadge: 'On Time',
+    exactPunchBadgeTitle: 'Late time ignored for this day (status On Time)',
+    exactPunchOptionTitle: 'Ignore Late (Status On Time)',
+    exactPunchOptionDesc: 'Days where late time is ignored, only worked hours are counted, and status is On Time.',
+    exactPunchObsDetail: 'On Time',
+    filterExactPunches: 'Late Ignored (On Time)',
     groupSchedule: 'Group & Schedule',
     btnAdjust: 'Adjust',
     btnAddSupp: '+ Supp',
@@ -785,6 +835,16 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     viewDailyAttendance: 'View Daily Attendance',
     filteringByEmployee: 'Filtered by Employee',
     viewAllEmployees: 'View All Employees',
+    filterAllWorkers: 'All Employees',
+    filterActiveWithPunches: 'With Punches (>0)',
+    filterZeroPunches: '0 Punches (Inactive)',
+    hideZeroPunches: 'Hide 0 Punches',
+    showZeroPunches: 'Show 0 Punches',
+    zeroPunchesBadge: '0 Punches',
+    zeroPunchesBannerTitle: 'Workers with 0 Punches',
+    zeroPunchesBannerDesc: 'workers have 0 punches for the entire uploaded period.',
+    zeroPunchesHiddenNotice: 'workers with 0 punches are currently hidden.',
+    totalPunches: 'Total Punches',
 
     addEmployee: 'Add Employee',
     editEmployee: 'Edit Employee',
@@ -1028,6 +1088,16 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colSupp: 'مضاف',
     colObservation: 'الملاحظة',
     colActions: 'إجراءات',
+    colExactPunchShort: 'تجاهل التأخير',
+    colExactPunchTooltip: 'تجاهل التأخير: عدم احتساب التأخير أو الخروج المبكر، احتساب ساعات العمل فقط وتعيين الحالة في الوقت',
+    exactPunchEnabledTitle: 'تم تجاهل التأخير لهذا اليوم (الحالة في الوقت). انقر لاستعادة حساب التأخير العادي.',
+    exactPunchDisabledTitle: 'تجاهل التأخير لهذا اليوم (احتساب ساعات العمل فقط وتعيين الحالة في الوقت)',
+    exactPunchBadge: 'في الوقت',
+    exactPunchBadgeTitle: 'تم تجاهل التأخير لهذا اليوم (الحالة في الوقت)',
+    exactPunchOptionTitle: 'تجاهل التأخير (الحالة في الوقت)',
+    exactPunchOptionDesc: 'أيام تم فيها تجاهل التأخير (احتساب ساعات العمل فقط وتعيين الحالة في الوقت).',
+    exactPunchObsDetail: 'في الوقت',
+    filterExactPunches: 'تجاهل التأخير (في الوقت)',
     groupSchedule: 'المجموعة والجدول',
     btnAdjust: 'تعديل',
     btnAddSupp: '+ إضافي',
@@ -1091,6 +1161,16 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     viewDailyAttendance: 'عرض الحضور اليومي',
     filteringByEmployee: 'مصفى حسب الموظف',
     viewAllEmployees: 'عرض جميع الموظفين',
+    filterAllWorkers: 'جميع الموظفين',
+    filterActiveWithPunches: 'مع بصمات (>0)',
+    filterZeroPunches: '0 بصمة (غير نشط)',
+    hideZeroPunches: 'إخفاء أصحاب 0 بصمة',
+    showZeroPunches: 'إظهار أصحاب 0 بصمة',
+    zeroPunchesBadge: '0 بصمة',
+    zeroPunchesBannerTitle: 'موظفون بدون أي بصمة',
+    zeroPunchesBannerDesc: 'موظف(ون) ليس لديهم أي بصمة طوال الشهر المرفوع.',
+    zeroPunchesHiddenNotice: 'موظف(ون) بدون أي بصمة مخفيون حالياً.',
+    totalPunches: 'إجمالي البصمات',
 
     addEmployee: 'إضافة موظف',
     editEmployee: 'تعديل الموظف',

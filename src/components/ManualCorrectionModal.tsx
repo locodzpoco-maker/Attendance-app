@@ -15,7 +15,8 @@ interface ManualCorrectionModalProps {
     auditor: string,
     overrideShiftId?: string,
     adjustedSecondCheckIn?: string,
-    injectedSuppMinutes?: number
+    injectedSuppMinutes?: number,
+    exactPunchOnly?: boolean
   ) => void;
   currentUser: string;
   language?: AppLanguage;
@@ -43,6 +44,11 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
   const [injectedHours, setInjectedHours] = useState<number>(Math.floor(initialInjected / 60));
   const [injectedMinutes, setInjectedMinutes] = useState<number>(initialInjected % 60);
 
+  // Exact Punches Only Mode (ignore lateness and early exit for this day only)
+  const [exactPunchOnly, setExactPunchOnly] = useState<boolean>(
+    record.manualAdjustment?.exactPunchOnly ?? record.exactPunchOnly ?? false
+  );
+
   const [reason, setReason] = useState(record.manualAdjustment?.reason || '');
   const [auditor, setAuditor] = useState(currentUser || 'HR Admin');
   const [error, setError] = useState('');
@@ -63,7 +69,8 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
       auditor.trim(),
       overrideShift || undefined,
       secondCheckIn.trim() ? secondCheckIn.trim() : undefined,
-      totalInjectedMins > 0 ? totalInjectedMins : undefined
+      totalInjectedMins > 0 ? totalInjectedMins : undefined,
+      exactPunchOnly
     );
     onClose();
   };
@@ -262,6 +269,27 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 {formatMinutesToHoursAndMinutes(Math.max(0, record.suppMinutes - (record.injectedSuppMinutes || 0)))}
               </span>
             </div>
+          </div>
+
+          {/* Exact Punch Only Checkbox Option */}
+          <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                id="correction-exact-punch-checkbox"
+                type="checkbox"
+                checked={exactPunchOnly}
+                onChange={(e) => setExactPunchOnly(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              />
+              <div>
+                <span className="font-semibold text-sky-950 block">
+                  {t.exactPunchOptionTitle}
+                </span>
+                <span className="text-sky-800/90 text-[11px] block mt-0.5 leading-relaxed">
+                  {t.exactPunchOptionDesc}
+                </span>
+              </div>
+            </label>
           </div>
 
           <div>

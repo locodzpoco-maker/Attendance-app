@@ -363,11 +363,8 @@ export function calculateAttendance(
       let exitTime: string | null = null;
       let isOvernightPunch = false;
 
-      // Resolve Entry and Exit times
-      if (manualAdj) {
-        if (manualAdj.adjustedEntry) entryTime = manualAdj.adjustedEntry;
-        if (manualAdj.adjustedExit) exitTime = manualAdj.adjustedExit;
-      } else if (assignedSchedule.crossesMidnight) {
+      // Resolve Entry and Exit times from raw punches according to shift type
+      if (assignedSchedule.crossesMidnight) {
         // Overnight Shift: Shift 2 (18:00 - 02:00) or Shift 4 (16:00 - 00:00)
         entryTime = firstCheckInTime;
 
@@ -426,6 +423,14 @@ export function calculateAttendance(
         }
       }
 
+      // Override with manual punch adjustments if explicitly provided
+      if (manualAdj?.adjustedEntry) {
+        entryTime = manualAdj.adjustedEntry;
+      }
+      if (manualAdj?.adjustedExit) {
+        exitTime = manualAdj.adjustedExit;
+      }
+
       // Extract secondCheckInTime (return from break) if the schedule has a break:
       let secondCheckInTime: string | null = null;
       if (manualAdj?.adjustedSecondCheckIn) {
@@ -459,6 +464,7 @@ export function calculateAttendance(
       // Calculations:
       let firstCheckInDelayMinutes = 0;
       let secondCheckInDelayMinutes = 0;
+      let earlyExitMinutes = 0;
       let delayMinutes = 0;
       let workedMinutes = 0;
       let suppMinutes = 0;
@@ -524,24 +530,33 @@ export function calculateAttendance(
         return 0;
       };
 
-      if (entryTime) {
-        firstCheckInDelayMinutes = computeFirstCheckInDelay(entryTime);
-      }
+      const isExactPunchOnly = Boolean(manualAdj?.exactPunchOnly);
 
-      // Count late time on 2nd check-in (after break) for Admin workers only.
-      // Excludes the 10 min break grace from the total late duration.
-      if (isAdminWorkerType && secondCheckInTime) {
-        secondCheckInDelayMinutes = computeSecondCheckInDelay(secondCheckInTime);
-      } else {
+      if (isExactPunchOnly) {
+        firstCheckInDelayMinutes = 0;
         secondCheckInDelayMinutes = 0;
-      }
+        earlyExitMinutes = 0;
+        delayMinutes = 0;
+      } else {
+        if (entryTime) {
+          firstCheckInDelayMinutes = computeFirstCheckInDelay(entryTime);
+        }
 
-      let earlyExitMinutes = 0;
-      if (exitTime) {
-        earlyExitMinutes = computeEarlyExit(exitTime);
-      }
+        // Count late time on 2nd check-in (after break) for Admin workers only.
+        // Excludes the 10 min break grace from the total late duration.
+        if (isAdminWorkerType && secondCheckInTime) {
+          secondCheckInDelayMinutes = computeSecondCheckInDelay(secondCheckInTime);
+        } else {
+          secondCheckInDelayMinutes = 0;
+        }
 
-      delayMinutes = firstCheckInDelayMinutes + secondCheckInDelayMinutes + earlyExitMinutes;
+        earlyExitMinutes = 0;
+        if (exitTime) {
+          earlyExitMinutes = computeEarlyExit(exitTime);
+        }
+
+        delayMinutes = firstCheckInDelayMinutes + secondCheckInDelayMinutes + earlyExitMinutes;
+      }
 
       if (isShiftUnclear) {
         firstCheckInDelayMinutes = 0;
@@ -579,7 +594,9 @@ export function calculateAttendance(
       } else if (entryTime && !exitTime) {
         // Missing exit
         observation = 'Sortie non pointée';
-        if (delayMinutes > 0) {
+        if (isExactPunchOnly) {
+          observationDetail = 'Sortie non pointée (Pointage exact)';
+        } else if (delayMinutes > 0) {
           if (firstCheckInDelayMinutes > 0 && secondCheckInDelayMinutes > 0) {
             observationDetail = `Sortie non pointée (Retard: ${delayMinutes} min [Entrée ${firstCheckInDelayMinutes}m, Pause ${secondCheckInDelayMinutes}m])`;
           } else if (secondCheckInDelayMinutes > 0) {
@@ -594,7 +611,9 @@ export function calculateAttendance(
       } else if (!entryTime && exitTime) {
         // Missing entry
         observation = 'Entrée non pointée';
-        if (delayMinutes > 0) {
+        if (isExactPunchOnly) {
+          observationDetail = 'Entrée non pointée (Pointage exact)';
+        } else if (delayMinutes > 0) {
           const breakdownParts: string[] = [];
           if (secondCheckInDelayMinutes > 0) breakdownParts.push(`Pause ${secondCheckInDelayMinutes}m`);
           if (earlyExitMinutes > 0) breakdownParts.push(`Sortie anticipée ${earlyExitMinutes}m`);
@@ -616,63 +635,106 @@ export function calculateAttendance(
           }
         }
 
-        // 2. Calculate Overtime (Supp Hours)
-        if (assignedSchedule.overtimeAllowed && assignedSchedule.overtimeStartTime) {
-          let otStartMins = parseTimeToMinutes(assignedSchedule.overtimeStartTime);
-          if (assignedSchedule.crossesMidnight && otStartMins < schedStartMins) {
-            otStartMins += 24 * 60;
-          }
+        if (isExactPunchOnly) {
+          // Ignore late arrival, 2nd check-in delay, and early departure for this day
+          // Count working hours between check-in and check-out, and set status to On Time (Ponctuel)
+          firstCheckInDelayMinutes = 0;
+          secondCheckInDelayMinutes = 0;
+          earlyExitMinutes = 0;
+          delayMinutes = 0;
 
-          if (exitMins > otStartMins) {
-            const rawOt = exitMins - otStartMins;
-            if (rawOt <= overtimeGrace) {
-              suppMinutes = 0;
-            } else {
-              suppMinutes = rawOt;
+          // Overtime (Supp Hours) calculation if overtime allowed
+          if (assignedSchedule.overtimeAllowed && assignedSchedule.overtimeStartTime) {
+            let otStartMins = parseTimeToMinutes(assignedSchedule.overtimeStartTime);
+            if (assignedSchedule.crossesMidnight && otStartMins < schedStartMins) {
+              otStartMins += 24 * 60;
+            }
+
+            if (exitMins > otStartMins) {
+              const rawOt = exitMins - otStartMins;
+              if (rawOt <= overtimeGrace) {
+                suppMinutes = 0;
+              } else {
+                suppMinutes = rawOt;
+              }
             }
           }
-        }
 
-        // 3. Calculate Worked Hours
-        const totalDurationMins = Math.max(0, exitMins - entryMins);
-        const breakDeduction = assignedSchedule.hasBreak ? assignedSchedule.breakDurationMinutes : 0;
-        const netDurationBeforeOt = Math.max(0, totalDurationMins - suppMinutes - breakDeduction);
-        const targetNormalMins = Math.round(assignedSchedule.normalWorkedHours * 60);
+          // Calculate Worked Hours (elapsed duration minus scheduled break)
+          const totalDurationMins = Math.max(0, exitMins - entryMins);
+          const breakDeduction = assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0;
+          const netDurationBeforeOt = Math.max(0, totalDurationMins - suppMinutes - breakDeduction);
+          const targetNormalMins = Math.round(assignedSchedule.normalWorkedHours * 60);
 
-        if (netDurationBeforeOt >= targetNormalMins) {
-          workedMinutes = targetNormalMins;
-        } else {
-          workedMinutes = netDurationBeforeOt;
-        }
-
-        // Observation
-        if (delayMinutes > 0) {
-          observation = 'Retard';
-          const breakdownParts: string[] = [];
-          if (firstCheckInDelayMinutes > 0) breakdownParts.push(`Entrée ${firstCheckInDelayMinutes}m`);
-          if (secondCheckInDelayMinutes > 0) breakdownParts.push(`Pause ${secondCheckInDelayMinutes}m`);
-          if (earlyExitMinutes > 0) breakdownParts.push(`Sortie anticipée ${earlyExitMinutes}m`);
-
-          if (breakdownParts.length > 1) {
-            observationDetail = `Retard ${delayMinutes} min (${breakdownParts.join(' + ')})`;
-          } else if (firstCheckInDelayMinutes > 0) {
-            observationDetail = `Retard ${delayMinutes} min`;
-          } else if (secondCheckInDelayMinutes > 0) {
-            observationDetail = `Retard ${secondCheckInDelayMinutes} min (Reprise pause)`;
-          } else if (earlyExitMinutes > 0) {
-            observationDetail = `Retard ${earlyExitMinutes} min (Sortie anticipée)`;
+          if (netDurationBeforeOt >= targetNormalMins) {
+            workedMinutes = targetNormalMins;
           } else {
-            observationDetail = `Retard ${delayMinutes} min`;
+            workedMinutes = netDurationBeforeOt;
           }
-          statusType = 'warning';
-        } else if (isOvernightPunch) {
-          observation = 'Sortie après minuit';
-          observationDetail = 'Sortie après minuit';
-          statusType = 'info';
-        } else {
+
+          // Status is strictly On Time
           observation = 'Ponctuel';
           observationDetail = 'Ponctuel';
           statusType = 'success';
+        } else {
+          // 2. Calculate Overtime (Supp Hours)
+          if (assignedSchedule.overtimeAllowed && assignedSchedule.overtimeStartTime) {
+            let otStartMins = parseTimeToMinutes(assignedSchedule.overtimeStartTime);
+            if (assignedSchedule.crossesMidnight && otStartMins < schedStartMins) {
+              otStartMins += 24 * 60;
+            }
+
+            if (exitMins > otStartMins) {
+              const rawOt = exitMins - otStartMins;
+              if (rawOt <= overtimeGrace) {
+                suppMinutes = 0;
+              } else {
+                suppMinutes = rawOt;
+              }
+            }
+          }
+
+          // 3. Calculate Worked Hours
+          const totalDurationMins = Math.max(0, exitMins - entryMins);
+          const breakDeduction = assignedSchedule.hasBreak ? assignedSchedule.breakDurationMinutes : 0;
+          const netDurationBeforeOt = Math.max(0, totalDurationMins - suppMinutes - breakDeduction);
+          const targetNormalMins = Math.round(assignedSchedule.normalWorkedHours * 60);
+
+          if (netDurationBeforeOt >= targetNormalMins) {
+            workedMinutes = targetNormalMins;
+          } else {
+            workedMinutes = netDurationBeforeOt;
+          }
+
+          // Observation
+          if (delayMinutes > 0) {
+            observation = 'Retard';
+            const breakdownParts: string[] = [];
+            if (firstCheckInDelayMinutes > 0) breakdownParts.push(`Entrée ${firstCheckInDelayMinutes}m`);
+            if (secondCheckInDelayMinutes > 0) breakdownParts.push(`Pause ${secondCheckInDelayMinutes}m`);
+            if (earlyExitMinutes > 0) breakdownParts.push(`Sortie anticipée ${earlyExitMinutes}m`);
+
+            if (breakdownParts.length > 1) {
+              observationDetail = `Retard ${delayMinutes} min (${breakdownParts.join(' + ')})`;
+            } else if (firstCheckInDelayMinutes > 0) {
+              observationDetail = `Retard ${delayMinutes} min`;
+            } else if (secondCheckInDelayMinutes > 0) {
+              observationDetail = `Retard ${secondCheckInDelayMinutes} min (Reprise pause)`;
+            } else if (earlyExitMinutes > 0) {
+              observationDetail = `Retard ${earlyExitMinutes} min (Sortie anticipée)`;
+            } else {
+              observationDetail = `Retard ${delayMinutes} min`;
+            }
+            statusType = 'warning';
+          } else if (isOvernightPunch) {
+            observation = 'Sortie après minuit';
+            observationDetail = 'Sortie après minuit';
+            statusType = 'info';
+          } else {
+            observation = 'Ponctuel';
+            observationDetail = 'Ponctuel';
+            statusType = 'success';
+          }
         }
       }
 
@@ -727,7 +789,15 @@ export function calculateAttendance(
         exitTime,
         isOvernightPunch,
         manualAdjustment: manualAdj,
-        isManuallyAdjusted: Boolean(manualAdj),
+        isManuallyAdjusted: Boolean(
+          manualAdj &&
+            (manualAdj.adjustedEntry ||
+              manualAdj.adjustedExit ||
+              manualAdj.adjustedSecondCheckIn ||
+              manualAdj.overrideShiftId ||
+              (manualAdj.injectedSuppMinutes && manualAdj.injectedSuppMinutes > 0))
+        ),
+        exactPunchOnly: isExactPunchOnly,
         injectedSuppMinutes: injectedSuppMinutes > 0 ? injectedSuppMinutes : undefined,
         firstCheckInDelayMinutes,
         secondCheckInDelayMinutes,
@@ -787,9 +857,18 @@ export function generateMonthlySummaryFromDailyRecords(
         totalWorkedFormatted: '0h 00',
         totalSuppMinutes: 0,
         totalSuppFormatted: '0h 00',
+        totalPunchesCount: 0,
       };
       summaryMap.set(record.employeeId, summary);
     }
+
+    // Accumulate punches count for this day
+    const dayPunchesCount = (record.rawPunches && record.rawPunches.length > 0)
+      ? record.rawPunches.length
+      : ((record.firstCheckInTime || record.entryTime ? 1 : 0) +
+         (record.secondCheckInTime ? 1 : 0) +
+         (record.exitTime ? 1 : 0));
+    summary.totalPunchesCount = (summary.totalPunchesCount || 0) + dayPunchesCount;
 
     if (record.isWorkingDay) {
       summary.scheduledWorkingDays += 1;

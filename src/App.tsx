@@ -403,7 +403,8 @@ export default function App() {
     auditor: string,
     overrideShiftId?: string,
     adjustedSecondCheckIn?: string,
-    injectedSuppMinutes?: number
+    injectedSuppMinutes?: number,
+    exactPunchOnly?: boolean
   ) => {
     const target = dailyRecords.find((r) => r.id === recordId);
     if (!target) return;
@@ -418,6 +419,7 @@ export default function App() {
       adjustedExit,
       overrideShiftId,
       injectedSuppMinutes: injectedSuppMinutes !== undefined ? injectedSuppMinutes : existingAdj?.injectedSuppMinutes,
+      exactPunchOnly: exactPunchOnly !== undefined ? exactPunchOnly : existingAdj?.exactPunchOnly,
       reason,
       adjustedBy: auditor,
       adjustedAt: new Date().toISOString(),
@@ -430,6 +432,7 @@ export default function App() {
 
     // Log to Audit Trail
     const suppDetail = injectedSuppMinutes !== undefined ? ` | Injected Supp: +${Math.floor(injectedSuppMinutes / 60)}h ${injectedSuppMinutes % 60}m` : '';
+    const exactPunchDetail = exactPunchOnly ? ' | Exact Punch Mode: Enabled (Raw duration, 0 penalty)' : '';
     const newLog: AttendanceAuditLog = {
       id: `audit_${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -438,11 +441,75 @@ export default function App() {
       employeeName: target.employeeName,
       date: target.date,
       action: 'MANUAL_PUNCH_ADJUSTMENT',
-      details: `Entry: ${adjustedEntry || target.entryTime || 'none'} | 2nd In: ${adjustedSecondCheckIn || target.secondCheckInTime || 'none'} | Exit: ${adjustedExit || target.exitTime || 'none'} | Shift: ${overrideShiftId || 'Auto'}${suppDetail} | Reason: ${reason}`,
+      details: `Entry: ${adjustedEntry || target.entryTime || 'none'} | 2nd In: ${adjustedSecondCheckIn || target.secondCheckInTime || 'none'} | Exit: ${adjustedExit || target.exitTime || 'none'} | Shift: ${overrideShiftId || 'Auto'}${suppDetail}${exactPunchDetail} | Reason: ${reason}`,
     };
 
     setAuditLogs((prev) => [newLog, ...prev]);
   };
+
+  // Toggle Exact Punch Only for a specific day directly from the daily attendance table checkbox
+  const handleToggleExactPunchOnly = useCallback((recordId: string) => {
+    const target = dailyRecords.find((r) => r.id === recordId);
+    if (!target) return;
+
+    const existingAdj = manualAdjustments[recordId];
+    const currentlyExact = Boolean(existingAdj?.exactPunchOnly ?? target.exactPunchOnly ?? false);
+    const nextExact = !currentlyExact;
+
+    // Check if there are other manual adjustments on this record
+    const hasOtherAdjustments = Boolean(
+      existingAdj && (
+        existingAdj.adjustedEntry ||
+        existingAdj.adjustedExit ||
+        existingAdj.adjustedSecondCheckIn ||
+        existingAdj.overrideShiftId ||
+        (existingAdj.injectedSuppMinutes !== undefined && existingAdj.injectedSuppMinutes > 0) ||
+        (existingAdj.reason && !existingAdj.reason.includes('Exact punch mode') && !existingAdj.reason.includes('Pointage brut'))
+      )
+    );
+
+    setManualAdjustments((prev) => {
+      if (!nextExact && !hasOtherAdjustments) {
+        const copy = { ...prev };
+        delete copy[recordId];
+        return copy;
+      }
+
+      const updatedAdj: ManualAdjustment = {
+        date: target.date,
+        employeeId: target.employeeId,
+        adjustedEntry: existingAdj?.adjustedEntry,
+        adjustedSecondCheckIn: existingAdj?.adjustedSecondCheckIn,
+        adjustedExit: existingAdj?.adjustedExit,
+        overrideShiftId: existingAdj?.overrideShiftId,
+        injectedSuppMinutes: existingAdj?.injectedSuppMinutes,
+        exactPunchOnly: nextExact,
+        reason: existingAdj?.reason || (nextExact ? 'Ignore late time enabled: counts only worked hours, late penalty ignored, status set to On Time' : 'Standard schedule rules restored'),
+        adjustedBy: settings.activeRole || 'HR Admin',
+        adjustedAt: new Date().toISOString(),
+      };
+
+      return {
+        ...prev,
+        [recordId]: updatedAdj,
+      };
+    });
+
+    // Add audit log entry
+    const newLog: AttendanceAuditLog = {
+      id: `audit_${Date.now()}`,
+      timestamp: new Date().toISOString(),
+      user: settings.activeRole || 'HR Admin',
+      employeeId: target.employeeId,
+      employeeName: target.employeeName,
+      date: target.date,
+      action: 'MANUAL_PUNCH_ADJUSTMENT',
+      details: nextExact
+        ? `[Ignore Late Enabled] ${target.employeeName} (${target.date}): Ignored late time in all reports, counted working hours only, status set to On Time.`
+        : `[Ignore Late Disabled] ${target.employeeName} (${target.date}): Reverted to standard schedule rules.`,
+    };
+    setAuditLogs((prev) => [newLog, ...prev]);
+  }, [dailyRecords, manualAdjustments, settings.activeRole]);
 
   // Inject Supplementary Hours Handler
   const handleInjectSuppHours = (params: InjectSuppHoursParams) => {
@@ -776,6 +843,7 @@ export default function App() {
             onOpenCorrection={(record) => setActiveCorrectionRecord(record)}
             onOpenInjectSupp={handleOpenInjectSupp}
             onOpenVacationForEmployee={handleOpenVacationModal}
+            onToggleExactPunchOnly={handleToggleExactPunchOnly}
             onExportExcel={handleExportDailyExcel}
             onExportPDF={handleExportDailyPDF}
             settings={settings}

@@ -96,6 +96,7 @@ export interface ManualAdjustment {
   adjustedExit?: string;
   overrideShiftId?: string; // e.g. "stock_g1", "stock_g2", "stock_g3", "stock_g4"
   injectedSuppMinutes?: number; // additional/injected overtime minutes for this worker on this day
+  exactPunchOnly?: boolean; // When true: only count between check-in and check-out, ignoring late arrival and early departure for this day
   reason: string;
   adjustedBy: string;
   adjustedAt: string;
@@ -133,6 +134,7 @@ export interface DailyAttendanceRecord {
   // Manual Adjustment (if any)
   manualAdjustment?: ManualAdjustment;
   isManuallyAdjusted: boolean;
+  exactPunchOnly?: boolean; // When true: only counts time between checkins and checkouts, ignoring late and early exit
 
   // Calculated figures
   firstCheckInDelayMinutes: number; // delay on shift entry past grace
@@ -180,6 +182,7 @@ export interface MonthlySummaryRecord {
   totalWorkedFormatted: string; // e.g. "154h 00"
   totalSuppMinutes: number;
   totalSuppFormatted: string; // e.g. "8h 20"
+  totalPunchesCount?: number; // Total physical punches detected during the month
 }
 
 export interface AttendanceAuditLog {
