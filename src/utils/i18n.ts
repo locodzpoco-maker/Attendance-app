@@ -258,6 +258,12 @@ export interface Translations {
   deleteScheduleConfirm: string;
   resetSchedulesConfirm: string;
   scheduleSavedSuccess: string;
+  allSchedules: string;
+  weekdayShifts: string;
+  saturdayShifts: string;
+  editSaturdayShift: string;
+  autoCalculate: string;
+  saturdayShiftConfigNotice: string;
 
   // Days of week
   daySunday: string;
@@ -310,6 +316,16 @@ export interface Translations {
   breakGraceMinutes: string;
   userRoles: string;
   backupRestore: string;
+  saveProgress: string;
+  exportProgress: string;
+  importProgress: string;
+  continueWork: string;
+  saveProgressTooltip: string;
+  importProgressTooltip: string;
+  progressSavedSuccess: string;
+  progressRestoredSuccess: string;
+  progressSessionTitle: string;
+  progressSessionDesc: string;
   resetAllData: string;
   resetConfirm: string;
   desktopDatabase: string;
@@ -437,13 +453,13 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colObservation: 'Observation',
     colActions: 'Actions',
     colExactPunchShort: 'Ign. Retard',
-    colExactPunchTooltip: 'Ignorer le retard : ne pas compter le retard ou le départ anticipé, compter uniquement les heures travaillées et marquer Ponctuel',
-    exactPunchEnabledTitle: 'Retard ignoré pour cette journée (statut Ponctuel). Cliquer pour rétablir le calcul normal du retard.',
-    exactPunchDisabledTitle: 'Ignorer le retard pour cette journée (compter uniquement les heures travaillées et marquer Ponctuel)',
+    colExactPunchTooltip: 'Ignorer le retard & Pause non incluse : ne pas compter de retard, ne pas déduire le temps de pause, et marquer Ponctuel',
+    exactPunchEnabledTitle: 'Retard ignoré et temps de pause non inclus (statut Ponctuel). Cliquer pour rétablir le calcul normal.',
+    exactPunchDisabledTitle: 'Ignorer le retard et ne pas inclure le temps de pause pour cette journée (statut Ponctuel)',
     exactPunchBadge: 'Ponctuel',
-    exactPunchBadgeTitle: 'Retard ignoré pour ce jour (statut Ponctuel)',
-    exactPunchOptionTitle: 'Retard ignoré (Statut Ponctuel)',
-    exactPunchOptionDesc: 'Journées avec retard ignoré (heures travaillées comptabilisées et statut Ponctuel).',
+    exactPunchBadgeTitle: 'Retard ignoré et pause non incluse (statut Ponctuel)',
+    exactPunchOptionTitle: 'Retard ignoré & Pause non incluse',
+    exactPunchOptionDesc: 'Journées avec retard ignoré et temps de pause non inclus (heures travaillées comptabilisées et statut Ponctuel).',
     exactPunchObsDetail: 'Ponctuel',
     filterExactPunches: 'Retard ignoré (Ponctuel)',
     groupSchedule: 'Groupe & Horaire',
@@ -472,7 +488,7 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     shiftSatLabel: 'Shift Samedi',
     adminFixedSchedule: 'Administratif / Horaire Fixe',
     hasSaturdayShift: 'Travail le Samedi',
-    saturdayShiftDesc: 'Active le travail le samedi (08:30–17:00 pour Admin, 10:00–17:00 pour Stock) pour cet employé',
+    saturdayShiftDesc: 'Active le travail le samedi (09:00–17:00 pour Admin, 10:00–17:00 pour Stock) pour cet employé',
     filterSaturdayWorkers: 'Samedi Travaillé',
     saturdayActive: 'Samedi Actif',
     saturdayOff: 'Samedi Repos',
@@ -590,6 +606,12 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     deleteScheduleConfirm: 'Êtes-vous sûr de vouloir supprimer l’horaire ?',
     resetSchedulesConfirm: 'Réinitialiser tous les horaires aux valeurs par défaut d’usine ? Tout horaire personnalisé sera remplacé.',
     scheduleSavedSuccess: 'Horaire enregistré avec succès ! Sauvegardé localement.',
+    allSchedules: 'Tous les horaires',
+    weekdayShifts: 'Horaires semaine',
+    saturdayShifts: 'Horaires du Samedi',
+    editSaturdayShift: 'Modifier le shift samedi',
+    autoCalculate: 'Calculer auto',
+    saturdayShiftConfigNotice: 'Shift Samedi : Les horaires, pauses et tolérances sont enregistrés et s\'appliquent immédiatement à tous les calculs du samedi.',
 
     daySunday: 'Dimanche',
     dayMonday: 'Lundi',
@@ -638,6 +660,16 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     breakGraceMinutes: 'Tolérance Temps de Pause (minutes)',
     userRoles: 'Rôle Utilisateur Actif',
     backupRestore: 'Sauvegarde & Restauration',
+    saveProgress: 'Sauvegarder Progression',
+    exportProgress: 'Exporter Progression',
+    importProgress: 'Importer Progression',
+    continueWork: 'Reprendre le Travail',
+    saveProgressTooltip: 'Sauvegardez l’état complet de votre session (cases cochées, modifications, filtres, horaires) pour continuer plus tard.',
+    importProgressTooltip: 'Chargez un fichier de progression pour reprendre exactement là où vous vous êtes arrêté.',
+    progressSavedSuccess: 'Progression sauvegardée et exportée avec succès !',
+    progressRestoredSuccess: 'Progression et session restaurées avec succès !',
+    progressSessionTitle: 'Sauvegarde de la Session & Progression',
+    progressSessionDesc: 'Exportez tout votre travail en cours (pointages, filtres, cases cochées, plannings) dans un fichier pour le reprendre à tout moment.',
     resetAllData: 'Réinitialiser toutes les données',
     resetConfirm: 'Voulez-vous vraiment réinitialiser toutes les données ?',
     desktopDatabase: 'Base de Données Locale SQLite',
@@ -763,13 +795,13 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colObservation: 'Observation',
     colActions: 'Actions',
     colExactPunchShort: 'Ign. Late',
-    colExactPunchTooltip: 'Ignore late time: do not count late arrival or early exit, count only worked hours, and mark status as On Time',
-    exactPunchEnabledTitle: 'Late time ignored for this day (status On Time). Click to restore normal late penalty calculation.',
-    exactPunchDisabledTitle: 'Ignore late time for this day (count only worked hours and set status to On Time)',
+    colExactPunchTooltip: 'Ignore late & do not include rest time: no late penalty, do not deduct rest time, and mark status On Time',
+    exactPunchEnabledTitle: 'Late time ignored and rest time not included (status On Time). Click to restore normal calculation.',
+    exactPunchDisabledTitle: 'Ignore late time and do not include rest time for this day (status On Time)',
     exactPunchBadge: 'On Time',
-    exactPunchBadgeTitle: 'Late time ignored for this day (status On Time)',
-    exactPunchOptionTitle: 'Ignore Late (Status On Time)',
-    exactPunchOptionDesc: 'Days where late time is ignored, only worked hours are counted, and status is On Time.',
+    exactPunchBadgeTitle: 'Late time ignored and rest time not included (status On Time)',
+    exactPunchOptionTitle: 'Ignore Late & Exclude Rest Time',
+    exactPunchOptionDesc: 'Days where late time is ignored and rest/break time is not included, only worked hours are counted, and status is On Time.',
     exactPunchObsDetail: 'On Time',
     filterExactPunches: 'Late Ignored (On Time)',
     groupSchedule: 'Group & Schedule',
@@ -798,7 +830,7 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     shiftSatLabel: 'Saturday Shift',
     adminFixedSchedule: 'Admin / Fixed schedule',
     hasSaturdayShift: 'Works Saturday',
-    saturdayShiftDesc: 'Enables Saturday working day (08:30–17:00 for Admin, 10:00–17:00 for Stock) for this worker',
+    saturdayShiftDesc: 'Enables Saturday working day (09:00–17:00 for Admin, 10:00–17:00 for Stock) for this worker',
     filterSaturdayWorkers: 'Saturday Shift',
     saturdayActive: 'Saturday Active',
     saturdayOff: 'Saturday Off',
@@ -916,6 +948,12 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     deleteScheduleConfirm: 'Are you sure you want to delete this schedule?',
     resetSchedulesConfirm: 'Reset all schedules to system factory defaults? Any custom schedules will be replaced.',
     scheduleSavedSuccess: 'Schedule saved successfully! Changes are actively saved locally.',
+    allSchedules: 'All Schedules',
+    weekdayShifts: 'Weekday Shifts',
+    saturdayShifts: 'Saturday Shifts',
+    editSaturdayShift: 'Edit Saturday Shift',
+    autoCalculate: 'Auto-calculate',
+    saturdayShiftConfigNotice: 'Saturday Shift: Configured hours, breaks, and grace thresholds are saved locally and immediately apply across all Saturday calculations.',
 
     daySunday: 'Sunday',
     dayMonday: 'Monday',
@@ -964,6 +1002,16 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     breakGraceMinutes: 'Break Grace (minutes)',
     userRoles: 'Active Role',
     backupRestore: 'Backup & Restore',
+    saveProgress: 'Save Progress',
+    exportProgress: 'Export Progress',
+    importProgress: 'Import Progress',
+    continueWork: 'Continue Work',
+    saveProgressTooltip: 'Save your entire work session (boxes checked, schedule changes, manual punches, filters, settings) to resume later.',
+    importProgressTooltip: 'Load a saved progress file to resume work exactly where you left off.',
+    progressSavedSuccess: 'Work progress saved and exported successfully!',
+    progressRestoredSuccess: 'Work progress restored successfully!',
+    progressSessionTitle: 'Work Progress & Session Save',
+    progressSessionDesc: 'Save all your in-progress work (checked boxes, corrections, filters, schedules) to a file and resume anytime.',
     resetAllData: 'Reset All Data',
     resetConfirm: 'Are you sure you want to reset all data and settings?',
     desktopDatabase: 'Local SQLite Database',
@@ -1089,13 +1137,13 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colObservation: 'الملاحظة',
     colActions: 'إجراءات',
     colExactPunchShort: 'تجاهل التأخير',
-    colExactPunchTooltip: 'تجاهل التأخير: عدم احتساب التأخير أو الخروج المبكر، احتساب ساعات العمل فقط وتعيين الحالة في الوقت',
-    exactPunchEnabledTitle: 'تم تجاهل التأخير لهذا اليوم (الحالة في الوقت). انقر لاستعادة حساب التأخير العادي.',
-    exactPunchDisabledTitle: 'تجاهل التأخير لهذا اليوم (احتساب ساعات العمل فقط وتعيين الحالة في الوقت)',
+    colExactPunchTooltip: 'تجاهل التأخير وعدم تضمين وقت الاستراحة: عدم احتساب التأخير، عدم خصم وقت الاستراحة، وتعيين الحالة في الوقت',
+    exactPunchEnabledTitle: 'تم تجاهل التأخير وعدم تضمين وقت الاستراحة (الحالة في الوقت). انقر للاستعادة.',
+    exactPunchDisabledTitle: 'تجاهل التأخير وعدم تضمين وقت الاستراحة لهذا اليوم (الحالة في الوقت)',
     exactPunchBadge: 'في الوقت',
-    exactPunchBadgeTitle: 'تم تجاهل التأخير لهذا اليوم (الحالة في الوقت)',
-    exactPunchOptionTitle: 'تجاهل التأخير (الحالة في الوقت)',
-    exactPunchOptionDesc: 'أيام تم فيها تجاهل التأخير (احتساب ساعات العمل فقط وتعيين الحالة في الوقت).',
+    exactPunchBadgeTitle: 'تم تجاهل التأخير وعدم تضمين وقت الاستراحة (الحالة في الوقت)',
+    exactPunchOptionTitle: 'تجاهل التأخير واستبعاد الاستراحة',
+    exactPunchOptionDesc: 'أيام تم فيها تجاهل التأخير وعدم تضمين وقت الاستراحة، مع احتساب ساعات العمل فقط وتعيين الحالة في الوقت.',
     exactPunchObsDetail: 'في الوقت',
     filterExactPunches: 'تجاهل التأخير (في الوقت)',
     groupSchedule: 'المجموعة والجدول',
@@ -1124,7 +1172,7 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     shiftSatLabel: 'وردية السبت',
     adminFixedSchedule: 'إداري / جدول ثابت',
     hasSaturdayShift: 'العمل يوم السبت',
-    saturdayShiftDesc: 'تفعيل العمل يوم السبت (08:30–17:00 للإدارة، 10:00–17:00 للمخزن) لهذا العامل',
+    saturdayShiftDesc: 'تفعيل العمل يوم السبت (09:00–17:00 للإدارة، 10:00–17:00 للمخزن) لهذا العامل',
     filterSaturdayWorkers: 'عمال السبت',
     saturdayActive: 'السبت مفعّل',
     saturdayOff: 'السبت راحة',
@@ -1242,6 +1290,12 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     deleteScheduleConfirm: 'هل أنت متأكد من حذف هذا الجدول؟',
     resetSchedulesConfirm: 'استعادة جميع الجداول إلى الإعدادات المصنعية الافتراضية؟ سيتم استبدال أي جداول مخصصة.',
     scheduleSavedSuccess: 'تم حفظ الجدول بنجاح! التغييرات محفوظة محلياً.',
+    allSchedules: 'جميع الجداول',
+    weekdayShifts: 'ورديات أيام الأسبوع',
+    saturdayShifts: 'ورديات يوم السبت',
+    editSaturdayShift: 'تعديل وردية السبت',
+    autoCalculate: 'حساب تلقائي',
+    saturdayShiftConfigNotice: 'وردية السبت: يتم حفظ الأوقات وفترات الاستراحة والسماح وتطبيقها فوراً على حسابات السبت.',
 
     daySunday: 'الأحد',
     dayMonday: 'الإثنين',
@@ -1290,6 +1344,16 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     breakGraceMinutes: 'سماحية وقت الاستراحة (دقائق)',
     userRoles: 'الصلاحية النشطة',
     backupRestore: 'النسخ الاحتياطي والاستعادة',
+    saveProgress: 'حفظ التقدم',
+    exportProgress: 'تصدير التقدم',
+    importProgress: 'استيراد التقدم',
+    continueWork: 'متابعة العمل',
+    saveProgressTooltip: 'احفظ جلسة عملك كاملة (المربعات المحددة، تعديلات الورديات، الفلاتر، الإعدادات) للاستئناف لاحقاً.',
+    importProgressTooltip: 'تحميل ملف تقدم محفوظ لمتابعة العمل من حيث توقفت تماماً.',
+    progressSavedSuccess: 'تم حفظ وتصدير التقدم بنجاح!',
+    progressRestoredSuccess: 'تم استعادة تقدم العمل بنجاح!',
+    progressSessionTitle: 'حفظ تقدم العمل والجلسة',
+    progressSessionDesc: 'احفظ جميع أعمالك قيد التنفيذ في ملف واستأنف العمل في أي وقت.',
     resetAllData: 'استعادة ضبط المصنع لجميع البيانات',
     resetConfirm: 'هل تريد بالفعل إعادة ضبط جميع البيانات والإعدادات؟',
     desktopDatabase: 'قاعدة بيانات SQLite المحلية',

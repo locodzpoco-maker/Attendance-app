@@ -485,7 +485,7 @@ const ADMIN_EMPLOYEES: Employee[] = ADMIN_WORKERS_INPUT.map((worker) => {
     startDate: "2023-01-01",
     hasSaturdayShift: hasSat,
     notes: hasSat
-      ? "Administration (Shift Samedi 08:30-17:00 activé + 08:30-17:00 en semaine)"
+      ? "Administration (Shift Samedi 09:00-17:00 activé + 08:30-17:00 en semaine)"
       : "Administration (08:30 - 17:00)",
   };
 });

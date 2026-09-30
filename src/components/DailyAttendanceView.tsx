@@ -32,6 +32,18 @@ import {
 import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
 import { getTranslations, translateDayOfWeek, Translations } from '../utils/i18n';
 import { isAdminWorker, isStockWorker } from '../utils/employees';
+import { getStorageItem, saveStorageItem } from '../utils/storage';
+
+interface SavedDailyFilters {
+  searchTerm?: string;
+  selectedGroup?: 'ADMIN' | 'STOCK';
+  selectedStatus?: string;
+  excludeArchived?: boolean;
+  excludeZeroPunches?: boolean;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+}
 
 interface DailyAttendanceViewProps {
   records: DailyAttendanceRecord[];
@@ -100,19 +112,39 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   onClearSelectedEmployee,
 }) => {
   const t = getTranslations(settings.language);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState<'ADMIN' | 'STOCK'>('ADMIN');
-  const [selectedStatus, setSelectedStatus] = useState('ALL');
-  const [excludeArchived, setExcludeArchived] = useState(true);
-  const [excludeZeroPunches, setExcludeZeroPunches] = useState(false);
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
-  const [page, setPage] = useState(1);
+  const [savedFilters] = useState<SavedDailyFilters | null>(() =>
+    getStorageItem<SavedDailyFilters | null>('ams_daily_filters', null)
+  );
+  const [searchTerm, setSearchTerm] = useState(savedFilters?.searchTerm ?? '');
+  const [selectedGroup, setSelectedGroup] = useState<'ADMIN' | 'STOCK'>(savedFilters?.selectedGroup ?? 'ADMIN');
+  const [selectedStatus, setSelectedStatus] = useState(savedFilters?.selectedStatus ?? 'ALL');
+  const [excludeArchived, setExcludeArchived] = useState(savedFilters?.excludeArchived ?? true);
+  const [excludeZeroPunches, setExcludeZeroPunches] = useState(savedFilters?.excludeZeroPunches ?? false);
+  const [startDate, setStartDate] = useState(savedFilters?.startDate ?? '');
+  const [endDate, setEndDate] = useState(savedFilters?.endDate ?? '');
+  const [page, setPage] = useState(savedFilters?.page ?? 1);
   const pageSize = 25;
 
-  // Sync selected employee from props (e.g., when drilled down from Monthly Summary)
+  // Persist filters to localStorage in real time
   useEffect(() => {
-    if (selectedEmployeeId) {
+    saveStorageItem('ams_daily_filters', {
+      searchTerm,
+      selectedGroup,
+      selectedStatus,
+      excludeArchived,
+      excludeZeroPunches,
+      startDate,
+      endDate,
+      page,
+      selectedEmployeeId: selectedEmployeeId || undefined,
+    });
+  }, [searchTerm, selectedGroup, selectedStatus, excludeArchived, excludeZeroPunches, startDate, endDate, page, selectedEmployeeId]);
+
+  // Sync selected employee from props only when selectedEmployeeId actually changes value (prevent resetting when records recompute)
+  const prevSelectedEmployeeIdRef = React.useRef<string | null | undefined>(undefined);
+  useEffect(() => {
+    if (selectedEmployeeId && selectedEmployeeId !== prevSelectedEmployeeIdRef.current) {
+      prevSelectedEmployeeIdRef.current = selectedEmployeeId;
       const empRecords = records.filter((r) => r.employeeId === selectedEmployeeId);
       const isStock = empRecords.length > 0
         ? isDailyRecordStock(empRecords[0])
@@ -124,11 +156,31 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
       if (isArchived) {
         setExcludeArchived(false);
       }
-      // When a specific worker is selected, make sure they are not hidden
       setExcludeZeroPunches(false);
       setPage(1);
+    } else if (!selectedEmployeeId) {
+      prevSelectedEmployeeIdRef.current = null;
     }
   }, [selectedEmployeeId, records]);
+
+  // Listen for progress restored event to update active filters in real-time
+  useEffect(() => {
+    const handleProgressRestored = () => {
+      const restored = getStorageItem<SavedDailyFilters | null>('ams_daily_filters', null);
+      if (restored) {
+        if (restored.searchTerm !== undefined) setSearchTerm(restored.searchTerm);
+        if (restored.selectedGroup !== undefined) setSelectedGroup(restored.selectedGroup);
+        if (restored.selectedStatus !== undefined) setSelectedStatus(restored.selectedStatus);
+        if (restored.excludeArchived !== undefined) setExcludeArchived(restored.excludeArchived);
+        if (restored.excludeZeroPunches !== undefined) setExcludeZeroPunches(restored.excludeZeroPunches);
+        if (restored.startDate !== undefined) setStartDate(restored.startDate);
+        if (restored.endDate !== undefined) setEndDate(restored.endDate);
+        if (restored.page !== undefined) setPage(restored.page);
+      }
+    };
+    window.addEventListener('ams_progress_restored', handleProgressRestored);
+    return () => window.removeEventListener('ams_progress_restored', handleProgressRestored);
+  }, []);
 
   // Selected employee information for the active filter banner
   const selectedEmployeeInfo = useMemo(() => {
@@ -971,39 +1023,59 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
       {/* Suggested Columns Table (PRD Section 21 + Dynamic Shift Specification) */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-xs table-auto">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold text-[11px]">
                 <th
-                  className="py-2.5 px-1 text-center w-8 font-bold"
+                  className="py-2.5 px-1 text-center w-8 font-bold whitespace-nowrap"
                   title={t.colExactPunchTooltip}
                 >
                   <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
                     {t.colExactPunchShort}
                   </span>
                 </th>
-                <th className="py-2.5 px-2">{t.colDate}</th>
-                <th className="py-2.5 px-2 font-mono">{t.colId}</th>
-                <th className="py-2.5 px-2">{t.colName}</th>
-                <th className="py-2.5 px-1.5 text-center">{t.colIn}</th>
-                <th className="py-2.5 px-1.5 text-center">{t.secondCheckIn}</th>
-                <th className="py-2.5 px-1.5 text-center">{t.colShift}</th>
-                <th className="py-2.5 px-1.5 text-center">{t.colOut}</th>
-                <th className="py-2.5 px-1.5 text-center">{t.colLate}</th>
-                <th className="py-2.5 px-1.5 text-center">{t.colBreak}</th>
-                <th className="py-2.5 px-1.5 text-center">{t.colWorked}</th>
-                <th className="py-2.5 px-1.5 text-center font-bold text-indigo-700">{t.colSupp}</th>
-                <th className="py-2.5 px-2">{t.colObservation}</th>
+                <th className="py-2.5 px-2 whitespace-nowrap">{t.colDate}</th>
+                <th className="py-2.5 px-2 font-mono whitespace-nowrap">{t.colId}</th>
+                <th className="py-2.5 px-2 whitespace-nowrap">{t.colName}</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap">{t.colIn}</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap">{t.secondCheckIn}</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap">{t.colShift}</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap">{t.colOut}</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap">{t.colLate}</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap">{t.colBreak}</th>
+                <th className="py-2.5 px-1.5 text-center whitespace-nowrap">{t.colWorked}</th>
+                <th className="py-2.5 px-1.5 text-center font-bold text-indigo-700 whitespace-nowrap">{t.colSupp}</th>
+                <th className="py-2.5 px-2 whitespace-nowrap">{t.colObservation}</th>
                 {settings.activeRole !== 'Management' && (
-                  <th className="py-2.5 px-2 text-right">{t.colActions}</th>
+                  <th className="py-2.5 px-2 text-right whitespace-nowrap">{t.colActions}</th>
                 )}
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {paginatedRecords.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="py-12 text-center text-slate-400">
-                    {t.noRecordsFound}
+                  <td colSpan={14} className="py-16 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Clock className="h-8 w-8 text-slate-300" />
+                      <p className="font-semibold text-slate-700 text-sm">
+                        {records.length === 0
+                          ? settings.language === 'ar'
+                            ? 'لا توجد تسجيلات حضور محملة'
+                            : settings.language === 'en'
+                            ? 'No Attendance Records Loaded'
+                            : 'Aucun enregistrement de présence chargé'
+                          : t.noRecordsFound}
+                      </p>
+                      <p className="text-xs text-slate-400 max-w-md">
+                        {records.length === 0
+                          ? settings.language === 'ar'
+                            ? 'قم باستيراد ملف البصمة البيومترية من الشريط العلوي لعرض الحضور اليومي وساعات العمل.'
+                            : settings.language === 'en'
+                            ? 'Import a biometric fingerprint file from the top bar to calculate daily attendance and worked hours.'
+                            : 'Importez un fichier d’émargement biométrique depuis la barre supérieure pour afficher les pointages et les heures travaillées.'
+                          : ''}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (

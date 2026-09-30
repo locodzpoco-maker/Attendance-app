@@ -1,9 +1,16 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { Employee, WorkSchedule, AppSettings, RawEmployeeRecord } from '../types';
 import { isStockWorker, isAdminWorker, findUnmappedEmployees, createEmployeeFromDetected } from '../utils/employees';
 import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert, UserPlus, Sparkles, Zap, Check, Palmtree, Archive, ArchiveRestore } from 'lucide-react';
 import { AddDetectedWorkersModal } from './AddDetectedWorkersModal';
 import { getTranslations } from '../utils/i18n';
+import { getStorageItem, saveStorageItem } from '../utils/storage';
+
+interface SavedEmployeesFilters {
+  searchTerm?: string;
+  categoryFilter?: 'ALL' | 'STOCK' | 'ADMIN' | 'SATURDAY' | 'ARCHIVED';
+  showArchived?: boolean;
+}
 
 interface EmployeesViewProps {
   employees: Employee[];
@@ -29,9 +36,37 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   rawEmployeesFromDataset,
 }) => {
   const t = getTranslations(settings.language);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'STOCK' | 'ADMIN' | 'SATURDAY' | 'ARCHIVED'>('ALL');
-  const [showArchived, setShowArchived] = useState(false);
+  const [savedFilters] = useState<SavedEmployeesFilters | null>(() =>
+    getStorageItem<SavedEmployeesFilters | null>('ams_employees_filters', null)
+  );
+  const [searchTerm, setSearchTerm] = useState(savedFilters?.searchTerm ?? '');
+  const [categoryFilter, setCategoryFilter] = useState<'ALL' | 'STOCK' | 'ADMIN' | 'SATURDAY' | 'ARCHIVED'>(
+    savedFilters?.categoryFilter ?? 'ALL'
+  );
+  const [showArchived, setShowArchived] = useState(savedFilters?.showArchived ?? false);
+
+  // Persist employee filters to localStorage in real time
+  useEffect(() => {
+    saveStorageItem('ams_employees_filters', {
+      searchTerm,
+      categoryFilter,
+      showArchived,
+    });
+  }, [searchTerm, categoryFilter, showArchived]);
+
+  // Listen for progress restored event to update active filters in real-time
+  useEffect(() => {
+    const handleProgressRestored = () => {
+      const restored = getStorageItem<SavedEmployeesFilters | null>('ams_employees_filters', null);
+      if (restored) {
+        if (restored.searchTerm !== undefined) setSearchTerm(restored.searchTerm);
+        if (restored.categoryFilter !== undefined) setCategoryFilter(restored.categoryFilter);
+        if (restored.showArchived !== undefined) setShowArchived(restored.showArchived);
+      }
+    };
+    window.addEventListener('ams_progress_restored', handleProgressRestored);
+    return () => window.removeEventListener('ams_progress_restored', handleProgressRestored);
+  }, []);
   const [modalOpen, setModalOpen] = useState(false);
   const [editingEmp, setEditingEmp] = useState<Employee | null>(null);
   const [detectedModalOpen, setDetectedModalOpen] = useState(false);
@@ -335,9 +370,13 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
               </button>
               {categoryFilter === "SATURDAY" && (
                 <span className="text-[11px] text-teal-800 bg-teal-50 border border-teal-200 rounded-lg px-2.5 py-1 font-semibold flex items-center gap-1.5 shadow-2xs">
-                  <span>{stockSaturdayCount} {t.stockRoleBadge} (10:00–17:00)</span>
+                  <span>
+                    {stockSaturdayCount} {t.stockRoleBadge} ({schedules.find((s) => s.id === 'stock_sat')?.startTime || '10:00'}–{schedules.find((s) => s.id === 'stock_sat')?.endTime || '17:00'})
+                  </span>
                   <span className="text-teal-400">•</span>
-                  <span>{adminSaturdayCount} {t.adminRoleBadge} (08:30–17:00)</span>
+                  <span>
+                    {adminSaturdayCount} {t.adminRoleBadge} ({schedules.find((s) => s.id === 'admin_sat')?.startTime || '09:00'}–{schedules.find((s) => s.id === 'admin_sat')?.endTime || '17:00'})
+                  </span>
                 </span>
               )}
             </div>
@@ -690,19 +729,32 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     onChange={(e) => setHasSaturdayShift(e.target.checked)}
                     className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                   />
-                  <div className="text-xs">
-                    <span className="font-bold text-teal-950 flex items-center gap-1.5">
-                      <span>📅</span> {t.hasSaturdayShift}
-                      <span className="ml-1 text-[11px] font-semibold text-teal-700 bg-teal-100/80 rounded px-1.5 py-0.5">
-                        {(isStockWorker(empId) || companyDept.toLowerCase().includes('stock')) ? '10:00–17:00' : '08:30–17:00'}
-                      </span>
-                    </span>
-                    <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
-                      {(isStockWorker(empId) || companyDept.toLowerCase().includes('stock'))
-                        ? 'Stock : Shift Samedi (10:00 – 17:00, Pause 13:00–14:00, HS > 17:00)'
-                        : 'Administration : Shift Samedi identique aux horaires normaux (08:30 – 17:00, Pause 12:30–14:00, Sans HS / No Overtime)'}
-                    </p>
-                  </div>
+                  {(() => {
+                    const isStockEmp = isStockWorker(empId) || companyDept.toLowerCase().includes('stock');
+                    const satSched = schedules.find((s) => s.id === (isStockEmp ? 'stock_sat' : 'admin_sat'));
+                    const startT = satSched?.startTime || (isStockEmp ? '10:00' : '09:00');
+                    const endT = satSched?.endTime || '17:00';
+                    const hasB = satSched ? satSched.hasBreak : true;
+                    const breakInfo = hasB && satSched?.breakStart && satSched?.breakEnd
+                      ? `, Pause ${satSched.breakStart}–${satSched.breakEnd}`
+                      : '';
+                    const otInfo = satSched?.overtimeAllowed && satSched?.overtimeStartTime
+                      ? `, HS > ${satSched.overtimeStartTime}`
+                      : (isStockEmp ? '' : ', Sans HS');
+                    return (
+                      <div className="text-xs">
+                        <span className="font-bold text-teal-950 flex items-center gap-1.5">
+                          <span>📅</span> {t.hasSaturdayShift}
+                          <span className="ml-1 text-[11px] font-semibold text-teal-700 bg-teal-100/80 rounded px-1.5 py-0.5">
+                            {startT}–{endT}
+                          </span>
+                        </span>
+                        <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
+                          {isStockEmp ? 'Stock' : 'Administration'} : Shift Samedi ({startT} – {endT}{breakInfo}{otInfo})
+                        </p>
+                      </div>
+                    );
+                  })()}
                 </label>
               </div>
 

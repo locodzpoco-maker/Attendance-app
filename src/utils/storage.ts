@@ -10,8 +10,145 @@ export const STORAGE_KEYS = {
   ACTIVE_DATASET: 'ams_active_dataset',
   HISTORICAL_PERIODS: 'ams_historical_periods',
   SELECTED_PERIOD_ID: 'ams_selected_period_id',
+  SELECTED_EMP_FOR_DAILY: 'ams_selected_emp_for_daily',
   PAID_VACATIONS: 'ams_paid_vacations',
+  DAILY_FILTERS: 'ams_daily_filters',
+  MONTHLY_FILTERS: 'ams_monthly_filters',
+  EMPLOYEES_FILTERS: 'ams_employees_filters',
+  SCHEDULES_FILTER: 'ams_schedules_filter',
 };
+
+export interface SavedDailyFilters {
+  searchTerm?: string;
+  selectedGroup?: 'ADMIN' | 'STOCK';
+  selectedStatus?: string;
+  excludeArchived?: boolean;
+  excludeZeroPunches?: boolean;
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+  selectedEmployeeId?: string | null;
+}
+
+export interface SavedMonthlyFilters {
+  searchTerm?: string;
+  selectedGroup?: string;
+  excludeArchived?: boolean;
+  punchFilter?: 'ALL' | 'ACTIVE_ONLY' | 'ZERO_PUNCHES_ONLY';
+  startDate?: string;
+  endDate?: string;
+}
+
+export interface SavedEmployeesFilters {
+  searchTerm?: string;
+  categoryFilter?: 'ALL' | 'STOCK' | 'ADMIN' | 'SATURDAY' | 'ARCHIVED';
+  showArchived?: boolean;
+}
+
+// Full application snapshot for pausing and resuming work
+export interface AppProgressSnapshot {
+  type: 'AMS_PROGRESS_SNAPSHOT';
+  version: string;
+  exportedAt: string;
+  activeTab?: 'dashboard' | 'daily' | 'monthly' | 'employees' | 'schedules' | 'settings';
+  selectedPeriodId?: string;
+  activeDataset?: RawAttendanceDataset | null;
+  historicalPeriods?: HistoricalPeriodRecord[];
+  settings: AppSettings;
+  schedules: WorkSchedule[];
+  employees: Employee[];
+  manualAdjustments: Record<string, ManualAdjustment>;
+  paidVacations?: PaidVacation[];
+  auditLogs?: AttendanceAuditLog[];
+  dailyFilters?: SavedDailyFilters;
+  monthlyFilters?: SavedMonthlyFilters;
+  employeesFilters?: SavedEmployeesFilters;
+  schedulesFilter?: 'all' | 'weekday' | 'saturday';
+  summary?: {
+    totalEmployees?: number;
+    exactPunchCount?: number;
+    adjustmentsCount?: number;
+    schedulesCount?: number;
+    vacationsCount?: number;
+  };
+}
+
+// Legacy format compatibility
+export interface AppBackupPayload {
+  version: string;
+  exportedAt: string;
+  settings: AppSettings;
+  schedules: WorkSchedule[];
+  employees: Employee[];
+  manualAdjustments: Record<string, ManualAdjustment>;
+  paidVacations?: PaidVacation[];
+  activeDataset?: RawAttendanceDataset | null;
+  historicalPeriods?: HistoricalPeriodRecord[];
+}
+
+// IndexedDB Helper for unlimited quota storage of heavy datasets
+const IDB_NAME = 'AMS_ATTENDANCE_DB';
+const IDB_STORE = 'ams_store';
+const IDB_VERSION = 1;
+
+function openIdb(): Promise<IDBDatabase | null> {
+  if (typeof window === 'undefined' || !window.indexedDB) {
+    return Promise.resolve(null);
+  }
+  return new Promise((resolve) => {
+    try {
+      const request = indexedDB.open(IDB_NAME, IDB_VERSION);
+      request.onupgradeneeded = () => {
+        const db = request.result;
+        if (!db.objectStoreNames.contains(IDB_STORE)) {
+          db.createObjectStore(IDB_STORE);
+        }
+      };
+      request.onsuccess = () => resolve(request.result);
+      request.onerror = () => resolve(null);
+    } catch {
+      resolve(null);
+    }
+  });
+}
+
+export async function idbSet<T>(key: string, value: T): Promise<boolean> {
+  try {
+    const db = await openIdb();
+    if (!db) return false;
+    return new Promise((resolve) => {
+      const tx = db.transaction(IDB_STORE, 'readwrite');
+      const store = tx.objectStore(IDB_STORE);
+      store.put(value, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => resolve(false);
+    });
+  } catch {
+    return false;
+  }
+}
+
+export async function idbGet<T>(key: string, defaultValue: T): Promise<T> {
+  try {
+    const db = await openIdb();
+    if (!db) return defaultValue;
+    return new Promise((resolve) => {
+      const tx = db.transaction(IDB_STORE, 'readonly');
+      const store = tx.objectStore(IDB_STORE);
+      const req = store.get(key);
+      req.onsuccess = () => {
+        if (req.result !== undefined && req.result !== null) {
+          resolve(req.result as T);
+        } else {
+          resolve(defaultValue);
+        }
+      };
+      req.onerror = () => resolve(defaultValue);
+    });
+  } catch {
+    return defaultValue;
+  }
+}
 
 // Clean up duplicate legacy keys on module load to free quota space
 export function cleanupLegacyStorage() {
@@ -31,6 +168,18 @@ export function cleanupLegacyStorage() {
         // ignore
       }
     });
+
+    // Purge previous sample reference punches and demo dataset from storage
+    const savedDataset = localStorage.getItem('ams_active_dataset');
+    if (
+      savedDataset &&
+      (savedDataset.includes('AttendanceRecord_0 (56).xls') ||
+        savedDataset.includes('2026/07/01-2026/07/31'))
+    ) {
+      localStorage.removeItem('ams_active_dataset');
+      localStorage.removeItem('ams_historical_periods');
+      localStorage.removeItem('ams_selected_period_id');
+    }
   } catch (e) {
     console.warn('Could not cleanup legacy storage', e);
   }
@@ -50,8 +199,13 @@ export function getStorageItem<T>(key: string, defaultValue: T): T {
   }
 }
 
-// Safely save item with QuotaExceeded recovery and Electron SQLite synchronization
+// Safely save item with QuotaExceeded recovery, IndexedDB backing, and Electron SQLite synchronization
 export function saveStorageItem<T>(key: string, value: T): boolean {
+  // Sync heavy data with IndexedDB asynchronously so it is NEVER lost even if localStorage is full
+  if (key === STORAGE_KEYS.ACTIVE_DATASET || key === STORAGE_KEYS.HISTORICAL_PERIODS) {
+    idbSet(key, value).catch(() => {});
+  }
+
   // Sync with Electron SQLite database if running in desktop shell
   if (typeof window !== 'undefined' && window.electronAPI && window.electronAPI.isElectron) {
     try {
@@ -87,17 +241,21 @@ export function saveStorageItem<T>(key: string, value: T): boolean {
   } catch (e: any) {
     console.warn(`Quota or storage error writing key "${key}". Attempting cleanup...`, e);
 
-    // If quota exceeded, remove heavy dataset cache and retry saving
+    // Save heavy dataset to IndexedDB first
+    if (key === STORAGE_KEYS.ACTIVE_DATASET || key === STORAGE_KEYS.HISTORICAL_PERIODS) {
+      idbSet(key, value);
+    }
+
     try {
-      localStorage.removeItem(STORAGE_KEYS.HISTORICAL_PERIODS);
-      localStorage.removeItem(STORAGE_KEYS.ACTIVE_DATASET);
       cleanupLegacyStorage();
       const serialized = JSON.stringify(value);
       localStorage.setItem(key, serialized);
       return true;
     } catch (retryError) {
-      console.error(`Critical: Unable to save key "${key}" even after cleanup:`, retryError);
-      return false;
+      // If still exceeding quota, make sure key is preserved in IndexedDB
+      idbSet(key, value);
+      console.warn(`Saved key "${key}" to IndexedDB due to localStorage quota limit.`);
+      return true;
     }
   }
 }
@@ -115,7 +273,6 @@ export function saveCompactHistoricalPeriods(periods: HistoricalPeriodRecord[]) 
       importedAt: p.importedAt,
       employeeCount: p.employeeCount,
       dataset: p.dataset,
-      // Omit bulky dailyRecords and monthlySummary - they are computed dynamically on the fly!
     }));
     saveStorageItem(STORAGE_KEYS.HISTORICAL_PERIODS, compact);
   } catch (e) {
@@ -123,47 +280,76 @@ export function saveCompactHistoricalPeriods(periods: HistoricalPeriodRecord[]) 
   }
 }
 
-// Export backup payload
-export interface AppBackupPayload {
-  version: string;
-  exportedAt: string;
-  settings: AppSettings;
-  schedules: WorkSchedule[];
-  employees: Employee[];
-  manualAdjustments: Record<string, ManualAdjustment>;
-  paidVacations?: PaidVacation[];
-}
-
-export function exportBackupToFile(
-  settings: AppSettings,
-  schedules: WorkSchedule[],
-  employees: Employee[],
-  manualAdjustments: Record<string, ManualAdjustment>,
-  paidVacations?: PaidVacation[]
-) {
-  const payload: AppBackupPayload = {
-    version: '2.0',
-    exportedAt: new Date().toISOString(),
-    settings,
-    schedules,
-    employees,
-    manualAdjustments,
-    paidVacations,
-  };
-
+/**
+ * Export full work progress snapshot to JSON file (handles everything: dataset, adjustments, checked boxes, schedules, filters, tabs)
+ */
+export function exportProgressToFile(snapshot: AppProgressSnapshot) {
   const jsonString = `data:text/json;charset=utf-8,${encodeURIComponent(
-    JSON.stringify(payload, null, 2)
+    JSON.stringify(snapshot, null, 2)
   )}`;
   const downloadAnchor = document.createElement('a');
   downloadAnchor.setAttribute('href', jsonString);
-  const dateStr = new Date().toISOString().slice(0, 10);
-  downloadAnchor.setAttribute('download', `Attendance_Settings_Backup_${dateStr}.json`);
+  const now = new Date();
+  const dateStr = now.toISOString().slice(0, 10);
+  const timeStr = `${now.getHours().toString().padStart(2, '0')}${now.getMinutes().toString().padStart(2, '0')}`;
+  downloadAnchor.setAttribute('download', `Attendance_Work_Progress_${dateStr}_${timeStr}.json`);
   document.body.appendChild(downloadAnchor);
   downloadAnchor.click();
   downloadAnchor.remove();
 }
 
-export function parseBackupFile(file: File): Promise<AppBackupPayload> {
+/**
+ * Legacy export backup compatibility wrapper
+ */
+export function exportBackupToFile(
+  settings: AppSettings,
+  schedules: WorkSchedule[],
+  employees: Employee[],
+  manualAdjustments: Record<string, ManualAdjustment>,
+  paidVacations?: PaidVacation[],
+  activeDataset?: RawAttendanceDataset | null,
+  historicalPeriods?: HistoricalPeriodRecord[]
+) {
+  const dailyFilters = getStorageItem<SavedDailyFilters | undefined>(STORAGE_KEYS.DAILY_FILTERS, undefined);
+  const monthlyFilters = getStorageItem<SavedMonthlyFilters | undefined>(STORAGE_KEYS.MONTHLY_FILTERS, undefined);
+  const employeesFilters = getStorageItem<SavedEmployeesFilters | undefined>(STORAGE_KEYS.EMPLOYEES_FILTERS, undefined);
+  const schedulesFilter = getStorageItem<'all' | 'weekday' | 'saturday' | undefined>(STORAGE_KEYS.SCHEDULES_FILTER, undefined);
+  const activeTab = getStorageItem<any>(STORAGE_KEYS.ACTIVE_TAB, 'daily');
+  const selectedPeriodId = getStorageItem<string>(STORAGE_KEYS.SELECTED_PERIOD_ID, '2026-07');
+
+  const snapshot: AppProgressSnapshot = {
+    type: 'AMS_PROGRESS_SNAPSHOT',
+    version: '3.0',
+    exportedAt: new Date().toISOString(),
+    activeTab,
+    selectedPeriodId,
+    activeDataset: activeDataset || getStorageItem(STORAGE_KEYS.ACTIVE_DATASET, null),
+    historicalPeriods: historicalPeriods || getStorageItem(STORAGE_KEYS.HISTORICAL_PERIODS, []),
+    settings,
+    schedules,
+    employees,
+    manualAdjustments,
+    paidVacations: paidVacations || [],
+    dailyFilters,
+    monthlyFilters,
+    employeesFilters,
+    schedulesFilter,
+    summary: {
+      totalEmployees: employees.length,
+      adjustmentsCount: Object.keys(manualAdjustments).length,
+      exactPunchCount: Object.values(manualAdjustments).filter((a) => a.exactPunchOnly).length,
+      schedulesCount: schedules.length,
+      vacationsCount: paidVacations ? paidVacations.length : 0,
+    },
+  };
+
+  exportProgressToFile(snapshot);
+}
+
+/**
+ * Parses and validates a progress snapshot or backup file
+ */
+export function parseProgressFile(file: File): Promise<AppProgressSnapshot> {
   return new Promise((resolve, reject) => {
     const reader = new FileReader();
     reader.onload = (event) => {
@@ -171,12 +357,34 @@ export function parseBackupFile(file: File): Promise<AppBackupPayload> {
         const text = event.target?.result as string;
         const parsed = JSON.parse(text);
         if (!parsed || typeof parsed !== 'object') {
-          throw new Error('Invalid JSON format');
+          throw new Error('Invalid JSON format in progress file');
         }
-        if (!Array.isArray(parsed.schedules) && !parsed.settings) {
-          throw new Error('Backup file does not contain valid settings or schedules');
+        if (!Array.isArray(parsed.schedules) && !parsed.settings && !parsed.manualAdjustments) {
+          throw new Error('File does not contain valid Attendance Management progress data');
         }
-        resolve(parsed);
+
+        const snapshot: AppProgressSnapshot = {
+          type: 'AMS_PROGRESS_SNAPSHOT',
+          version: parsed.version || '3.0',
+          exportedAt: parsed.exportedAt || new Date().toISOString(),
+          activeTab: parsed.activeTab || 'daily',
+          selectedPeriodId: parsed.selectedPeriodId,
+          activeDataset: parsed.activeDataset,
+          historicalPeriods: parsed.historicalPeriods,
+          settings: parsed.settings,
+          schedules: parsed.schedules || [],
+          employees: parsed.employees || [],
+          manualAdjustments: parsed.manualAdjustments || {},
+          paidVacations: parsed.paidVacations || [],
+          auditLogs: parsed.auditLogs || [],
+          dailyFilters: parsed.dailyFilters,
+          monthlyFilters: parsed.monthlyFilters,
+          employeesFilters: parsed.employeesFilters,
+          schedulesFilter: parsed.schedulesFilter,
+          summary: parsed.summary,
+        };
+
+        resolve(snapshot);
       } catch (err) {
         reject(err);
       }
@@ -185,3 +393,8 @@ export function parseBackupFile(file: File): Promise<AppBackupPayload> {
     reader.readAsText(file);
   });
 }
+
+export function parseBackupFile(file: File): Promise<AppProgressSnapshot> {
+  return parseProgressFile(file);
+}
+

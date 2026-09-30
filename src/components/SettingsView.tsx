@@ -515,23 +515,27 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
           </div>
         </div>
 
-        {/* Backup & Export Controls */}
+        {/* Work Progress & Backup Transfer Controls */}
         <div className="mt-5 pt-4 border-t border-slate-100 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
           <div>
-            <span className="text-xs font-semibold text-slate-800 block">Configuration Backup & Transfer</span>
-            <span className="text-[11px] text-slate-400 block">
-              Download your custom schedules, grace settings, and employee assignments as a JSON file to transfer or keep safe offline.
+            <span className="text-xs font-bold text-slate-800 block flex items-center gap-1.5">
+              <Save className="h-3.5 w-3.5 text-emerald-600" />
+              {t.progressSessionTitle}
+            </span>
+            <span className="text-[11px] text-slate-500 block mt-0.5">
+              {t.progressSessionDesc}
             </span>
           </div>
           <div className="flex items-center gap-2">
             {onExportBackup && (
               <button
                 type="button"
+                id="settings-export-progress-btn"
                 onClick={onExportBackup}
-                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-200 bg-white px-3.5 py-1.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors shadow-2xs"
-                title={t.exportBackup}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-emerald-300 bg-emerald-50 px-3.5 py-1.5 text-xs font-semibold text-emerald-800 hover:bg-emerald-100 transition-colors shadow-2xs"
+                title={t.saveProgressTooltip}
               >
-                <Download className="h-3.5 w-3.5 text-slate-500" /> {t.exportBackup}
+                <Save className="h-3.5 w-3.5 text-emerald-600" /> {t.saveProgress}
               </button>
             )}
 
@@ -552,11 +556,12 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 />
                 <button
                   type="button"
+                  id="settings-import-progress-btn"
                   onClick={() => fileInputRef.current?.click()}
                   className="inline-flex items-center gap-1.5 rounded-xl border border-indigo-200 bg-indigo-50 px-3.5 py-1.5 text-xs font-semibold text-indigo-700 hover:bg-indigo-100 transition-colors"
-                  title={t.importBackup}
+                  title={t.importProgressTooltip}
                 >
-                  <Upload className="h-3.5 w-3.5 text-indigo-600" /> {t.importBackup}
+                  <Upload className="h-3.5 w-3.5 text-indigo-600" /> {t.importProgress}
                 </button>
               </>
             )}

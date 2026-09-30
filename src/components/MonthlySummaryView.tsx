@@ -1,4 +1,4 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import { MonthlySummaryRecord, DailyAttendanceRecord, AppSettings } from '../types';
 import {
   Search,
@@ -22,6 +22,17 @@ import {
 } from 'lucide-react';
 import { generateMonthlySummaryFromDailyRecords } from '../utils/calculator';
 import { getTranslations, translateShiftName } from '../utils/i18n';
+import { getStorageItem, saveStorageItem } from '../utils/storage';
+
+interface SavedMonthlyFilters {
+  searchTerm?: string;
+  selectedGroup?: string;
+  excludeArchived?: boolean;
+  punchFilter?: 'ALL' | 'ACTIVE_ONLY' | 'ZERO_PUNCHES_ONLY';
+  startDate?: string;
+  endDate?: string;
+  page?: number;
+}
 
 interface MonthlySummaryViewProps {
   summaries: MonthlySummaryRecord[];
@@ -53,12 +64,46 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
   onSelectEmployeeForDaily,
 }) => {
   const t = getTranslations(settings.language);
-  const [searchTerm, setSearchTerm] = useState('');
-  const [selectedGroup, setSelectedGroup] = useState('ALL');
-  const [excludeArchived, setExcludeArchived] = useState(true);
-  const [punchFilter, setPunchFilter] = useState<'ALL' | 'ACTIVE_ONLY' | 'ZERO_PUNCHES_ONLY'>('ALL');
-  const [startDate, setStartDate] = useState('');
-  const [endDate, setEndDate] = useState('');
+  const [savedFilters] = useState<SavedMonthlyFilters | null>(() =>
+    getStorageItem<SavedMonthlyFilters | null>('ams_monthly_filters', null)
+  );
+  const [searchTerm, setSearchTerm] = useState(savedFilters?.searchTerm ?? '');
+  const [selectedGroup, setSelectedGroup] = useState(savedFilters?.selectedGroup ?? 'ALL');
+  const [excludeArchived, setExcludeArchived] = useState(savedFilters?.excludeArchived ?? true);
+  const [punchFilter, setPunchFilter] = useState<'ALL' | 'ACTIVE_ONLY' | 'ZERO_PUNCHES_ONLY'>(
+    savedFilters?.punchFilter ?? 'ALL'
+  );
+  const [startDate, setStartDate] = useState(savedFilters?.startDate ?? '');
+  const [endDate, setEndDate] = useState(savedFilters?.endDate ?? '');
+
+  // Persist monthly filters to localStorage in real time
+  useEffect(() => {
+    saveStorageItem('ams_monthly_filters', {
+      searchTerm,
+      selectedGroup,
+      excludeArchived,
+      punchFilter,
+      startDate,
+      endDate,
+    });
+  }, [searchTerm, selectedGroup, excludeArchived, punchFilter, startDate, endDate]);
+
+  // Listen for progress restored event to update active filters in real-time
+  useEffect(() => {
+    const handleProgressRestored = () => {
+      const restored = getStorageItem<SavedMonthlyFilters | null>('ams_monthly_filters', null);
+      if (restored) {
+        if (restored.searchTerm !== undefined) setSearchTerm(restored.searchTerm);
+        if (restored.selectedGroup !== undefined) setSelectedGroup(restored.selectedGroup);
+        if (restored.excludeArchived !== undefined) setExcludeArchived(restored.excludeArchived);
+        if (restored.punchFilter !== undefined) setPunchFilter(restored.punchFilter);
+        if (restored.startDate !== undefined) setStartDate(restored.startDate);
+        if (restored.endDate !== undefined) setEndDate(restored.endDate);
+      }
+    };
+    window.addEventListener('ams_progress_restored', handleProgressRestored);
+    return () => window.removeEventListener('ams_progress_restored', handleProgressRestored);
+  }, []);
 
   // Extract unique sorted dates from dailyRecords if available
   const dateOptions = useMemo(() => {
@@ -615,30 +660,50 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
       {/* Suggested Columns Table (PRD Section 23) */}
       <div className="rounded-2xl border border-slate-200 bg-white shadow-xs overflow-hidden">
         <div className="overflow-x-auto">
-          <table className="w-full text-left border-collapse text-xs">
+          <table className="w-full text-left border-collapse text-xs table-auto">
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold">
-                <th className="py-3 px-3">{t.colName}</th>
-                <th className="py-3 px-3 font-mono">{t.colId}</th>
-                <th className="py-3 px-3">{t.colDept}</th>
-                <th className="py-3 px-3">{t.groupSchedule}</th>
-                <th className="py-3 px-3 text-center">{t.colPresentDays}</th>
-                <th className="py-3 px-3 text-center text-teal-800">{t.colVacationDays}</th>
-                <th className="py-3 px-3 text-center">{t.colAbsentDays}</th>
-                <th className="py-3 px-3 text-center">{t.colOffDays}</th>
-                <th className="py-3 px-3 text-center">{t.colTotalWorked}</th>
-                <th className="py-3 px-3 text-center font-bold text-indigo-700">{t.colTotalSupp}</th>
-                <th className="py-3 px-3 text-center">{t.colLateDays}</th>
-                <th className="py-3 px-3 text-center">{t.colTotalLate}</th>
-                <th className="py-3 px-3 text-center">{t.colMissingPunches}</th>
-                <th className="py-3 px-3 text-center">{t.colActions}</th>
+                <th className="py-3 px-3 whitespace-nowrap">{t.colName}</th>
+                <th className="py-3 px-3 font-mono whitespace-nowrap">{t.colId}</th>
+                <th className="py-3 px-3 whitespace-nowrap">{t.colDept}</th>
+                <th className="py-3 px-3 whitespace-nowrap">{t.groupSchedule}</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">{t.colPresentDays}</th>
+                <th className="py-3 px-3 text-center text-teal-800 whitespace-nowrap">{t.colVacationDays}</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">{t.colAbsentDays}</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">{t.colOffDays}</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">{t.colTotalWorked}</th>
+                <th className="py-3 px-3 text-center font-bold text-indigo-700 whitespace-nowrap">{t.colTotalSupp}</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">{t.colLateDays}</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">{t.colTotalLate}</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">{t.colMissingPunches}</th>
+                <th className="py-3 px-3 text-center whitespace-nowrap">{t.colActions}</th>
               </tr>
             </thead>
             <tbody className="divide-y divide-slate-100">
               {filteredSummaries.length === 0 ? (
                 <tr>
-                  <td colSpan={14} className="py-12 text-center text-slate-400">
-                    No matching monthly summary data found.
+                  <td colSpan={14} className="py-16 text-center text-slate-400">
+                    <div className="flex flex-col items-center justify-center gap-2">
+                      <Users className="h-8 w-8 text-slate-300" />
+                      <p className="font-semibold text-slate-700 text-sm">
+                        {summaries.length === 0
+                          ? settings.language === 'ar'
+                            ? 'لا يوجد ملخص شهري متاح حالياً'
+                            : settings.language === 'en'
+                            ? 'No Monthly Summary Data Available'
+                            : 'Aucun récapitulatif mensuel disponible'
+                          : 'No matching monthly summary data found.'}
+                      </p>
+                      <p className="text-xs text-slate-400 max-w-md">
+                        {summaries.length === 0
+                          ? settings.language === 'ar'
+                            ? 'سيتم احتساب الملخص الشهري وإحصائيات العمل فور استيراد ملف الحضور.'
+                            : settings.language === 'en'
+                            ? 'Monthly summary and work statistics will be generated automatically once an attendance file is imported.'
+                            : 'Le récapitulatif mensuel sera généré dès qu’un fichier d’émargement sera importé.'
+                          : ''}
+                      </p>
+                    </div>
                   </td>
                 </tr>
               ) : (

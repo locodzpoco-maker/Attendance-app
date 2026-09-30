@@ -112,16 +112,16 @@ export const STOCK_SHIFT_SATURDAY: WorkSchedule = {
 
 export const ADMIN_SHIFT_SATURDAY: WorkSchedule = {
   id: 'admin_sat',
-  name: 'Admin Samedi (08:30 - 17:00)',
+  name: 'Admin Samedi (09:00 - 17:00)',
   groupName: 'Admin Shift Samedi',
   department: 'Administration',
-  startTime: '08:30',
+  startTime: '09:00',
   endTime: '17:00',
   crossesMidnight: false,
   hasBreak: true,
-  breakStart: '12:30',
+  breakStart: '13:00',
   breakEnd: '14:00',
-  breakDurationMinutes: 90,
+  breakDurationMinutes: 60,
   overtimeAllowed: false,
   normalWorkedHours: 7.0,
   workingDays: ['Saturday'],
@@ -221,7 +221,8 @@ export interface DetectedShiftResult {
 export function detectStockShift(
   firstCheckInTime: string | null,
   dayOfWeek?: DayOfWeek,
-  hasSaturdayShift?: boolean
+  hasSaturdayShift?: boolean,
+  customStockSatSchedule?: WorkSchedule | null
 ): DetectedShiftResult {
   if (!firstCheckInTime) {
     return {
@@ -245,15 +246,19 @@ export function detectStockShift(
   }
 
   // SATURDAY SPECIFIC AUTO-DETECTION:
-  // Saturday shift (10:00 - 17:00) ONLY activates on Saturdays, and only for designated workers!
+  // Saturday shift ONLY activates on Saturdays, and only for designated workers!
   if (dayOfWeek === 'Saturday') {
     if (hasSaturdayShift) {
-      // Check-in around 10:00 (Window: 08:00 to 13:00)
-      if (mins >= 480 && mins <= 780) {
+      const satSchedule = customStockSatSchedule || STOCK_SHIFT_SATURDAY;
+      const targetStartMins = parseTimeToMinutes(satSchedule.startTime || '10:00');
+      // Dynamic detection window: up to 2 hours before target start, and up to 3 hours after target start
+      const windowStart = Math.max(360, targetStartMins - 120);
+      const windowEnd = Math.min(1080, targetStartMins + 180);
+      if (mins >= windowStart && mins <= windowEnd) {
         return {
-          schedule: STOCK_SHIFT_SATURDAY,
-          shiftId: 'stock_sat',
-          shiftName: 'Shift Samedi',
+          schedule: satSchedule,
+          shiftId: satSchedule.id,
+          shiftName: satSchedule.name.split(' (')[0] || 'Shift Samedi',
           isUnclear: false,
         };
       }

@@ -145,17 +145,17 @@ export function generateReferenceDataset(): RawAttendanceDataset {
         continue;
       }
 
-      // Saturday (6): ONLY Admin workers assigned to Saturday shift have punches (08:30 - 17:00, Break 12:30 - 14:00)
+      // Saturday (6): ONLY Admin workers assigned to Saturday shift have punches (09:00 - 17:00, Break 13:00 - 14:00)
       if (dayOfWeek === 6) {
         if (isSaturdayWorker(worker.id)) {
-          const inMin = 24 + ((d + idx) % 5); // 08:24 to 08:28
+          const inMin = 54 + ((d + idx) % 5); // 08:54 to 08:58
           const inStr = `08:${inMin}`;
           const outStr = (d + idx) % 3 === 0 ? "17:15" : "17:02";
           days[d] = {
             dayNumber: d,
             dateStr: dStr(d),
-            rawPunchesText: `${inStr}\n12:30\n14:00\n${outStr}`,
-            rawPunches: [inStr, "12:30", "14:00", outStr],
+            rawPunchesText: `${inStr}\n13:00\n14:00\n${outStr}`,
+            rawPunches: [inStr, "13:00", "14:00", outStr],
           };
         } else {
           // Off on Saturday

@@ -96,7 +96,7 @@ export interface ManualAdjustment {
   adjustedExit?: string;
   overrideShiftId?: string; // e.g. "stock_g1", "stock_g2", "stock_g3", "stock_g4"
   injectedSuppMinutes?: number; // additional/injected overtime minutes for this worker on this day
-  exactPunchOnly?: boolean; // When true: only count between check-in and check-out, ignoring late arrival and early departure for this day
+  exactPunchOnly?: boolean; // When true: ignores late arrival, 2nd check-in delay, early exit, and does not include/deduct rest time for this day
   reason: string;
   adjustedBy: string;
   adjustedAt: string;
@@ -134,8 +134,8 @@ export interface DailyAttendanceRecord {
   // Manual Adjustment (if any)
   manualAdjustment?: ManualAdjustment;
   isManuallyAdjusted: boolean;
-  exactPunchOnly?: boolean; // When true: only counts time between checkins and checkouts, ignoring late and early exit
-
+  exactPunchOnly?: boolean; // When true: counts time between check-in and check-out without rest time deduction, ignoring late and early exit
+  
   // Calculated figures
   firstCheckInDelayMinutes: number; // delay on shift entry past grace
   secondCheckInDelayMinutes: number; // delay on 2nd check-in (after break) past grace for admin workers (excludes 10m grace)

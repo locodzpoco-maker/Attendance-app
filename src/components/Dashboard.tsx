@@ -110,28 +110,51 @@ export const Dashboard: React.FC<DashboardProps> = ({
               <span className="text-xs text-slate-400 font-medium">{t.authoritativeDate}</span>
             </div>
             <h2 className="mt-1 text-2xl font-extrabold text-slate-900 tracking-tight">
-              {dataset?.madeDateRaw || 'Attendance Period: July 2026'}
+              {dataset?.madeDateRaw ||
+                (settings.language === 'ar'
+                  ? 'لا توجد بيانات حضور محملة'
+                  : settings.language === 'en'
+                  ? 'No Attendance Data Loaded'
+                  : 'Aucune donnée de présence chargée')}
             </h2>
             <p className="mt-1 text-xs text-slate-500">
-              Source: <span className="font-mono text-slate-700">{dataset?.fileName || 'AttendanceRecord_0 (56).xls'}</span> • Sheet: <span className="font-semibold text-slate-700">{dataset?.sheetName || 'Attendance Record'}</span> • {dataset?.totalDays || 31} calendar days processed
+              {dataset ? (
+                <>
+                  Source: <span className="font-mono text-slate-700">{dataset.fileName}</span> • Sheet:{' '}
+                  <span className="font-semibold text-slate-700">{dataset.sheetName}</span> •{' '}
+                  {dataset.totalDays} calendar days processed
+                </>
+              ) : (
+                settings.language === 'ar'
+                  ? 'قم باستيراد ملف البصمة البيومترية (.xls أو .xlsx) لحساب الحضور وساعات العمل والورديات.'
+                  : settings.language === 'en'
+                  ? 'Import your biometric fingerprint file (.xls or .xlsx) to calculate punches, attendance, and work hours.'
+                  : 'Veuillez importer votre fichier d’émargement biométrique (.xls ou .xlsx) pour calculer les présences et les horaires.'
+              )}
             </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-2.5">
-            <button
-              id="dash-calculate-btn"
-              onClick={onCalculate}
-              className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-colors"
-            >
-              <Sparkles className="h-4 w-4" />
-              {t.recalculateEntirePeriod}
-            </button>
+            {dataset && (
+              <button
+                id="dash-calculate-btn"
+                onClick={onCalculate}
+                className="inline-flex items-center gap-2 rounded-xl bg-indigo-600 px-4 py-2.5 text-xs font-bold text-white shadow-xs hover:bg-indigo-700 transition-colors"
+              >
+                <Sparkles className="h-4 w-4" />
+                {t.recalculateEntirePeriod}
+              </button>
+            )}
             <button
               id="dash-import-btn"
               onClick={onOpenImport}
-              className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white px-3.5 py-2.5 text-xs font-semibold text-slate-700 hover:bg-slate-50 transition-colors"
+              className={`inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all shadow-xs ${
+                dataset
+                  ? 'border border-slate-300 bg-white text-slate-700 hover:bg-slate-50'
+                  : 'bg-indigo-600 hover:bg-indigo-700 text-white ring-2 ring-indigo-600/30'
+              }`}
             >
-              <FileSpreadsheet className="h-4 w-4 text-slate-500" />
+              <FileSpreadsheet className="h-4 w-4" />
               {t.importNewFile}
             </button>
           </div>

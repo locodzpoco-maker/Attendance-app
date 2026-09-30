@@ -1,8 +1,9 @@
-import React, { useState, useRef } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { WorkSchedule, DayOfWeek, AppSettings } from '../types';
-import { DAYS_OF_WEEK } from '../utils/schedules';
-import { Clock, Plus, Edit2, Sun, Moon, Trash2, RotateCcw, CheckCircle2, Download, Upload } from 'lucide-react';
+import { DAYS_OF_WEEK, parseTimeToMinutes } from '../utils/schedules';
+import { Clock, Plus, Edit2, Sun, Moon, Trash2, RotateCcw, CheckCircle2, Download, Upload, Calendar } from 'lucide-react';
 import { getTranslations, translateDayOfWeek, translateShiftName } from '../utils/i18n';
+import { getStorageItem, saveStorageItem } from '../utils/storage';
 
 interface SchedulesViewProps {
   schedules: WorkSchedule[];
@@ -31,6 +32,25 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   const [editingSchedule, setEditingSchedule] = useState<WorkSchedule | null>(null);
   const [modalOpen, setModalOpen] = useState(false);
   const [justSaved, setJustSaved] = useState(false);
+  const [filterCategory, setFilterCategory] = useState<'all' | 'weekday' | 'saturday'>(() =>
+    getStorageItem<'all' | 'weekday' | 'saturday'>('ams_schedules_filter', 'all')
+  );
+
+  useEffect(() => {
+    saveStorageItem('ams_schedules_filter', filterCategory);
+  }, [filterCategory]);
+
+  // Listen for progress restored event
+  useEffect(() => {
+    const handleProgressRestored = () => {
+      const restored = getStorageItem<'all' | 'weekday' | 'saturday' | null>('ams_schedules_filter', null);
+      if (restored) {
+        setFilterCategory(restored);
+      }
+    };
+    window.addEventListener('ams_progress_restored', handleProgressRestored);
+    return () => window.removeEventListener('ams_progress_restored', handleProgressRestored);
+  }, []);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   // Form states
@@ -58,6 +78,47 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
   const [breakGraceMinutes, setBreakGraceMinutes] = useState(10);
   const [earlyExitGraceMinutes, setEarlyExitGraceMinutes] = useState(5);
   const [overtimeGraceMinutes, setOvertimeGraceMinutes] = useState(15);
+
+  const isSaturdaySchedule = (s: WorkSchedule) =>
+    s.id === 'admin_sat' ||
+    s.id === 'stock_sat' ||
+    s.groupName.toLowerCase().includes('samedi') ||
+    s.groupName.toLowerCase().includes('saturday') ||
+    (s.workingDays.length === 1 && s.workingDays.includes('Saturday'));
+
+  const saturdayCount = schedules.filter(isSaturdaySchedule).length;
+  const weekdayCount = schedules.filter((s) => !isSaturdaySchedule(s)).length;
+
+  const displayedSchedules = schedules.filter((s) => {
+    if (filterCategory === 'saturday') return isSaturdaySchedule(s);
+    if (filterCategory === 'weekday') return !isSaturdaySchedule(s);
+    return true;
+  });
+
+  const handleStartTimeChange = (val: string) => {
+    setStartTime(val);
+    if (editingSchedule && isSaturdaySchedule(editingSchedule)) {
+      const base = editingSchedule.id === 'admin_sat' ? 'Admin Samedi' : 'Shift Samedi';
+      setName(`${base} (${val} - ${endTime})`);
+    }
+  };
+
+  const handleEndTimeChange = (val: string) => {
+    setEndTime(val);
+    if (editingSchedule && isSaturdaySchedule(editingSchedule)) {
+      const base = editingSchedule.id === 'admin_sat' ? 'Admin Samedi' : 'Shift Samedi';
+      setName(`${base} (${startTime} - ${val})`);
+    }
+  };
+
+  const calculateSuggestedHours = () => {
+    const startM = parseTimeToMinutes(startTime);
+    let endM = parseTimeToMinutes(endTime);
+    if (crossesMidnight || endM < startM) endM += 24 * 60;
+    const breakM = hasBreak ? breakDurationMinutes : 0;
+    const dur = Math.max(0, endM - startM - breakM);
+    setNormalWorkedHours(Number((dur / 60).toFixed(1)));
+  };
 
   const openAdd = () => {
     setEditingSchedule(null);
@@ -248,139 +309,232 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
         )}
       </div>
 
+      {/* Category Filter Tabs */}
+      <div className="flex flex-wrap items-center gap-2">
+        <button
+          type="button"
+          onClick={() => setFilterCategory('all')}
+          className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+            filterCategory === 'all'
+              ? 'bg-slate-900 text-white shadow-2xs'
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          {t.allSchedules} ({schedules.length})
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterCategory('saturday')}
+          className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold flex items-center gap-1.5 transition-colors ${
+            filterCategory === 'saturday'
+              ? 'bg-teal-700 text-white shadow-2xs ring-2 ring-teal-500/30'
+              : 'bg-teal-50/80 border border-teal-200 text-teal-800 hover:bg-teal-100'
+          }`}
+        >
+          <span>📅</span>
+          <span>{t.saturdayShifts} ({saturdayCount})</span>
+        </button>
+
+        <button
+          type="button"
+          onClick={() => setFilterCategory('weekday')}
+          className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-colors ${
+            filterCategory === 'weekday'
+              ? 'bg-slate-900 text-white shadow-2xs'
+              : 'bg-white border border-slate-200 text-slate-600 hover:bg-slate-50'
+          }`}
+        >
+          {t.weekdayShifts} ({weekdayCount})
+        </button>
+      </div>
+
       {/* Grid of Schedules */}
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
-        {schedules.map((s) => (
-          <div
-            key={s.id}
-            className="rounded-2xl border border-slate-200 bg-white p-5 shadow-xs flex flex-col justify-between hover:border-slate-300 transition-all"
-          >
-            <div>
-              <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100">
-                <div>
-                  <div className="flex items-center gap-1.5">
-                    <span className="font-bold text-slate-900 text-sm">{translateShiftName(s.groupName, settings?.language) || s.groupName}</span>
-                    {s.crossesMidnight ? (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
-                        <Moon className="h-3 w-3" /> {t.nightShift}
+        {displayedSchedules.map((s) => {
+          const isSat = isSaturdaySchedule(s);
+          return (
+            <div
+              key={s.id}
+              className={`rounded-2xl border bg-white p-5 shadow-xs flex flex-col justify-between transition-all ${
+                isSat
+                  ? 'border-teal-300 ring-1 ring-teal-500/20 hover:border-teal-400 hover:shadow-sm'
+                  : 'border-slate-200 hover:border-slate-300'
+              }`}
+            >
+              <div>
+                <div className="flex items-start justify-between gap-2 pb-3 border-b border-slate-100">
+                  <div>
+                    <div className="flex items-center gap-1.5 flex-wrap">
+                      <span className="font-bold text-slate-900 text-sm">
+                        {translateShiftName(s.groupName, settings?.language) || s.groupName}
                       </span>
-                    ) : (
-                      <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
-                        <Sun className="h-3 w-3" /> {t.dayShift}
-                      </span>
+                      {isSat && (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-teal-50 border border-teal-200 px-2 py-0.5 text-[10px] font-bold text-teal-800">
+                          <span>📅</span> {t.shiftSatLabel}
+                        </span>
+                      )}
+                      {s.crossesMidnight ? (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-700">
+                          <Moon className="h-3 w-3" /> {t.nightShift}
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-0.5 rounded-full bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-700">
+                          <Sun className="h-3 w-3" /> {t.dayShift}
+                        </span>
+                      )}
+                    </div>
+                    <p className="text-[11px] text-slate-400 mt-0.5">{s.department}</p>
+                  </div>
+
+                  <div className="flex items-center gap-1">
+                    {canEdit && (
+                      <button
+                        onClick={() => openEdit(s)}
+                        className={`rounded-lg p-1.5 transition-colors ${
+                          isSat
+                            ? 'text-teal-700 hover:bg-teal-50 hover:text-teal-900'
+                            : 'text-slate-400 hover:bg-slate-100 hover:text-indigo-600'
+                        }`}
+                        title={isSat ? t.editSaturdayShift : t.editSchedule}
+                      >
+                        <Edit2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+
+                    {canEdit && onDeleteSchedule && schedules.length > 1 && !isSat && (
+                      <button
+                        onClick={() => handleDelete(s)}
+                        className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                        title={t.deleteSchedule}
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
                     )}
                   </div>
-                  <p className="text-[11px] text-slate-400 mt-0.5">{s.department}</p>
                 </div>
 
-                <div className="flex items-center gap-1">
-                  {canEdit && (
-                    <button
-                      onClick={() => openEdit(s)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-slate-100 hover:text-indigo-600 transition-colors"
-                      title={t.editSchedule}
-                    >
-                      <Edit2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
+                {/* Schedule details */}
+                <div className="mt-3.5 space-y-2 text-xs">
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">{t.startTime} / {t.endTime}:</span>
+                    <span className="font-semibold text-slate-800">
+                      {s.startTime} → {s.endTime}
+                      {s.crossesMidnight && ` (${t.crossesMidnight})`}
+                    </span>
+                  </div>
 
-                  {canEdit && onDeleteSchedule && schedules.length > 1 && (
-                    <button
-                      onClick={() => handleDelete(s)}
-                      className="rounded-lg p-1.5 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
-                      title={t.deleteSchedule}
-                    >
-                      <Trash2 className="h-3.5 w-3.5" />
-                    </button>
-                  )}
-                </div>
-              </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">{t.hasBreak}:</span>
+                    <span className="font-medium text-slate-700">
+                      {s.hasBreak ? `${s.breakDurationMinutes} min (${s.breakStart} - ${s.breakEnd})` : '-'}
+                    </span>
+                  </div>
 
-              {/* Schedule details */}
-              <div className="mt-3.5 space-y-2 text-xs">
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">{t.startTime} / {t.endTime}:</span>
-                  <span className="font-semibold text-slate-800">
-                    {s.startTime} → {s.endTime}
-                    {s.crossesMidnight && ` (${t.crossesMidnight})`}
-                  </span>
-                </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">{t.normalHours}:</span>
+                    <span className="font-bold text-slate-900">{s.normalWorkedHours} h</span>
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">{t.hasBreak}:</span>
-                  <span className="font-medium text-slate-700">
-                    {s.hasBreak ? `${s.breakDurationMinutes} min (${s.breakStart} - ${s.breakEnd})` : '-'}
-                  </span>
-                </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">{t.overtimeStarts}:</span>
+                    <span className="font-medium text-indigo-700">
+                      {s.overtimeAllowed ? s.overtimeStartTime : '-'}
+                    </span>
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">{t.normalHours}:</span>
-                  <span className="font-bold text-slate-900">{s.normalWorkedHours} h</span>
-                </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">{t.arrivalGraceMinutesLabel} / {t.breakGraceMinutesLabel}:</span>
+                    <span className="font-semibold text-slate-800">
+                      {s.arrivalGraceMinutes ?? 10}m / {s.breakGraceMinutes ?? 10}m
+                    </span>
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">{t.overtimeStarts}:</span>
-                  <span className="font-medium text-indigo-700">
-                    {s.overtimeAllowed ? s.overtimeStartTime : '-'}
-                  </span>
-                </div>
+                  <div className="flex items-center justify-between">
+                    <span className="text-slate-500">{t.earlyExitGraceMinutesLabel} / {t.overtimeGraceMinutesLabel}:</span>
+                    <span className="font-semibold text-slate-800">
+                      {s.earlyExitGraceMinutes ?? 5}m / {s.overtimeGraceMinutes}m
+                    </span>
+                  </div>
 
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">{t.arrivalGraceMinutesLabel} / {t.breakGraceMinutesLabel}:</span>
-                  <span className="font-semibold text-slate-800">
-                    {s.arrivalGraceMinutes ?? 10}m / {s.breakGraceMinutes ?? 10}m
-                  </span>
-                </div>
-
-                <div className="flex items-center justify-between">
-                  <span className="text-slate-500">{t.earlyExitGraceMinutesLabel} / {t.overtimeGraceMinutesLabel}:</span>
-                  <span className="font-semibold text-slate-800">
-                    {s.earlyExitGraceMinutes ?? 5}m / {s.overtimeGraceMinutes}m
-                  </span>
-                </div>
-
-                {/* Working days pill list */}
-                <div className="pt-2 border-t border-slate-100">
-                  <span className="text-[11px] text-slate-400 block mb-1">{t.workingDaysLabel}:</span>
-                  <div className="flex flex-wrap gap-1">
-                    {DAYS_OF_WEEK.map((day) => {
-                      const isWorking = s.workingDays.includes(day);
-                      return (
-                        <span
-                          key={day}
-                          className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
-                            isWorking
-                              ? 'bg-slate-800 text-white'
-                              : 'bg-slate-100 text-slate-400 line-through'
-                          }`}
-                        >
-                          {translateDayOfWeek(day, settings?.language).slice(0, 3)}
-                        </span>
-                      );
-                    })}
+                  {/* Working days pill list */}
+                  <div className="pt-2 border-t border-slate-100">
+                    <span className="text-[11px] text-slate-400 block mb-1">{t.workingDaysLabel}:</span>
+                    <div className="flex flex-wrap gap-1">
+                      {DAYS_OF_WEEK.map((day) => {
+                        const isWorking = s.workingDays.includes(day);
+                        return (
+                          <span
+                            key={day}
+                            className={`rounded px-1.5 py-0.5 text-[10px] font-medium ${
+                              isWorking
+                                ? isSat && day === 'Saturday'
+                                  ? 'bg-teal-700 text-white font-semibold'
+                                  : 'bg-slate-800 text-white'
+                                : 'bg-slate-100 text-slate-400 line-through'
+                            }`}
+                          >
+                            {translateDayOfWeek(day, settings?.language).slice(0, 3)}
+                          </span>
+                        );
+                      })}
+                    </div>
                   </div>
                 </div>
               </div>
-            </div>
 
-            {/* Footer Summary Notice */}
-            <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
-              <span>{s.name}</span>
-              {s.overtimeAllowed && (
-                <span className="text-indigo-600 font-medium">+{t.overtimeAllowed}</span>
-              )}
+              {/* Footer Summary Notice */}
+              <div className="mt-4 pt-3 border-t border-slate-100 flex items-center justify-between text-[11px] text-slate-400">
+                <span className="font-mono text-slate-600 font-medium">{s.name}</span>
+                <div className="flex items-center gap-2">
+                  {canEdit && (
+                    <button
+                      type="button"
+                      onClick={() => openEdit(s)}
+                      className={`inline-flex items-center gap-1 rounded-lg px-2.5 py-1 text-[11px] font-semibold transition-colors ${
+                        isSat
+                          ? 'bg-teal-50 text-teal-800 hover:bg-teal-100 border border-teal-200'
+                          : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                      }`}
+                    >
+                      <Edit2 className="h-3 w-3" />
+                      {isSat ? t.editSaturdayShift : t.editSchedule}
+                    </button>
+                  )}
+                  {s.overtimeAllowed && (
+                    <span className="text-indigo-600 font-medium">+{t.overtimeAllowed}</span>
+                  )}
+                </div>
+              </div>
             </div>
-          </div>
-        ))}
+          );
+        })}
       </div>
 
       {/* Edit/Create Modal */}
       {modalOpen && (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-slate-900/50 backdrop-blur-xs p-4 overflow-y-auto">
           <div className="w-full max-w-lg rounded-2xl bg-white p-6 shadow-xl border border-slate-200 animate-in fade-in zoom-in-95 my-8">
-            <h3 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100">
-              {editingSchedule ? t.editSchedule : t.addNewSchedule}
+            <h3 className="text-base font-bold text-slate-900 mb-4 pb-2 border-b border-slate-100 flex items-center justify-between">
+              <span>{editingSchedule ? t.editSchedule : t.addNewSchedule}</span>
+              {editingSchedule && isSaturdaySchedule(editingSchedule) && (
+                <span className="text-xs bg-teal-50 border border-teal-200 text-teal-800 font-semibold px-2 py-0.5 rounded-full">
+                  📅 {t.shiftSatLabel}
+                </span>
+              )}
             </h3>
+
+            {editingSchedule && isSaturdaySchedule(editingSchedule) && (
+              <div className="rounded-xl bg-teal-50 border border-teal-200 p-3 mb-4 flex items-start gap-2.5 text-teal-950">
+                <span className="text-base leading-none">📅</span>
+                <div className="text-xs">
+                  <span className="font-bold">{t.shiftSatLabel} ({editingSchedule.groupName})</span>
+                  <p className="text-[11px] text-teal-800 mt-0.5 leading-relaxed">
+                    {t.saturdayShiftConfigNotice}
+                  </p>
+                </div>
+              </div>
+            )}
 
             <form onSubmit={handleSave} className="space-y-3.5 text-xs">
               <div className="grid grid-cols-2 gap-3">
@@ -435,7 +589,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     required
                     placeholder="HH:MM"
                     value={startTime}
-                    onChange={(e) => setStartTime(e.target.value)}
+                    onChange={(e) => handleStartTimeChange(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 font-mono text-slate-800 outline-none"
                   />
                 </div>
@@ -448,7 +602,7 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
                     required
                     placeholder="HH:MM"
                     value={endTime}
-                    onChange={(e) => setEndTime(e.target.value)}
+                    onChange={(e) => handleEndTimeChange(e.target.value)}
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 font-mono text-slate-800 outline-none"
                   />
                 </div>
@@ -524,9 +678,19 @@ export const SchedulesView: React.FC<SchedulesViewProps> = ({
 
               <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
                 <div>
-                  <label className="block font-semibold text-slate-700 mb-1">
-                    {t.normalHours}
-                  </label>
+                  <div className="flex items-center justify-between mb-1">
+                    <label className="font-semibold text-slate-700">
+                      {t.normalHours}
+                    </label>
+                    <button
+                      type="button"
+                      onClick={calculateSuggestedHours}
+                      className="text-[10px] text-indigo-600 hover:text-indigo-800 font-medium underline"
+                      title="Calculate (Exit - Entry - Break)"
+                    >
+                      {t.autoCalculate}
+                    </button>
+                  </div>
                   <input
                     type="number"
                     step="0.5"

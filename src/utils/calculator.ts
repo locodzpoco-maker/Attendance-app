@@ -194,14 +194,17 @@ export function calculateAttendance(
           // Manual supervisor override
           const over =
             scheduleMap.get(manualAdj.overrideShiftId) ||
-            (manualAdj.overrideShiftId === 'stock_sat' ? STOCK_SHIFT_SATURDAY : STOCK_SHIFT_1);
+            (manualAdj.overrideShiftId === 'stock_sat'
+              ? (scheduleMap.get('stock_sat') || STOCK_SHIFT_SATURDAY)
+              : (scheduleMap.get('stock_g1') || STOCK_SHIFT_1));
           assignedSchedule = over;
           detectedShiftId = over.id;
           detectedShiftName = over.name.split(' (')[0];
           dayGroupName = `Stock ${detectedShiftName}`;
         } else if (firstCheckInTime) {
           // Auto-detect based on first check-in time and day of week
-          const detected = detectStockShift(firstCheckInTime, dayOfWeek, hasSaturdayShift);
+          const customStockSat = scheduleMap.get('stock_sat') || STOCK_SHIFT_SATURDAY;
+          const detected = detectStockShift(firstCheckInTime, dayOfWeek, hasSaturdayShift, customStockSat);
           detectedShiftId = detected.shiftId;
           detectedShiftName = detected.shiftName;
           isShiftUnclear = detected.isUnclear;
@@ -211,18 +214,20 @@ export function calculateAttendance(
             dayGroupName = `Stock ${detected.shiftName}`;
           } else {
             // Unclear shift
-            assignedSchedule = (dayOfWeek === 'Saturday' && hasSaturdayShift) ? STOCK_SHIFT_SATURDAY : STOCK_SHIFT_1;
+            assignedSchedule = (dayOfWeek === 'Saturday' && hasSaturdayShift)
+              ? (scheduleMap.get('stock_sat') || STOCK_SHIFT_SATURDAY)
+              : (scheduleMap.get('stock_g1') || STOCK_SHIFT_1);
             dayGroupName = 'Stock (Shift Unclear)';
           }
         } else {
           // No regular check-in today (e.g. rest day, or day after night shift with only 02:00 exit)
           if (dayOfWeek === 'Saturday' && hasSaturdayShift) {
-            assignedSchedule = STOCK_SHIFT_SATURDAY;
+            assignedSchedule = scheduleMap.get('stock_sat') || STOCK_SHIFT_SATURDAY;
             detectedShiftId = 'stock_sat';
-            detectedShiftName = 'Shift Samedi';
-            dayGroupName = 'Stock Shift Samedi';
+            detectedShiftName = assignedSchedule.name.split(' (')[0] || 'Shift Samedi';
+            dayGroupName = assignedSchedule.groupName;
           } else {
-            assignedSchedule = STOCK_SHIFT_1;
+            assignedSchedule = scheduleMap.get('stock_g1') || STOCK_SHIFT_1;
             detectedShiftId = 'NONE';
             detectedShiftName = '-';
             dayGroupName = 'Stock';
@@ -234,9 +239,9 @@ export function calculateAttendance(
           const over =
             scheduleMap.get(manualAdj.overrideShiftId) ||
             (manualAdj.overrideShiftId === 'admin_sat'
-              ? ADMIN_SHIFT_SATURDAY
+              ? (scheduleMap.get('admin_sat') || ADMIN_SHIFT_SATURDAY)
               : manualAdj.overrideShiftId === 'stock_sat'
-              ? STOCK_SHIFT_SATURDAY
+              ? (scheduleMap.get('stock_sat') || STOCK_SHIFT_SATURDAY)
               : undefined);
           if (over) {
             assignedSchedule = over;
@@ -245,10 +250,10 @@ export function calculateAttendance(
             dayGroupName = over.groupName;
           }
         } else if (dayOfWeek === 'Saturday' && hasSaturdayShift && assignedSchedule.id !== 'admin_g2') {
-          // If this employee is specifically assigned to Saturday shift (Admin: 08:30 - 17:00)
+          // If this employee is specifically assigned to Saturday shift (Admin: 09:00 - 17:00 or user-customized)
           assignedSchedule = scheduleMap.get('admin_sat') || ADMIN_SHIFT_SATURDAY;
           detectedShiftId = assignedSchedule.id;
-          detectedShiftName = 'Shift Samedi';
+          detectedShiftName = assignedSchedule.name.split(' (')[0] || 'Shift Samedi';
           dayGroupName = assignedSchedule.groupName;
         } else {
           detectedShiftId = assignedSchedule.id;
@@ -574,7 +579,8 @@ export function calculateAttendance(
           let xM = parseTimeToMinutes(exitTime);
           if (xM < eM) xM += 24 * 60;
           const dur = Math.max(0, xM - eM);
-          workedMinutes = Math.max(0, dur - (assignedSchedule.breakDurationMinutes || 60));
+          const breakMins = isExactPunchOnly ? 0 : (assignedSchedule.breakDurationMinutes || 60);
+          workedMinutes = Math.max(0, dur - breakMins);
         }
       } else if (!entryTime && !exitTime) {
         if (!isWorkingDay) {
@@ -660,14 +666,17 @@ export function calculateAttendance(
             }
           }
 
-          // Calculate Worked Hours (elapsed duration minus scheduled break)
+          // Calculate Worked Hours: elapsed duration between punches without deducting rest time
           const totalDurationMins = Math.max(0, exitMins - entryMins);
-          const breakDeduction = assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0;
-          const netDurationBeforeOt = Math.max(0, totalDurationMins - suppMinutes - breakDeduction);
-          const targetNormalMins = Math.round(assignedSchedule.normalWorkedHours * 60);
+          const netDurationBeforeOt = Math.max(0, totalDurationMins - suppMinutes);
+          // Target max normal shift duration without break deduction
+          const fullShiftMins = Math.round(
+            (assignedSchedule.normalWorkedHours * 60) +
+            (assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0)
+          );
 
-          if (netDurationBeforeOt >= targetNormalMins) {
-            workedMinutes = targetNormalMins;
+          if (netDurationBeforeOt >= fullShiftMins) {
+            workedMinutes = fullShiftMins;
           } else {
             workedMinutes = netDurationBeforeOt;
           }
@@ -803,7 +812,9 @@ export function calculateAttendance(
         secondCheckInDelayMinutes,
         earlyExitMinutes,
         delayMinutes,
-        breakDurationMinutes: assignedSchedule.hasBreak ? assignedSchedule.breakDurationMinutes : 0,
+        breakDurationMinutes: isExactPunchOnly
+          ? 0
+          : (assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0),
         workedMinutes,
         workedHoursFormatted,
         workedDecimalHours,

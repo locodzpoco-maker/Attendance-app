@@ -1,7 +1,7 @@
 import React, { useState } from 'react';
-import { DailyAttendanceRecord, AppLanguage } from '../types';
+import { DailyAttendanceRecord, AppLanguage, WorkSchedule } from '../types';
 import { Clock, ShieldAlert, Check, X, HelpCircle, Layers, Zap } from 'lucide-react';
-import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
+import { formatMinutesToHoursAndMinutes, ADMIN_SHIFT_SATURDAY, STOCK_SHIFT_SATURDAY } from '../utils/schedules';
 import { getTranslations } from '../utils/i18n';
 
 interface ManualCorrectionModalProps {
@@ -20,6 +20,7 @@ interface ManualCorrectionModalProps {
   ) => void;
   currentUser: string;
   language?: AppLanguage;
+  schedules?: WorkSchedule[];
 }
 
 export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
@@ -28,9 +29,13 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
   onSave,
   currentUser,
   language,
+  schedules,
 }) => {
   if (!record) return null;
   const t = getTranslations(language);
+
+  const adminSat = schedules?.find((s) => s.id === 'admin_sat') || ADMIN_SHIFT_SATURDAY;
+  const stockSat = schedules?.find((s) => s.id === 'stock_sat') || STOCK_SHIFT_SATURDAY;
 
   const [entry, setEntry] = useState(record.entryTime || '');
   const [secondCheckIn, setSecondCheckIn] = useState(record.secondCheckInTime || '');
@@ -150,8 +155,12 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 className="w-full rounded-lg border border-slate-300 px-3 py-2 text-xs text-slate-800 focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none bg-white"
               >
                 <option value="">{t.detectFingerprints} (Auto)</option>
-                <option value="admin_sat">{t.shiftSatLabel} [Admin] (08:30 – 17:00, Break 12:30–14:00, No OT)</option>
-                <option value="stock_sat">{t.shiftSatLabel} [Stock] (10:00 – 17:00, Break 13:00–14:00, OT &gt; 17:00)</option>
+                <option value="admin_sat">
+                  {t.shiftSatLabel} [Admin] ({adminSat.startTime} – {adminSat.endTime}, {adminSat.hasBreak ? `Break ${adminSat.breakStart}–${adminSat.breakEnd}` : 'No Break'}, {adminSat.overtimeAllowed ? `OT > ${adminSat.overtimeStartTime}` : 'No OT'})
+                </option>
+                <option value="stock_sat">
+                  {t.shiftSatLabel} [Stock] ({stockSat.startTime} – {stockSat.endTime}, {stockSat.hasBreak ? `Break ${stockSat.breakStart}–${stockSat.breakEnd}` : 'No Break'}, {stockSat.overtimeAllowed ? `OT > ${stockSat.overtimeStartTime}` : 'No OT'})
+                </option>
                 <option value="stock_g1">{t.shift1Label} (10:00 – 18:00, Break 13:00–14:00, OT &gt; 18:00)</option>
                 <option value="stock_g2">{t.shift2Label} (18:00 – 02:00, Break 21:00–22:00, OT &gt; 02:00)</option>
                 <option value="stock_g3">{t.shift3Label} (08:30 – 16:30, Break 12:00–13:00, OT &gt; 16:30)</option>

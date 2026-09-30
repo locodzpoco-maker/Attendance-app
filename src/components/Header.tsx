@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useRef } from 'react';
 import {
   Calendar,
   UploadCloud,
@@ -13,6 +13,8 @@ import {
   Palmtree,
   Languages,
   FileText,
+  Save,
+  Upload,
 } from 'lucide-react';
 import { AppSettings, HistoricalPeriodRecord, AppLanguage } from '../types';
 import { getTranslations } from '../utils/i18n';
@@ -35,6 +37,8 @@ interface HeaderProps {
   onOpenDatabaseModal?: () => void;
   onOpenVacationModal?: () => void;
   vacationCount?: number;
+  onSaveProgress?: () => void;
+  onImportProgress?: (file: File) => void;
 }
 
 export const Header: React.FC<HeaderProps> = ({
@@ -55,8 +59,11 @@ export const Header: React.FC<HeaderProps> = ({
   onOpenDatabaseModal,
   onOpenVacationModal,
   vacationCount = 0,
+  onSaveProgress,
+  onImportProgress,
 }) => {
   const t = getTranslations(settings.language);
+  const progressFileInputRef = useRef<HTMLInputElement>(null);
 
   return (
     <header className="sticky top-0 z-40 bg-white/95 backdrop-blur-md border-b border-slate-200">
@@ -146,6 +153,47 @@ export const Header: React.FC<HeaderProps> = ({
                 <Database className="h-4 w-4 text-blue-600" />
                 <span className="hidden sm:inline">{t.databaseBackups}</span>
               </button>
+            )}
+
+            {/* Save / Export Full Work Progress */}
+            {onSaveProgress && (
+              <button
+                id="header-save-progress-btn"
+                onClick={onSaveProgress}
+                className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-300 bg-emerald-50/70 hover:bg-emerald-100 text-emerald-900 px-3 py-1.5 text-xs font-semibold shadow-xs transition-colors"
+                title={t.saveProgressTooltip}
+              >
+                <Save className="h-4 w-4 text-emerald-600" />
+                <span className="hidden sm:inline">{t.saveProgress}</span>
+              </button>
+            )}
+
+            {/* Import / Resume Work Progress */}
+            {onImportProgress && settings.activeRole !== 'Management' && (
+              <>
+                <input
+                  type="file"
+                  ref={progressFileInputRef}
+                  accept=".json"
+                  className="hidden"
+                  onChange={(e) => {
+                    const file = e.target.files?.[0];
+                    if (file) {
+                      onImportProgress(file);
+                      e.target.value = '';
+                    }
+                  }}
+                />
+                <button
+                  id="header-import-progress-btn"
+                  onClick={() => progressFileInputRef.current?.click()}
+                  className="inline-flex items-center gap-1.5 rounded-lg border border-indigo-200 bg-indigo-50/70 hover:bg-indigo-100 text-indigo-900 px-3 py-1.5 text-xs font-semibold shadow-xs transition-colors"
+                  title={t.importProgressTooltip}
+                >
+                  <Upload className="h-4 w-4 text-indigo-600" />
+                  <span className="hidden sm:inline">{t.importProgress}</span>
+                </button>
+              </>
             )}
 
             {/* Paid Vacation Manager */}

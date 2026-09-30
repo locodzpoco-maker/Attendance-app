@@ -30,7 +30,16 @@ import {
   saveCompactHistoricalPeriods,
   exportBackupToFile,
   parseBackupFile,
+  exportProgressToFile,
+  parseProgressFile,
+  idbGet,
+  AppProgressSnapshot,
+  SavedDailyFilters,
+  SavedMonthlyFilters,
+  SavedEmployeesFilters,
+  STORAGE_KEYS,
 } from './utils/storage';
+import { CheckCircle2, Save, Upload } from 'lucide-react';
 
 import { Header } from './components/Header';
 import { Dashboard } from './components/Dashboard';
@@ -51,7 +60,7 @@ export default function App() {
   const [isDatabaseModalOpen, setIsDatabaseModalOpen] = useState(false);
 
   // Navigation & Active Tab
-  const [activeTab, setActiveTab] = useState<
+  const [activeTab, setActiveTabState] = useState<
     'dashboard' | 'daily' | 'monthly' | 'employees' | 'schedules' | 'settings'
   >(() => {
     return getStorageItem<'dashboard' | 'daily' | 'monthly' | 'employees' | 'schedules' | 'settings'>(
@@ -59,6 +68,13 @@ export default function App() {
       'dashboard'
     );
   });
+
+  const setActiveTab = (
+    tab: 'dashboard' | 'daily' | 'monthly' | 'employees' | 'schedules' | 'settings'
+  ) => {
+    setActiveTabState(tab);
+    saveStorageItem('ams_active_tab', tab);
+  };
 
   // App Settings
   const [settings, setSettings] = useState<AppSettings>(() => {
@@ -82,6 +98,8 @@ export default function App() {
     return defaultSettings;
   });
 
+  const t = getTranslations(settings.language);
+
   // Schedules (Reads from consistent storage key with quota recovery & fallback)
   const [schedules, setSchedules] = useState<WorkSchedule[]>(() => {
     cleanupLegacyStorage();
@@ -91,25 +109,29 @@ export default function App() {
       getStorageItem<WorkSchedule[] | null>('ams_schedules_v2', null);
     if (Array.isArray(saved) && saved.length > 0) {
       const list = saved.map((s) => {
+        if (s.id === 'admin_sat') {
+          // If still using old legacy 08:30 default with 90m break, upgrade to new 09:00 default; otherwise preserve custom edits
+          if (s.startTime === '08:30' && (s.breakDurationMinutes === 90 || s.breakDurationMinutes === undefined)) {
+            return ADMIN_SHIFT_SATURDAY;
+          }
+          return s;
+        }
+        if (s.id === 'stock_sat') {
+          return s;
+        }
         if (s.id === 'admin_g2' || s.groupName === 'Admin Group 2' || s.name.includes('Admin Group 2')) {
           return s;
         }
         if (s.id === 'stock_g3') {
           return {
             ...s,
-            name: 'Shift 3 (08:30 - 16:30)',
-            endTime: '16:30',
-            overtimeStartTime: '16:30',
-            normalWorkedHours: 7.0,
+            name: s.name || 'Shift 3 (08:30 - 16:30)',
+            endTime: s.endTime || '16:30',
+            overtimeStartTime: s.overtimeStartTime || '16:30',
+            normalWorkedHours: s.normalWorkedHours ?? 7.0,
           };
         }
-        if (s.id === 'admin_sat') {
-          return ADMIN_SHIFT_SATURDAY;
-        }
-        return {
-          ...s,
-          normalWorkedHours: 7.0,
-        };
+        return s;
       });
       if (!list.some((s) => s.id === 'stock_sat')) {
         list.push(STOCK_SHIFT_SATURDAY);
@@ -151,44 +173,41 @@ export default function App() {
     return getStorageItem<AttendanceAuditLog[]>('ams_audit_logs', []);
   });
 
-  // Raw Active Dataset
-  const [activeDataset, setActiveDataset] = useState<RawAttendanceDataset>(() => {
+  // Raw Active Dataset - starts completely empty with 0 punches
+  const [activeDataset, setActiveDataset] = useState<RawAttendanceDataset | null>(() => {
+    cleanupLegacyStorage();
     const saved = getStorageItem<RawAttendanceDataset | null>('ams_active_dataset', null);
-    if (saved && Array.isArray(saved.employees)) {
+    if (saved && Array.isArray(saved.employees) && saved.employees.length > 0) {
+      if (
+        saved.fileName === 'AttendanceRecord_0 (56).xls' ||
+        saved.madeDateRaw?.includes('2026/07/01-2026/07/31')
+      ) {
+        return null;
+      }
       return saved;
     }
-    return generateReferenceDataset();
+    return null;
   });
 
-  // Historical Periods
+  // Historical Periods - starts empty []
   const [historicalPeriods, setHistoricalPeriods] = useState<HistoricalPeriodRecord[]>(() => {
     const saved = getStorageItem<HistoricalPeriodRecord[] | null>('ams_historical_periods', null);
     if (Array.isArray(saved) && saved.length > 0) {
-      return saved;
+      const filtered = saved.filter(
+        (p) =>
+          p.fileName !== 'AttendanceRecord_0 (56).xls' &&
+          p.id !== '2026-07' &&
+          !p.periodLabel?.includes('01/07/2026')
+      );
+      return filtered;
     }
-    const initialDataset = generateReferenceDataset();
-    const initialCalc = calculateAttendance(initialDataset, {
-      schedules: DEFAULT_SCHEDULES,
-      employees: DEFAULT_EMPLOYEES,
-    });
-    return [
-      {
-        id: '2026-07',
-        periodLabel: '01/07/2026 → 31/07/2026',
-        startDate: initialDataset.startDate,
-        endDate: initialDataset.endDate,
-        fileName: initialDataset.fileName,
-        importedAt: new Date().toISOString(),
-        employeeCount: initialDataset.employees.length,
-        dataset: initialDataset,
-        dailyRecords: initialCalc.dailyRecords,
-        monthlySummary: initialCalc.monthlySummary,
-      },
-    ];
+    return [];
   });
 
   const [selectedPeriodId, setSelectedPeriodId] = useState<string>(() => {
-    return getStorageItem<string>('ams_selected_period_id', '2026-07');
+    const saved = getStorageItem<string>('ams_selected_period_id', '');
+    if (saved === '2026-07') return '';
+    return saved;
   });
   const [isCalculating, setIsCalculating] = useState(false);
   const [isImportModalOpen, setIsImportModalOpen] = useState(false);
@@ -206,12 +225,27 @@ export default function App() {
   const [vacationModalPreSelectedEmp, setVacationModalPreSelectedEmp] = useState<Employee | null>(null);
   const [vacationModalPreSelectedDate, setVacationModalPreSelectedDate] = useState<string | undefined>(undefined);
 
+  // Toast notification for user actions (save progress, restore, etc.)
+  const [toastMessage, setToastMessage] = useState<string | null>(null);
+  const showToast = useCallback((msg: string) => {
+    setToastMessage(msg);
+    setTimeout(() => setToastMessage(null), 4000);
+  }, []);
+
   // Drilldown filter: specific employee selected from Monthly Summary to view in Daily Attendance
-  const [selectedEmployeeIdForDaily, setSelectedEmployeeIdForDaily] = useState<string | null>(null);
+  const [selectedEmployeeIdForDaily, setSelectedEmployeeIdForDaily] = useState<string | null>(() => {
+    return getStorageItem<string | null>(STORAGE_KEYS.SELECTED_EMP_FOR_DAILY, null);
+  });
 
   const handleSelectEmployeeForDaily = (employeeId: string) => {
     setSelectedEmployeeIdForDaily(employeeId);
+    saveStorageItem(STORAGE_KEYS.SELECTED_EMP_FOR_DAILY, employeeId);
     setActiveTab('daily');
+  };
+
+  const handleClearSelectedEmployeeForDaily = () => {
+    setSelectedEmployeeIdForDaily(null);
+    saveStorageItem(STORAGE_KEYS.SELECTED_EMP_FOR_DAILY, null);
   };
 
   const handleOpenInjectSupp = (record?: DailyAttendanceRecord) => {
@@ -220,6 +254,10 @@ export default function App() {
   };
 
   // Sync to Storage immediately upon state changes with quota safety
+  useEffect(() => {
+    saveStorageItem(STORAGE_KEYS.SELECTED_EMP_FOR_DAILY, selectedEmployeeIdForDaily);
+  }, [selectedEmployeeIdForDaily]);
+
   useEffect(() => {
     saveStorageItem('ams_active_tab', activeTab);
   }, [activeTab]);
@@ -251,6 +289,10 @@ export default function App() {
   useEffect(() => {
     if (activeDataset) {
       saveStorageItem('ams_active_dataset', activeDataset);
+    } else {
+      try {
+        localStorage.removeItem('ams_active_dataset');
+      } catch {}
     }
   }, [activeDataset]);
 
@@ -308,6 +350,20 @@ export default function App() {
       reloadFromDatabase();
     }
   }, [reloadFromDatabase]);
+
+  // Check IndexedDB on startup to restore large datasets if localStorage quota was reached
+  useEffect(() => {
+    idbGet<RawAttendanceDataset | null>(STORAGE_KEYS.ACTIVE_DATASET, null).then((storedDataset) => {
+      if (storedDataset && Array.isArray(storedDataset.employees) && storedDataset.employees.length > 0) {
+        setActiveDataset((curr) => (!curr || curr.employees.length === 0 ? storedDataset : curr));
+      }
+    });
+    idbGet<HistoricalPeriodRecord[] | null>(STORAGE_KEYS.HISTORICAL_PERIODS, null).then((storedPeriods) => {
+      if (storedPeriods && Array.isArray(storedPeriods) && storedPeriods.length > 0) {
+        setHistoricalPeriods((curr) => (curr.length <= 1 ? storedPeriods : curr));
+      }
+    });
+  }, []);
 
   // Sync document language and RTL layout direction
   useEffect(() => {
@@ -432,7 +488,7 @@ export default function App() {
 
     // Log to Audit Trail
     const suppDetail = injectedSuppMinutes !== undefined ? ` | Injected Supp: +${Math.floor(injectedSuppMinutes / 60)}h ${injectedSuppMinutes % 60}m` : '';
-    const exactPunchDetail = exactPunchOnly ? ' | Exact Punch Mode: Enabled (Raw duration, 0 penalty)' : '';
+    const exactPunchDetail = exactPunchOnly ? ' | Exact Punch Mode: Enabled (Raw duration without rest time, 0 late penalty)' : '';
     const newLog: AttendanceAuditLog = {
       id: `audit_${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -484,7 +540,7 @@ export default function App() {
         overrideShiftId: existingAdj?.overrideShiftId,
         injectedSuppMinutes: existingAdj?.injectedSuppMinutes,
         exactPunchOnly: nextExact,
-        reason: existingAdj?.reason || (nextExact ? 'Ignore late time enabled: counts only worked hours, late penalty ignored, status set to On Time' : 'Standard schedule rules restored'),
+        reason: existingAdj?.reason || (nextExact ? 'Ignore late time enabled: counts only worked hours without rest time deduction, late penalty ignored, status set to On Time' : 'Standard schedule rules restored'),
         adjustedBy: settings.activeRole || 'HR Admin',
         adjustedAt: new Date().toISOString(),
       };
@@ -724,43 +780,130 @@ export default function App() {
     });
   };
 
-  // Export / Import entire application config (schedules, settings, employee assignments)
+  // Export / Import entire application progress snapshot (dataset, periods, schedules, employees, manual adjustments with checkboxes, settings, filters, and active tab)
   const handleExportBackup = () => {
-    exportBackupToFile(settings, schedules, employees, manualAdjustments, paidVacations);
+    const dailyFilters = getStorageItem<SavedDailyFilters | undefined>(STORAGE_KEYS.DAILY_FILTERS, undefined);
+    const monthlyFilters = getStorageItem<SavedMonthlyFilters | undefined>(STORAGE_KEYS.MONTHLY_FILTERS, undefined);
+    const employeesFilters = getStorageItem<SavedEmployeesFilters | undefined>(STORAGE_KEYS.EMPLOYEES_FILTERS, undefined);
+    const schedulesFilter = getStorageItem<'all' | 'weekday' | 'saturday' | undefined>(STORAGE_KEYS.SCHEDULES_FILTER, undefined);
+
+    const snapshot: AppProgressSnapshot = {
+      type: 'AMS_PROGRESS_SNAPSHOT',
+      version: '3.0',
+      exportedAt: new Date().toISOString(),
+      activeTab,
+      selectedPeriodId,
+      activeDataset,
+      historicalPeriods,
+      settings,
+      schedules,
+      employees,
+      manualAdjustments,
+      paidVacations,
+      auditLogs,
+      dailyFilters: {
+        ...dailyFilters,
+        selectedEmployeeId: selectedEmployeeIdForDaily,
+      },
+      monthlyFilters,
+      employeesFilters,
+      schedulesFilter,
+      summary: {
+        totalEmployees: employees.length,
+        adjustmentsCount: Object.keys(manualAdjustments).length,
+        exactPunchCount: Object.values(manualAdjustments).filter((a: ManualAdjustment) => Boolean(a.exactPunchOnly)).length,
+        schedulesCount: schedules.length,
+        vacationsCount: paidVacations.length,
+      },
+    };
+
+    exportProgressToFile(snapshot);
+    showToast(t.progressSavedSuccess || 'Work progress saved and exported successfully!');
   };
 
   const handleImportBackup = async (file: File) => {
     try {
-      const backup = await parseBackupFile(file);
+      const backup = await parseProgressFile(file);
       if (backup.settings) {
         setSettings(backup.settings);
-        saveStorageItem('ams_settings', backup.settings);
+        saveStorageItem(STORAGE_KEYS.SETTINGS, backup.settings);
       }
       if (Array.isArray(backup.schedules) && backup.schedules.length > 0) {
         setSchedules(backup.schedules);
-        saveStorageItem('ams_schedules', backup.schedules);
+        saveStorageItem(STORAGE_KEYS.SCHEDULES, backup.schedules);
       }
       if (Array.isArray(backup.employees) && backup.employees.length > 0) {
         setEmployees(backup.employees);
-        saveStorageItem('ams_employees', backup.employees);
+        saveStorageItem(STORAGE_KEYS.EMPLOYEES, backup.employees);
       }
       if (backup.manualAdjustments) {
         setManualAdjustments(backup.manualAdjustments);
-        saveStorageItem('ams_adjustments', backup.manualAdjustments);
+        saveStorageItem(STORAGE_KEYS.ADJUSTMENTS, backup.manualAdjustments);
       }
       if (Array.isArray(backup.paidVacations)) {
         setPaidVacations(backup.paidVacations);
-        saveStorageItem('ams_paid_vacations', backup.paidVacations);
+        saveStorageItem(STORAGE_KEYS.PAID_VACATIONS, backup.paidVacations);
       }
+      if (Array.isArray(backup.auditLogs) && backup.auditLogs.length > 0) {
+        setAuditLogs(backup.auditLogs);
+        saveStorageItem(STORAGE_KEYS.AUDIT_LOGS, backup.auditLogs);
+      }
+      if (backup.activeDataset && Array.isArray(backup.activeDataset.employees)) {
+        setActiveDataset(backup.activeDataset);
+        saveStorageItem(STORAGE_KEYS.ACTIVE_DATASET, backup.activeDataset);
+      }
+      if (Array.isArray(backup.historicalPeriods) && backup.historicalPeriods.length > 0) {
+        setHistoricalPeriods(backup.historicalPeriods);
+        saveCompactHistoricalPeriods(backup.historicalPeriods);
+      }
+      if (backup.selectedPeriodId) {
+        setSelectedPeriodId(backup.selectedPeriodId);
+        saveStorageItem(STORAGE_KEYS.SELECTED_PERIOD_ID, backup.selectedPeriodId);
+      }
+      if (backup.dailyFilters) {
+        saveStorageItem(STORAGE_KEYS.DAILY_FILTERS, backup.dailyFilters);
+        if (backup.dailyFilters.selectedEmployeeId !== undefined) {
+          setSelectedEmployeeIdForDaily(backup.dailyFilters.selectedEmployeeId);
+          saveStorageItem(STORAGE_KEYS.SELECTED_EMP_FOR_DAILY, backup.dailyFilters.selectedEmployeeId);
+        }
+      }
+      if (backup.monthlyFilters) {
+        saveStorageItem(STORAGE_KEYS.MONTHLY_FILTERS, backup.monthlyFilters);
+      }
+      if (backup.employeesFilters) {
+        saveStorageItem(STORAGE_KEYS.EMPLOYEES_FILTERS, backup.employeesFilters);
+      }
+      if (backup.schedulesFilter) {
+        saveStorageItem(STORAGE_KEYS.SCHEDULES_FILTER, backup.schedulesFilter);
+      }
+      if (backup.activeTab) {
+        setActiveTab(backup.activeTab);
+      }
+
+      // Notify mounted views to refresh filters immediately
+      if (typeof window !== 'undefined') {
+        window.dispatchEvent(new Event('ams_progress_restored'));
+      }
+
+      const exactCount = backup.manualAdjustments
+        ? Object.values(backup.manualAdjustments).filter((a) => a.exactPunchOnly).length
+        : 0;
+      const adjustmentsCount = backup.manualAdjustments
+        ? Object.keys(backup.manualAdjustments).length
+        : 0;
+
+      showToast(
+        `${t.progressRestoredSuccess || 'Work progress restored!'} (${adjustmentsCount} adjustments, ${exactCount} checkboxes, ${backup.schedules?.length || 0} schedules)`
+      );
     } catch (e: any) {
-      alert(`Could not restore backup file: ${e.message || e}`);
+      alert(`Could not restore progress file: ${e.message || e}`);
     }
   };
 
   // Period label for reports
   const currentPeriodLabel = activeDataset
     ? `${activeDataset.startDate} - ${activeDataset.endDate}`
-    : 'Selected Period';
+    : (settings.language === 'ar' ? 'لا توجد فترة محددة' : settings.language === 'en' ? 'No Period Loaded' : 'Aucune période chargée');
 
   // Export handlers
   const handleExportDailyExcel = (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => {
@@ -816,11 +959,13 @@ export default function App() {
         onOpenDatabaseModal={() => setIsDatabaseModalOpen(true)}
         onOpenVacationModal={() => handleOpenVacationModal()}
         vacationCount={paidVacations.length}
+        onSaveProgress={handleExportBackup}
+        onImportProgress={handleImportBackup}
       />
 
       {/* Main Content Area */}
       <main className="flex-1 w-full max-w-[1920px] mx-auto px-2 sm:px-4 lg:px-6 pt-4">
-        {activeTab === 'dashboard' && (
+        <div className={activeTab === 'dashboard' ? 'block' : 'hidden'}>
           <Dashboard
             dataset={activeDataset}
             dailyRecords={dailyRecords}
@@ -835,9 +980,9 @@ export default function App() {
             settings={settings}
             unmappedEmployeesCount={unmappedEmployeesCount}
           />
-        )}
+        </div>
 
-        {activeTab === 'daily' && (
+        <div className={activeTab === 'daily' ? 'block' : 'hidden'}>
           <DailyAttendanceView
             records={dailyRecords}
             onOpenCorrection={(record) => setActiveCorrectionRecord(record)}
@@ -848,11 +993,11 @@ export default function App() {
             onExportPDF={handleExportDailyPDF}
             settings={settings}
             selectedEmployeeId={selectedEmployeeIdForDaily}
-            onClearSelectedEmployee={() => setSelectedEmployeeIdForDaily(null)}
+            onClearSelectedEmployee={handleClearSelectedEmployeeForDaily}
           />
-        )}
+        </div>
 
-        {activeTab === 'monthly' && (
+        <div className={activeTab === 'monthly' ? 'block' : 'hidden'}>
           <MonthlySummaryView
             summaries={monthlySummary}
             dailyRecords={dailyRecords}
@@ -862,9 +1007,9 @@ export default function App() {
             periodLabel={currentPeriodLabel}
             onSelectEmployeeForDaily={handleSelectEmployeeForDaily}
           />
-        )}
+        </div>
 
-        {activeTab === 'employees' && (
+        <div className={activeTab === 'employees' ? 'block' : 'hidden'}>
           <EmployeesView
             employees={employees}
             schedules={schedules}
@@ -876,9 +1021,9 @@ export default function App() {
             settings={settings}
             rawEmployeesFromDataset={activeDataset?.employees || []}
           />
-        )}
+        </div>
 
-        {activeTab === 'schedules' && (
+        <div className={activeTab === 'schedules' ? 'block' : 'hidden'}>
           <SchedulesView
             schedules={schedules}
             onUpdateSchedule={handleUpdateSchedule}
@@ -890,9 +1035,9 @@ export default function App() {
             canEdit={settings.activeRole !== 'Management'}
             settings={settings}
           />
-        )}
+        </div>
 
-        {activeTab === 'settings' && (
+        <div className={activeTab === 'settings' ? 'block' : 'hidden'}>
           <SettingsView
             settings={settings}
             onUpdateSettings={handleUpdateSettings}
@@ -932,7 +1077,7 @@ export default function App() {
               saveStorageItem('ams_paid_vacations', []);
             }}
           />
-        )}
+        </div>
       </main>
 
       {/* Desktop SQLite Database & Backups Management Modal */}
@@ -961,6 +1106,7 @@ export default function App() {
           onSave={handleSaveCorrection}
           currentUser={settings.activeRole}
           language={settings.language}
+          schedules={schedules}
         />
       )}
 
@@ -994,6 +1140,17 @@ export default function App() {
         preSelectedDate={vacationModalPreSelectedDate}
         currentUserRole={settings.activeRole}
       />
+
+      {/* Global Toast Notification for Save & Restore Progress */}
+      {toastMessage && (
+        <div
+          id="app-global-toast"
+          className="fixed bottom-5 right-5 z-50 flex items-center gap-2.5 rounded-2xl bg-slate-900 text-white px-4 py-3 shadow-xl border border-slate-700 text-xs font-semibold animate-in fade-in slide-in-from-bottom-2"
+        >
+          <CheckCircle2 className="h-4 w-4 text-emerald-400 shrink-0" />
+          <span>{toastMessage}</span>
+        </div>
+      )}
     </div>
   );
 }
