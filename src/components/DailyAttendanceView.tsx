@@ -60,6 +60,11 @@ interface DailyAttendanceViewProps {
 
 // Helpers to classify records strictly into Admin vs Stock
 export function isDailyRecordStock(r: DailyAttendanceRecord): boolean {
+  if (r.scheduleId === 'no_shift' || r.detectedShiftId === 'no_shift') return false;
+  if (r.workerType === 'Stock') return true;
+  if (r.workerType === 'Admin') return false;
+  if (r.isAdminWorkerType === false) return true;
+  if (r.isAdminWorkerType === true) return false;
   if (isAdminWorker(r.employeeId)) return false;
   if (isStockWorker(r.employeeId)) return true;
   if (r.isDynamicShift) return true;

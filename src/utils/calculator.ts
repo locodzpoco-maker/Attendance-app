@@ -18,6 +18,7 @@ import {
   STOCK_SHIFT_SATURDAY,
   ADMIN_SHIFT_SATURDAY,
   STOCK_DYNAMIC_SCHEDULE,
+  NO_SHIFT_SCHEDULE,
   detectStockShift,
   isEarlyMorningTime,
   getDayOfWeekFromDate,
@@ -86,26 +87,32 @@ export function calculateAttendance(
     }
 
     // Resolve employee category:
-    // 1. Explicit ADMIN designation
-    // 2. Explicit STOCK designation
-    // 3. Fallback based on department text
-    const isExplicitAdmin = isAdminWorker(empId);
-    const isExplicitStock = isStockWorker(empId);
+    // 1. Explicit employee workerType ('Stock' | 'Admin') if set on employee
+    // 2. Explicit ADMIN designation
+    // 3. Explicit STOCK designation
+    // 4. Fallback based on department text
+    const isExplicitAdmin = dbEmp?.workerType === 'Admin' || (!dbEmp?.workerType && isAdminWorker(empId, dbEmp));
+    const isExplicitStock = dbEmp?.workerType === 'Stock' || (!dbEmp?.workerType && isStockWorker(empId, dbEmp));
 
     let isStock = false;
     let companyDept = 'Administration';
     let defaultGroupName = 'Admin Group 1';
     let baseSchedule: WorkSchedule = DEFAULT_SCHEDULES[0];
 
-    if (isExplicitAdmin) {
+    if (dbEmp?.scheduleId === 'no_shift') {
       isStock = false;
-      companyDept = 'Administration';
-      defaultGroupName = 'Admin Group 1';
-      baseSchedule = scheduleMap.get('admin_g1') || DEFAULT_SCHEDULES[0];
+      companyDept = dbEmp?.companyDepartment || 'Sans Shift';
+      defaultGroupName = dbEmp?.groupName || 'Sans Shift';
+      baseSchedule = scheduleMap.get('no_shift') || NO_SHIFT_SCHEDULE;
+    } else if (isExplicitAdmin) {
+      isStock = false;
+      companyDept = dbEmp?.companyDepartment || 'Administration';
+      defaultGroupName = dbEmp?.groupName || 'Admin Group 1';
+      baseSchedule = (dbEmp?.scheduleId ? scheduleMap.get(dbEmp.scheduleId) : null) || scheduleMap.get('admin_g1') || DEFAULT_SCHEDULES[0];
     } else if (isExplicitStock) {
       isStock = true;
-      companyDept = 'Stock & Logistique';
-      defaultGroupName = 'Stock';
+      companyDept = dbEmp?.companyDepartment || 'Stock & Logistique';
+      defaultGroupName = dbEmp?.groupName || 'Stock';
       baseSchedule = STOCK_DYNAMIC_SCHEDULE;
     } else if (dbEmp) {
       companyDept = dbEmp.companyDepartment || 'Administration';
@@ -234,8 +241,12 @@ export function calculateAttendance(
           }
         }
       } else {
-        // ADMIN EMPLOYEE: Standard schedule
-        if (manualAdj?.overrideShiftId) {
+        // ADMIN OR NO-SHIFT EMPLOYEE: Standard schedule
+        if (assignedSchedule.id === 'no_shift') {
+          detectedShiftId = 'no_shift';
+          detectedShiftName = 'Sans Shift';
+          dayGroupName = 'Sans Shift';
+        } else if (manualAdj?.overrideShiftId) {
           const over =
             scheduleMap.get(manualAdj.overrideShiftId) ||
             (manualAdj.overrideShiftId === 'admin_sat'
@@ -405,8 +416,19 @@ export function calculateAttendance(
           }
         }
       } else {
-        // Standard Day Shift (Shift 1, Shift 3, Admin Group 1, Admin Group 2)
-        if (regularPunches.length === 1) {
+        // Standard Day Shift (Shift 1, Shift 3, Admin Group 1, Admin Group 2, No Shift)
+        if (assignedSchedule.id === 'no_shift') {
+          if (regularPunches.length === 1) {
+            entryTime = regularPunches[0];
+            exitTime = null;
+          } else if (regularPunches.length > 1) {
+            entryTime = regularPunches[0];
+            exitTime = regularPunches[regularPunches.length - 1];
+            if (regularPunches.length === 2 && entryTime === exitTime) {
+              exitTime = null;
+            }
+          }
+        } else if (regularPunches.length === 1) {
           const p = regularPunches[0];
           const pMins = parseTimeToMinutes(p);
           const schedStartMins = parseTimeToMinutes(assignedSchedule.startTime);
@@ -535,9 +557,11 @@ export function calculateAttendance(
         return 0;
       };
 
+      const isNoShiftSchedule = assignedSchedule.id === 'no_shift';
       const isExactPunchOnly = Boolean(manualAdj?.exactPunchOnly);
+      const injectedSuppMinutes = manualAdj?.injectedSuppMinutes || 0;
 
-      if (isExactPunchOnly) {
+      if (isNoShiftSchedule || isExactPunchOnly) {
         firstCheckInDelayMinutes = 0;
         secondCheckInDelayMinutes = 0;
         earlyExitMinutes = 0;
@@ -641,7 +665,23 @@ export function calculateAttendance(
           }
         }
 
-        if (isExactPunchOnly) {
+        if (isNoShiftSchedule) {
+          // Employee follows NO SHIFT: calculates their work hours strictly from check-in to check-out normally!
+          firstCheckInDelayMinutes = 0;
+          secondCheckInDelayMinutes = 0;
+          earlyExitMinutes = 0;
+          delayMinutes = 0;
+
+          if (exitMins > entryMins) {
+            workedMinutes = exitMins - entryMins;
+          } else {
+            workedMinutes = 0;
+          }
+          observation = 'Ponctuel';
+          observationDetail = 'Ponctuel (Sans Shift)';
+          statusType = 'success';
+          suppMinutes = injectedSuppMinutes || 0;
+        } else if (isExactPunchOnly) {
           // Ignore late arrival, 2nd check-in delay, and early departure for this day
           // Count working hours between check-in and check-out, and set status to On Time (Ponctuel)
           firstCheckInDelayMinutes = 0;
@@ -748,7 +788,6 @@ export function calculateAttendance(
       }
 
       // Injected Supp Hours (Manual Overtime Injection by Supervisor/Admin)
-      const injectedSuppMinutes = manualAdj?.injectedSuppMinutes || 0;
       if (injectedSuppMinutes > 0) {
         suppMinutes += injectedSuppMinutes;
         if (observation === 'OFF') {
@@ -786,6 +825,8 @@ export function calculateAttendance(
               : 'Stock (Dynamic)'
           : assignedSchedule.name,
         isWorkingDay,
+        workerType: isStock ? 'Stock' : 'Admin',
+        isAdminWorkerType: !isStock,
         isDynamicShift: isStock,
         detectedShiftId,
         detectedShiftName,
@@ -812,7 +853,7 @@ export function calculateAttendance(
         secondCheckInDelayMinutes,
         earlyExitMinutes,
         delayMinutes,
-        breakDurationMinutes: isExactPunchOnly
+        breakDurationMinutes: isNoShiftSchedule || isExactPunchOnly
           ? 0
           : (assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0),
         workedMinutes,

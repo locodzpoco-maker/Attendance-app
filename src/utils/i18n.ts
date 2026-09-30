@@ -346,6 +346,9 @@ export interface Translations {
   btnCancel: string;
   stockRoleBadge: string;
   adminRoleBadge: string;
+  workerType: string;
+  adminWorker: string;
+  stockWorker: string;
   obsShiftUnclearDesc: string;
   detectFingerprints: string;
   searchEmployees: string;
@@ -355,6 +358,12 @@ export interface Translations {
   systemDocumentaryPdf: string;
   systemDocumentaryDesc: string;
   downloadPdf: string;
+  importEmployees: string;
+  exportEmployees: string;
+  exportCsv: string;
+  downloadTemplate: string;
+  noShift: string;
+  noShiftDesc: string;
 }
 
 export const TRANSLATIONS: Record<AppLanguage, Translations> = {
@@ -689,6 +698,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     btnCancel: 'Annuler',
     stockRoleBadge: 'Shift Stock',
     adminRoleBadge: 'Admin',
+    workerType: 'Type d\'employé (Rôle)',
+    adminWorker: 'Employé Administratif',
+    stockWorker: 'Employé Stock',
     obsShiftUnclearDesc: 'ne correspond pas clairement aux shifts de stock. Veuillez sélectionner le shift travaillé.',
     detectFingerprints: 'Auto-Détection',
     searchEmployees: 'Rechercher par nom ou matricule...',
@@ -698,6 +710,12 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     systemDocumentaryPdf: 'Guide & Documentaire Système (PDF)',
     systemDocumentaryDesc: 'Documentaire complet, architecture technique et guide d\'utilisation (EN / FR / AR)',
     downloadPdf: 'Télécharger PDF',
+    importEmployees: 'Importer Employés',
+    exportEmployees: 'Exporter Employés',
+    exportCsv: 'Exporter CSV (.csv)',
+    downloadTemplate: 'Modèle Excel',
+    noShift: 'Sans Shift (Libre)',
+    noShiftDesc: 'Calcul direct des heures travaillées Entrée - Sortie',
   },
 
   en: {
@@ -1031,6 +1049,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     btnCancel: 'Cancel',
     stockRoleBadge: 'Stock Shift',
     adminRoleBadge: 'Admin',
+    workerType: 'Worker Type (Role)',
+    adminWorker: 'Admin Worker',
+    stockWorker: 'Stock Worker',
     obsShiftUnclearDesc: 'does not clearly correspond to any stock shifts. Please confirm the shift worked.',
     detectFingerprints: 'Auto-Detect',
     searchEmployees: 'Search by name or ID...',
@@ -1040,6 +1061,12 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     systemDocumentaryPdf: 'System Documentary & Manual (PDF)',
     systemDocumentaryDesc: 'Complete technical architecture, capabilities & operator manual (EN / FR / AR)',
     downloadPdf: 'Download PDF',
+    importEmployees: 'Import Employees',
+    exportEmployees: 'Export Employees',
+    exportCsv: 'Export CSV (.csv)',
+    downloadTemplate: 'Excel Template',
+    noShift: 'No Shift (Flexible)',
+    noShiftDesc: 'Direct calculation of worked hours from check-in to check-out',
   },
 
   ar: {
@@ -1373,6 +1400,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     btnCancel: 'إلغاء',
     stockRoleBadge: 'وردية المخزن',
     adminRoleBadge: 'إداري',
+    workerType: 'نوع العامل (الدور)',
+    adminWorker: 'عامل إدارة',
+    stockWorker: 'عامل مخزن',
     obsShiftUnclearDesc: 'لا تتطابق بوضوح مع ورديات المخزن. يرجى تأكيد الوردية المنجزة.',
     detectFingerprints: 'كشف تلقائي',
     searchEmployees: 'البحث بالاسم أو الرقم...',
@@ -1382,6 +1412,12 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     systemDocumentaryPdf: 'الدليل المرجعي والتوثيق الشامل (PDF)',
     systemDocumentaryDesc: 'التوثيق الفني الشامل، المعمارية، ودليل التشغيل خطوة بخطوة (عربي / إنجليزي / فرنسي)',
     downloadPdf: 'تحميل PDF',
+    importEmployees: 'استيراد الموظفين',
+    exportEmployees: 'تصدير الموظفين',
+    exportCsv: 'تصدير CSV (.csv)',
+    downloadTemplate: 'نموذج إكسل',
+    noShift: 'بدون وردية (مرن)',
+    noShiftDesc: 'حساب مباشر لساعات العمل من الدخول إلى الخروج دون قيود',
   },
 };
 

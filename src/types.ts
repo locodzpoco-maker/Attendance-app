@@ -35,6 +35,7 @@ export interface Employee {
   startDate: string;
   notes?: string;
   hasSaturdayShift?: boolean; // When enabled, employee works Saturday Shift (08:30 - 17:00 for Admin, 10:00 - 17:00 for Stock) on Saturdays
+  workerType?: 'Admin' | 'Stock'; // Worker category: Admin worker or Stock worker
 }
 
 export interface RawDayAttendance {
@@ -115,6 +116,8 @@ export interface DailyAttendanceRecord {
   scheduleId: string;
   scheduleName: string;
   isWorkingDay: boolean;
+  workerType?: 'Admin' | 'Stock';
+  isAdminWorkerType?: boolean;
 
   // Dynamic Shift Detection (for Stock workers)
   isDynamicShift?: boolean;

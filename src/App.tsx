@@ -12,7 +12,7 @@ import {
   PaidVacation,
   AppLanguage,
 } from './types';
-import { DEFAULT_SCHEDULES, STOCK_SHIFT_SATURDAY, ADMIN_SHIFT_SATURDAY } from './utils/schedules';
+import { DEFAULT_SCHEDULES, STOCK_SHIFT_SATURDAY, ADMIN_SHIFT_SATURDAY, NO_SHIFT_SCHEDULE } from './utils/schedules';
 import { DEFAULT_EMPLOYEES, findUnmappedEmployees, DEFAULT_SATURDAY_WORKER_IDS, isSaturdayWorker } from './utils/employees';
 import { calculateAttendance } from './utils/calculator';
 import { generateReferenceDataset } from './utils/sampleData';
@@ -138,6 +138,9 @@ export default function App() {
       }
       if (!list.some((s) => s.id === 'admin_sat')) {
         list.push(ADMIN_SHIFT_SATURDAY);
+      }
+      if (!list.some((s) => s.id === 'no_shift')) {
+        list.unshift(NO_SHIFT_SCHEDULE);
       }
       return list;
     }
@@ -671,6 +674,47 @@ export default function App() {
     });
   };
 
+  const handleImportEmployees = (
+    importedList: Employee[],
+    mode: 'merge' | 'addNewOnly' | 'replace'
+  ) => {
+    if (importedList.length === 0) return;
+    setEmployees((prev) => {
+      let next: Employee[] = [];
+      if (mode === 'replace') {
+        next = importedList;
+      } else if (mode === 'addNewOnly') {
+        const existingIds = new Set(prev.map((e) => e.id.trim()));
+        const toAdd = importedList.filter((e) => !existingIds.has(e.id.trim()));
+        next = [...prev, ...toAdd];
+      } else {
+        // 'merge': update existing, append new
+        const map = new Map<string, Employee>();
+        prev.forEach((e) => map.set(e.id.trim(), e));
+        importedList.forEach((e) => map.set(e.id.trim(), e));
+        next = Array.from(map.values());
+      }
+      saveStorageItem('ams_employees', next);
+      return next;
+    });
+
+    const newLog: AttendanceAuditLog = {
+      id: `audit-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
+      timestamp: new Date().toISOString(),
+      user: settings.activeRole,
+      employeeId: 'IMPORT',
+      employeeName: `${importedList.length} Imported Workers`,
+      date: new Date().toISOString().slice(0, 10),
+      action: 'IMPORT_EMPLOYEES',
+      details: `Imported ${importedList.length} workers via Excel/CSV (mode: ${mode}).`,
+    };
+    setAuditLogs((prev) => {
+      const next = [newLog, ...prev];
+      saveStorageItem('ams_audit_logs', next);
+      return next;
+    });
+  };
+
   const handleUpdateEmployee = (updatedEmp: Employee) => {
     const prevEmp = employees.find((e) => e.id === updatedEmp.id);
     setEmployees((prev) => {
@@ -1015,6 +1059,7 @@ export default function App() {
             schedules={schedules}
             onAddEmployee={handleAddEmployee}
             onAddBatchEmployees={handleAddBatchEmployees}
+            onImportEmployees={handleImportEmployees}
             onUpdateEmployee={handleUpdateEmployee}
             onResetDefaults={() => setEmployees(DEFAULT_EMPLOYEES)}
             onOpenVacationForEmployee={(empId) => handleOpenVacationModal(empId)}

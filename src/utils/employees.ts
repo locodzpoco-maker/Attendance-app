@@ -393,7 +393,9 @@ export const STOCK_WORKER_IDS_SET = new Set<string>(
   STOCK_WORKERS_INPUT.flatMap((w) => generateKeyVariations(w.id))
 );
 
-export function isAdminWorker(employeeId: string): boolean {
+export function isAdminWorker(employeeId: string, employee?: Partial<Employee>): boolean {
+  if (employee?.workerType === 'Admin') return true;
+  if (employee?.workerType === 'Stock') return false;
   if (!employeeId) return false;
   const trimmed = employeeId.trim();
   const lower = trimmed.toLowerCase();
@@ -406,10 +408,13 @@ export function isAdminWorker(employeeId: string): boolean {
   );
 }
 
-export function isStockWorker(employeeId: string): boolean {
+export function isStockWorker(employeeId: string, employee?: Partial<Employee>): boolean {
+  if (employee?.workerType === 'Stock') return true;
+  if (employee?.workerType === 'Admin') return false;
+  if (employee?.companyDepartment && employee.companyDepartment.toLowerCase().includes('stock')) return true;
   if (!employeeId) return false;
   // If explicitly designated as Admin, not stock
-  if (isAdminWorker(employeeId)) return false;
+  if (isAdminWorker(employeeId, employee)) return false;
 
   const trimmed = employeeId.trim();
   const lower = trimmed.toLowerCase();
@@ -464,6 +469,7 @@ const STOCK_EMPLOYEES: Employee[] = STOCK_WORKERS_INPUT.map((worker) => {
     groupName: "Stock",
     scheduleId: "stock_dynamic",
     status: "Active",
+    workerType: 'Stock',
     startDate: "2023-01-01",
     hasSaturdayShift: hasSat,
     notes: hasSat
@@ -482,6 +488,7 @@ const ADMIN_EMPLOYEES: Employee[] = ADMIN_WORKERS_INPUT.map((worker) => {
     groupName: "Admin Group 1",
     scheduleId: "admin_g1",
     status: "Active",
+    workerType: 'Admin',
     startDate: "2023-01-01",
     hasSaturdayShift: hasSat,
     notes: hasSat
@@ -607,6 +614,7 @@ export function createEmployeeFromDetected(
     groupName: overrides?.groupName || detected.suggestedGroupName,
     scheduleId: overrides?.scheduleId || detected.suggestedScheduleId,
     status: 'Active',
+    workerType: overrides?.workerType || (detected.isSuggestedStock ? 'Stock' : 'Admin'),
     startDate: overrides?.startDate || new Date().toISOString().slice(0, 10),
     notes: overrides?.notes || detected.notes,
   };

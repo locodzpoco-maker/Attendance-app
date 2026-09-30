@@ -150,7 +150,27 @@ export const STOCK_DYNAMIC_SCHEDULE: WorkSchedule = {
   overtimeGraceMinutes: 15,
 };
 
+export const NO_SHIFT_SCHEDULE: WorkSchedule = {
+  id: 'no_shift',
+  name: 'Sans Shift (Calcul direct Entrée - Sortie)',
+  groupName: 'Sans Shift / Libre',
+  department: 'Flexible',
+  startTime: '00:00',
+  endTime: '23:59',
+  crossesMidnight: false,
+  hasBreak: false,
+  breakDurationMinutes: 0,
+  overtimeAllowed: false,
+  normalWorkedHours: 8.0,
+  workingDays: ['Sunday', 'Monday', 'Tuesday', 'Wednesday', 'Thursday', 'Saturday'],
+  arrivalGraceMinutes: 0,
+  breakGraceMinutes: 0,
+  earlyExitGraceMinutes: 0,
+  overtimeGraceMinutes: 0,
+};
+
 export const DEFAULT_SCHEDULES: WorkSchedule[] = [
+  NO_SHIFT_SCHEDULE,
   {
     id: 'admin_g1',
     name: 'Admin Group 1 (08:30 - 17:00)',

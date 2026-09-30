@@ -47,7 +47,7 @@ export const AddDetectedWorkersModal: React.FC<AddDetectedWorkersModalProps> = (
 
   // Custom department/schedule overrides per worker ID
   const [overrides, setOverrides] = useState<
-    Record<string, { companyDepartment: string; groupName: string; scheduleId: string }>
+    Record<string, { companyDepartment: string; groupName: string; scheduleId: string; workerType?: 'Stock' | 'Admin' }>
   >({});
 
   // Reset selection when modal opens or unmapped workers change
@@ -111,12 +111,14 @@ export const AddDetectedWorkersModal: React.FC<AddDetectedWorkersModalProps> = (
             companyDepartment: 'Stock & Logistique',
             groupName: 'Stock',
             scheduleId: 'stock_dynamic',
+            workerType: 'Stock',
           };
         } else {
           updated[w.id] = {
             companyDepartment: 'Administration',
             groupName: 'Admin Group 1',
             scheduleId: 'admin_g1',
+            workerType: 'Admin',
           };
         }
       }
@@ -136,6 +138,7 @@ export const AddDetectedWorkersModal: React.FC<AddDetectedWorkersModalProps> = (
       companyDepartment: base.suggestedDepartment,
       groupName: base.suggestedGroupName,
       scheduleId: base.suggestedScheduleId,
+      workerType: base.isSuggestedStock ? 'Stock' : 'Admin',
     };
 
     const next = {
@@ -148,9 +151,11 @@ export const AddDetectedWorkersModal: React.FC<AddDetectedWorkersModalProps> = (
       if (value.toLowerCase().includes('stock')) {
         next.groupName = 'Stock';
         next.scheduleId = 'stock_dynamic';
+        next.workerType = 'Stock';
       } else if (value.toLowerCase().includes('admin')) {
         next.groupName = 'Admin Group 1';
         next.scheduleId = 'admin_g1';
+        next.workerType = 'Admin';
       }
     }
 

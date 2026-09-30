@@ -1,8 +1,10 @@
 import React, { useState, useMemo, useEffect } from 'react';
 import { Employee, WorkSchedule, AppSettings, RawEmployeeRecord } from '../types';
 import { isStockWorker, isAdminWorker, findUnmappedEmployees, createEmployeeFromDetected } from '../utils/employees';
-import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert, UserPlus, Sparkles, Zap, Check, Palmtree, Archive, ArchiveRestore } from 'lucide-react';
+import { Users, Plus, Edit2, Search, CheckCircle, XCircle, ShieldAlert, UserPlus, Sparkles, Zap, Check, Palmtree, Archive, ArchiveRestore, Upload, Download, FileSpreadsheet, ChevronDown, FileDown } from 'lucide-react';
 import { AddDetectedWorkersModal } from './AddDetectedWorkersModal';
+import { ImportEmployeesModal } from './ImportEmployeesModal';
+import { exportEmployeesToExcel, exportEmployeesToCSV, downloadEmployeesSampleTemplate } from '../utils/exporter';
 import { getTranslations } from '../utils/i18n';
 import { getStorageItem, saveStorageItem } from '../utils/storage';
 
@@ -17,6 +19,7 @@ interface EmployeesViewProps {
   schedules: WorkSchedule[];
   onAddEmployee: (emp: Employee) => void;
   onAddBatchEmployees?: (newEmployees: Employee[]) => void;
+  onImportEmployees?: (employees: Employee[], mode: 'merge' | 'addNewOnly' | 'replace') => void;
   onUpdateEmployee: (emp: Employee) => void;
   onResetDefaults?: () => void;
   onOpenVacationForEmployee?: (empId: string) => void;
@@ -29,6 +32,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   schedules,
   onAddEmployee,
   onAddBatchEmployees,
+  onImportEmployees,
   onUpdateEmployee,
   onResetDefaults,
   onOpenVacationForEmployee,
@@ -44,6 +48,8 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     savedFilters?.categoryFilter ?? 'ALL'
   );
   const [showArchived, setShowArchived] = useState(savedFilters?.showArchived ?? false);
+  const [importModalOpen, setImportModalOpen] = useState(false);
+  const [exportDropdownOpen, setExportDropdownOpen] = useState(false);
 
   // Persist employee filters to localStorage in real time
   useEffect(() => {
@@ -92,10 +98,34 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setTimeout(() => setToastMessage(null), 4000);
   };
 
+  const handleImportComplete = (
+    importedList: Employee[],
+    mode: 'merge' | 'addNewOnly' | 'replace'
+  ) => {
+    if (onImportEmployees) {
+      onImportEmployees(importedList, mode);
+    } else if (onAddBatchEmployees) {
+      onAddBatchEmployees(importedList);
+    }
+    setToastMessage(`Importation réussie : ${importedList.length} employé(s) traité(s) !`);
+    setTimeout(() => setToastMessage(null), 4000);
+  };
+
+  const handleExportExcel = () => {
+    exportEmployeesToExcel(filteredEmployees.length > 0 ? filteredEmployees : employees, settings);
+    setExportDropdownOpen(false);
+  };
+
+  const handleExportCSV = () => {
+    exportEmployeesToCSV(filteredEmployees.length > 0 ? filteredEmployees : employees);
+    setExportDropdownOpen(false);
+  };
+
 
   // Form states
   const [empId, setEmpId] = useState('');
   const [name, setName] = useState('');
+  const [workerType, setWorkerType] = useState<'Admin' | 'Stock'>('Admin');
   const [companyDept, setCompanyDept] = useState('Stock & Logistique');
   const [groupName, setGroupName] = useState('Stock Group 1');
   const [scheduleId, setScheduleId] = useState('stock_g1');
@@ -106,10 +136,43 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   const [notes, setNotes] = useState('');
   const [formError, setFormError] = useState('');
 
+  // Helper to reliably check if employee is classified as a Stock worker
+  const isStockWorkerRecord = (e: Employee): boolean => {
+    if (e.workerType === 'Stock') return true;
+    if (e.workerType === 'Admin') return false;
+    return isStockWorker(e.id, e) || (e.companyDepartment || '').toLowerCase().includes('stock');
+  };
+
+  const handleWorkerTypeChange = (newType: 'Admin' | 'Stock') => {
+    setWorkerType(newType);
+    if (newType === 'Stock') {
+      if (!companyDept || companyDept === 'Administration' || companyDept.toLowerCase().includes('admin')) {
+        setCompanyDept('Stock & Logistique');
+      }
+      if (!groupName || groupName === 'Admin Group 1' || groupName === 'Admin Group 2') {
+        setGroupName('Stock');
+      }
+      if (scheduleId === 'admin_g1' || scheduleId === 'admin_g2') {
+        setScheduleId('stock_dynamic');
+      }
+    } else {
+      if (!companyDept || companyDept === 'Stock & Logistique' || companyDept.toLowerCase().includes('stock')) {
+        setCompanyDept('Administration');
+      }
+      if (!groupName || groupName === 'Stock') {
+        setGroupName('Admin Group 1');
+      }
+      if (scheduleId === 'stock_dynamic' || scheduleId.startsWith('stock_')) {
+        setScheduleId('admin_g1');
+      }
+    }
+  };
+
   const openAddModal = () => {
     setEditingEmp(null);
     setEmpId('');
     setName('');
+    setWorkerType('Stock');
     setCompanyDept('Stock & Logistique');
     setGroupName('Stock Group 1');
     setScheduleId(schedules[0]?.id || 'stock_g1');
@@ -123,9 +186,11 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   };
 
   const openEditModal = (emp: Employee) => {
+    const isStock = isStockWorkerRecord(emp);
     setEditingEmp(emp);
     setEmpId(emp.id);
     setName(emp.name);
+    setWorkerType(emp.workerType || (isStock ? 'Stock' : 'Admin'));
     setCompanyDept(emp.companyDepartment);
     setGroupName(emp.groupName);
     setScheduleId(emp.scheduleId);
@@ -195,6 +260,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       isArchived: archivedFlag,
       archivedAt: archivedFlag ? (editingEmp?.archivedAt || new Date().toISOString()) : undefined,
       notes: notes.trim() || undefined,
+      workerType,
     };
 
     if (editingEmp) {
@@ -205,12 +271,34 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setModalOpen(false);
   };
 
+  const handleQuickChangeWorkerType = (emp: Employee, newType: 'Admin' | 'Stock') => {
+    const updated: Employee = {
+      ...emp,
+      workerType: newType,
+      companyDepartment:
+        newType === 'Stock' && (!emp.companyDepartment || emp.companyDepartment === 'Administration')
+          ? 'Stock & Logistique'
+          : (newType === 'Admin' && (!emp.companyDepartment || emp.companyDepartment === 'Stock & Logistique') ? 'Administration' : emp.companyDepartment),
+      groupName:
+        newType === 'Stock' && (emp.groupName === 'Admin Group 1' || emp.groupName === 'Admin Group 2')
+          ? 'Stock'
+          : (newType === 'Admin' && emp.groupName === 'Stock' ? 'Admin Group 1' : emp.groupName),
+      scheduleId:
+        newType === 'Stock' && (emp.scheduleId === 'admin_g1' || emp.scheduleId === 'admin_g2')
+          ? 'stock_dynamic'
+          : (newType === 'Admin' && (emp.scheduleId === 'stock_dynamic' || emp.scheduleId.startsWith('stock_')) ? 'admin_g1' : emp.scheduleId),
+    };
+    onUpdateEmployee(updated);
+    setToastMessage(`${emp.name} (${emp.id}) — ${newType === 'Stock' ? t.stockRoleBadge : t.adminRoleBadge}`);
+    setTimeout(() => setToastMessage(null), 3000);
+  };
+
   const archivedCount = employees.filter((e) => Boolean(e.isArchived || e.status === 'Archived')).length;
   const activeEmployees = employees.filter((e) => !e.isArchived && e.status !== 'Archived');
-  const stockCount = employees.filter((e) => isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock")).length;
+  const stockCount = employees.filter(isStockWorkerRecord).length;
   const adminCount = employees.length - stockCount;
   const saturdayCount = employees.filter((e) => Boolean(e.hasSaturdayShift)).length;
-  const stockSaturdayCount = employees.filter((e) => Boolean(e.hasSaturdayShift) && (isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock"))).length;
+  const stockSaturdayCount = employees.filter((e) => Boolean(e.hasSaturdayShift) && isStockWorkerRecord(e)).length;
   const adminSaturdayCount = saturdayCount - stockSaturdayCount;
 
   const filteredEmployees = employees.filter((e) => {
@@ -222,7 +310,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       // If browsing active categories and not explicitly showing archived, exclude them
       if (!showArchived && isEmpArchived) return false;
 
-      const isStock = isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock");
+      const isStock = isStockWorkerRecord(e);
       if (categoryFilter === "STOCK" && !isStock) return false;
       if (categoryFilter === "ADMIN" && isStock) return false;
       if (categoryFilter === "SATURDAY" && !e.hasSaturdayShift) return false;
@@ -405,29 +493,93 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
             )}
           </div>
 
-          {settings.activeRole !== 'Management' && (
-            <div className="flex items-center gap-2">
-              {unmappedWorkers.length > 0 && (
-                <button
-                  id="toolbar-add-detected-btn"
-                  type="button"
-                  onClick={() => setDetectedModalOpen(true)}
-                  className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors shadow-2xs"
-                  title="Review and add unmapped workers detected in attendance logs"
-                >
-                  <UserPlus className="h-4 w-4" />
-                  <span>{t.detectMissing} ({unmappedWorkers.length})</span>
-                </button>
-              )}
+          <div className="flex items-center gap-2">
+            {/* Export Dropdown */}
+            <div className="relative">
               <button
-                id="add-employee-btn"
-                onClick={openAddModal}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
+                id="export-employees-dropdown-btn"
+                type="button"
+                onClick={() => setExportDropdownOpen((prev) => !prev)}
+                className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition-colors cursor-pointer"
+                title={t.exportEmployees}
               >
-                <Plus className="h-4 w-4" /> {t.addEmployee}
+                <Download className="h-4 w-4 text-emerald-600" />
+                <span>{t.exportEmployees}</span>
+                <ChevronDown className="h-3 w-3 text-slate-400" />
               </button>
+
+              {exportDropdownOpen && (
+                <div
+                  className="absolute right-0 top-full mt-1.5 w-52 rounded-xl border border-slate-200 bg-white shadow-xl py-1.5 z-30 animate-in fade-in zoom-in-95 text-xs"
+                  onMouseLeave={() => setExportDropdownOpen(false)}
+                >
+                  <button
+                    type="button"
+                    onClick={handleExportExcel}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium cursor-pointer"
+                  >
+                    <FileSpreadsheet className="h-4 w-4 text-emerald-600" />
+                    <span>{t.exportExcel}</span>
+                  </button>
+                  <button
+                    type="button"
+                    onClick={handleExportCSV}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-700 font-medium cursor-pointer"
+                  >
+                    <FileDown className="h-4 w-4 text-indigo-600" />
+                    <span>{t.exportCsv}</span>
+                  </button>
+                  <div className="border-t border-slate-100 my-1" />
+                  <button
+                    type="button"
+                    onClick={() => {
+                      downloadEmployeesSampleTemplate();
+                      setExportDropdownOpen(false);
+                    }}
+                    className="w-full text-left px-3 py-2 hover:bg-slate-50 flex items-center gap-2 text-slate-500 text-[11px] cursor-pointer"
+                  >
+                    <Download className="h-3.5 w-3.5 text-slate-400" />
+                    <span>{t.downloadTemplate} (.xlsx)</span>
+                  </button>
+                </div>
+              )}
             </div>
-          )}
+
+            {settings.activeRole !== 'Management' && (
+              <>
+                <button
+                  id="import-employees-btn"
+                  type="button"
+                  onClick={() => setImportModalOpen(true)}
+                  className="inline-flex items-center gap-1.5 rounded-xl border border-slate-300 bg-white hover:bg-slate-50 px-3 py-2 text-xs font-semibold text-slate-700 shadow-2xs transition-colors cursor-pointer"
+                  title={t.importEmployees}
+                >
+                  <Upload className="h-4 w-4 text-indigo-600" />
+                  <span>{t.importEmployees}</span>
+                </button>
+
+                {unmappedWorkers.length > 0 && (
+                  <button
+                    id="toolbar-add-detected-btn"
+                    type="button"
+                    onClick={() => setDetectedModalOpen(true)}
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-amber-500 hover:bg-amber-600 px-3.5 py-2 text-xs font-semibold text-white transition-colors shadow-2xs"
+                    title="Review and add unmapped workers detected in attendance logs"
+                  >
+                    <UserPlus className="h-4 w-4" />
+                    <span>{t.detectMissing} ({unmappedWorkers.length})</span>
+                  </button>
+                )}
+                <button
+                  id="add-employee-btn"
+                  onClick={openAddModal}
+                  className="inline-flex items-center gap-1.5 rounded-xl bg-indigo-600 px-4 py-2 text-xs font-semibold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
+                >
+                  <Plus className="h-4 w-4" /> {t.addEmployee}
+                </button>
+              </>
+            )}
+          </div>
         </div>
       </div>
 
@@ -456,16 +608,30 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                 return (
                   <tr key={e.id} className="hover:bg-slate-50/70 transition-colors">
                     <td className="py-3 px-4 font-mono font-bold text-slate-800 whitespace-nowrap">
-                      {e.id}
-                      {isStockWorker(e.id) ? (
-                        <span className="ml-2 inline-flex items-center rounded-sm bg-indigo-50 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700">
-                          {t.stockRoleBadge}
-                        </span>
-                      ) : (
-                        <span className="ml-2 inline-flex items-center rounded-sm bg-slate-100 px-1.5 py-0.5 text-[10px] font-bold text-slate-600">
-                          {t.adminRoleBadge}
-                        </span>
-                      )}
+                      <div className="flex items-center gap-2">
+                        <span>{e.id}</span>
+                        <div className="relative inline-block">
+                          <select
+                            id={`worker-type-select-${e.id}`}
+                            aria-label={`Change worker type for ${e.name}`}
+                            disabled={settings.activeRole === 'Management'}
+                            value={isStockWorkerRecord(e) ? 'Stock' : 'Admin'}
+                            onChange={(ev) => handleQuickChangeWorkerType(e, ev.target.value as 'Admin' | 'Stock')}
+                            className={`rounded-md border px-2 py-0.5 text-[10px] font-bold cursor-pointer transition-all outline-none appearance-none pr-5 ${
+                              isStockWorkerRecord(e)
+                                ? 'bg-indigo-50 border-indigo-200 text-indigo-700 hover:bg-indigo-100 focus:ring-1 focus:ring-indigo-400'
+                                : 'bg-slate-100 border-slate-300 text-slate-700 hover:bg-slate-200 focus:ring-1 focus:ring-slate-400'
+                            } ${settings.activeRole === 'Management' ? 'cursor-default pointer-events-none opacity-80' : ''}`}
+                            title="Changer le type d'employé: Admin ou Stock"
+                          >
+                            <option value="Admin">🏢 {t.adminRoleBadge}</option>
+                            <option value="Stock">📦 {t.stockRoleBadge}</option>
+                          </select>
+                          <span className="pointer-events-none absolute right-1.5 top-1/2 -translate-y-1/2 text-[8px] text-slate-400">
+                            ▼
+                          </span>
+                        </div>
+                      </div>
                     </td>
                     <td className="py-3 px-4 font-semibold text-slate-900">
                       {e.name}
@@ -510,7 +676,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     </td>
                     <td className="py-3 px-4 text-center">
                       {(() => {
-                        const isStockEmp = isStockWorker(e.id) || e.companyDepartment.toLowerCase().includes("stock");
+                        const isStockEmp = isStockWorkerRecord(e);
                         const satShiftTime = isStockEmp ? '10:00–17:00' : '08:30–17:00';
                         return (
                           <button
@@ -605,7 +771,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-3.5 mt-4 text-xs">
-              <div className="grid grid-cols-2 gap-3">
+              <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
                     {t.colId} <span className="text-rose-500">*</span>
@@ -620,6 +786,23 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     className="w-full rounded-lg border border-slate-300 px-3 py-1.5 font-mono text-slate-800 disabled:bg-slate-100 outline-none focus:border-indigo-500"
                   />
                   <span className="text-[10px] text-slate-400">Stored as text (preserves leading zeros)</span>
+                </div>
+                <div>
+                  <label className="block font-semibold text-slate-700 mb-1">
+                    {t.workerType} <span className="text-rose-500">*</span>
+                  </label>
+                  <select
+                    id="modal-worker-type-dropdown"
+                    value={workerType}
+                    onChange={(e) => handleWorkerTypeChange(e.target.value as 'Admin' | 'Stock')}
+                    className="w-full rounded-lg border-2 border-indigo-300 bg-indigo-50/60 px-2.5 py-1.5 font-bold text-indigo-950 outline-none focus:border-indigo-600 focus:bg-white cursor-pointer transition-colors"
+                  >
+                    <option value="Admin">🏢 {t.adminRoleBadge} ({t.adminWorker})</option>
+                    <option value="Stock">📦 {t.stockRoleBadge} ({t.stockWorker})</option>
+                  </select>
+                  <span className="text-[10px] text-indigo-600 font-medium">
+                    {workerType === 'Stock' ? 'Shifts dynamiques 1–4' : 'Horaire fixe 08:30–17:00'}
+                  </span>
                 </div>
                 <div>
                   <label className="block font-semibold text-slate-700 mb-1">
@@ -681,21 +864,36 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
               </div>
 
               <div>
-                <label className="block font-semibold text-slate-700 mb-1">
-                  {t.assignedSchedule} <span className="text-rose-500">*</span>
+                <label className="block font-semibold text-slate-700 mb-1 flex items-center justify-between">
+                  <span>{t.assignedSchedule} <span className="text-rose-500">*</span></span>
+                  {scheduleId === 'no_shift' && (
+                    <span className="text-[10px] font-bold text-indigo-700 bg-indigo-50 border border-indigo-200 rounded px-1.5 py-0.5">
+                      ⚡ Calcul direct Entrée - Sortie
+                    </span>
+                  )}
                 </label>
                 <select
                   value={scheduleId}
                   onChange={(e) => setScheduleId(e.target.value)}
-                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 outline-none focus:border-indigo-500"
+                  className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-slate-800 outline-none focus:border-indigo-500 cursor-pointer"
                 >
                   {schedules.map((s) => (
                     <option key={s.id} value={s.id}>
-                      {s.name} ({s.startTime} - {s.endTime}
-                      {s.crossesMidnight ? ' next day' : ''})
+                      {s.id === 'no_shift' ? '⚡ ' : ''}{s.name}
+                      {s.id !== 'no_shift' ? ` (${s.startTime} - ${s.endTime}${s.crossesMidnight ? ' next day' : ''})` : ''}
                     </option>
                   ))}
                 </select>
+                {scheduleId === 'no_shift' && (
+                  <div className="mt-1.5 rounded-xl border border-indigo-200 bg-indigo-50/80 p-2.5 text-xs text-indigo-900 leading-relaxed">
+                    <p className="font-bold flex items-center gap-1.5 text-indigo-950">
+                      <span>⚡</span> Option Sans Shift (Calcul Normal) :
+                    </p>
+                    <p className="text-[11px] text-indigo-800 mt-0.5">
+                      Cet employé ne suit aucun shift fixe. Ses heures de travail sont calculées normalement entre son pointage d'entrée et son pointage de sortie, sans aucune pénalité de retard ou de sortie anticipée.
+                    </p>
+                  </div>
+                )}
               </div>
 
               <div className="grid grid-cols-2 gap-3">
@@ -730,7 +928,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                     className="mt-0.5 h-4 w-4 rounded border-slate-300 text-teal-600 focus:ring-teal-500"
                   />
                   {(() => {
-                    const isStockEmp = isStockWorker(empId) || companyDept.toLowerCase().includes('stock');
+                    const isStockEmp = workerType === 'Stock';
                     const satSched = schedules.find((s) => s.id === (isStockEmp ? 'stock_sat' : 'admin_sat'));
                     const startT = satSched?.startTime || (isStockEmp ? '10:00' : '09:00');
                     const endT = satSched?.endTime || '17:00';
@@ -829,6 +1027,15 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
         onAddWorkers={handleAddBatchFromModal}
         totalSavedCount={employees.length}
         totalDetectedCount={rawEmployeesFromDataset?.length || (employees.length + unmappedWorkers.length)}
+      />
+
+      {/* Import Employees Modal */}
+      <ImportEmployeesModal
+        isOpen={importModalOpen}
+        onClose={() => setImportModalOpen(false)}
+        existingEmployees={employees}
+        schedules={schedules}
+        onImportComplete={handleImportComplete}
       />
     </div>
   );
