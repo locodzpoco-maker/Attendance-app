@@ -108,6 +108,16 @@ export interface Translations {
   exactPunchOptionTitle: string;
   exactPunchOptionDesc: string;
   exactPunchObsDetail: string;
+  exactPunchDeductedTooltip: string;
+  exactPunchIncludedTooltip: string;
+  exactPunchDefaultOptionLabel: string;
+  exactPunchDefaultOptionDesc: string;
+  bulkApplyPauseIncluded: string;
+  bulkApplyPauseDeducted: string;
+  eligibleForOvertimeLabel: string;
+  eligibleForOvertimeDesc: string;
+  overtimeCalculatedPreview: string;
+  noOvertimeCalculatedPreview: string;
   filterExactPunches: string;
   groupSchedule: string;
   btnAdjust: string;
@@ -364,6 +374,12 @@ export interface Translations {
   downloadTemplate: string;
   noShift: string;
   noShiftDesc: string;
+  deductPauseOption: string;
+  includePauseOption: string;
+  pauseHandling: string;
+  pauseHandlingDesc: string;
+  pauseDeducted: string;
+  pauseIncluded: string;
 }
 
 export const TRANSLATIONS: Record<AppLanguage, Translations> = {
@@ -462,14 +478,24 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colObservation: 'Observation',
     colActions: 'Actions',
     colExactPunchShort: 'Ign. Retard',
-    colExactPunchTooltip: 'Ignorer le retard & Pause non incluse : ne pas compter de retard, ne pas déduire le temps de pause, et marquer Ponctuel',
-    exactPunchEnabledTitle: 'Retard ignoré et temps de pause non inclus (statut Ponctuel). Cliquer pour rétablir le calcul normal.',
-    exactPunchDisabledTitle: 'Ignorer le retard et ne pas inclure le temps de pause pour cette journée (statut Ponctuel)',
+    colExactPunchTooltip: 'Ne pas compter les retards : marquer Ponctuel et choisir d’inclure ou déduire le temps de pause',
+    exactPunchEnabledTitle: 'Retards ignorés (statut Ponctuel). Cliquer pour rétablir le calcul normal.',
+    exactPunchDisabledTitle: 'Ne pas compter les retards pour cette journée (statut Ponctuel)',
     exactPunchBadge: 'Ponctuel',
-    exactPunchBadgeTitle: 'Retard ignoré et pause non incluse (statut Ponctuel)',
-    exactPunchOptionTitle: 'Retard ignoré & Pause non incluse',
-    exactPunchOptionDesc: 'Journées avec retard ignoré et temps de pause non inclus (heures travaillées comptabilisées et statut Ponctuel).',
+    exactPunchBadgeTitle: 'Retards ignorés (statut Ponctuel)',
+    exactPunchOptionTitle: 'Ne pas compter les retards (Statut Ponctuel)',
+    exactPunchOptionDesc: 'Ignorer les retards à l’arrivée et reprise pause, marquer la journée Ponctuelle et choisir d’inclure ou déduire le temps de pause.',
     exactPunchObsDetail: 'Ponctuel',
+    exactPunchDeductedTooltip: 'Retards ignorés & Pause déduite (-30m/-60m). Cliquer pour INCLURE la pause dans les heures.',
+    exactPunchIncludedTooltip: 'Retards ignorés & Pause incluse dans les heures (non déduite). Cliquer pour DÉDUIRE la pause.',
+    exactPunchDefaultOptionLabel: 'Comportement par défaut lors du cochage de « Ne pas compter les retards »',
+    exactPunchDefaultOptionDesc: 'Détermine si la pause est incluse dans les heures travaillées ou déduite lorsque vous cochez la case.',
+    bulkApplyPauseIncluded: 'Appliquer « Pause Incluse » à toutes les lignes cochées',
+    bulkApplyPauseDeducted: 'Appliquer « Pause Déduite » à toutes les lignes cochées',
+    eligibleForOvertimeLabel: 'Éligible aux heures supplémentaires',
+    eligibleForOvertimeDesc: 'Active le calcul automatique des heures supplémentaires pour cet employé (au-delà de l\'horaire du shift).',
+    overtimeCalculatedPreview: 'Heures supplémentaires calculées',
+    noOvertimeCalculatedPreview: 'Aucune heure supp. à calculer (la sortie ne dépasse pas l’horaire).',
     filterExactPunches: 'Retard ignoré (Ponctuel)',
     groupSchedule: 'Groupe & Horaire',
     btnAdjust: 'Ajuster',
@@ -716,6 +742,12 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     downloadTemplate: 'Modèle Excel',
     noShift: 'Sans Shift (Libre)',
     noShiftDesc: 'Calcul direct des heures travaillées Entrée - Sortie',
+    deductPauseOption: 'Déduire la pause',
+    includePauseOption: 'Ne pas déduire la pause (Pause incluse)',
+    pauseHandling: 'Gestion de la pause',
+    pauseHandlingDesc: 'Choisir si le temps de pause du shift doit être déduit ou inclus dans les heures travaillées lorsque les retards sont ignorés.',
+    pauseDeducted: 'Pause déduite',
+    pauseIncluded: 'Pause incluse',
   },
 
   en: {
@@ -812,15 +844,25 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colSupp: 'Supp',
     colObservation: 'Observation',
     colActions: 'Actions',
-    colExactPunchShort: 'Ign. Late',
-    colExactPunchTooltip: 'Ignore late & do not include rest time: no late penalty, do not deduct rest time, and mark status On Time',
-    exactPunchEnabledTitle: 'Late time ignored and rest time not included (status On Time). Click to restore normal calculation.',
-    exactPunchDisabledTitle: 'Ignore late time and do not include rest time for this day (status On Time)',
+    colExactPunchShort: "Don't count late",
+    colExactPunchTooltip: "Don't count late hours: mark On Time and choose whether to include or deduct pause/break time",
+    exactPunchEnabledTitle: 'Late hours ignored (status On Time). Click to restore normal calculation.',
+    exactPunchDisabledTitle: "Don't count late hours for this day (status On Time)",
     exactPunchBadge: 'On Time',
-    exactPunchBadgeTitle: 'Late time ignored and rest time not included (status On Time)',
-    exactPunchOptionTitle: 'Ignore Late & Exclude Rest Time',
-    exactPunchOptionDesc: 'Days where late time is ignored and rest/break time is not included, only worked hours are counted, and status is On Time.',
+    exactPunchBadgeTitle: 'Late hours ignored (status On Time)',
+    exactPunchOptionTitle: "Don't count late hours (On Time Status)",
+    exactPunchOptionDesc: 'Ignore arrival and pause return delays, mark On Time, and choose whether to include or deduct pause time.',
     exactPunchObsDetail: 'On Time',
+    exactPunchDeductedTooltip: 'Late ignored & Break deducted. Click to INCLUDE break in worked hours.',
+    exactPunchIncludedTooltip: 'Late ignored & Break included (not deducted). Click to DEDUCT break time.',
+    exactPunchDefaultOptionLabel: "Default behavior when checking \"Don't count late hours\"",
+    exactPunchDefaultOptionDesc: 'Determines whether the break time is included in worked hours or deducted when checking the box.',
+    bulkApplyPauseIncluded: 'Apply "Break Included" to all checked rows',
+    bulkApplyPauseDeducted: 'Apply "Break Deducted" to all checked rows',
+    eligibleForOvertimeLabel: 'Eligible for overtime',
+    eligibleForOvertimeDesc: 'Enables automatic calculation of overtime hours for this worker (beyond shift schedule).',
+    overtimeCalculatedPreview: 'Overtime hours calculated',
+    noOvertimeCalculatedPreview: 'No overtime to calculate (exit does not exceed shift end time).',
     filterExactPunches: 'Late Ignored (On Time)',
     groupSchedule: 'Group & Schedule',
     btnAdjust: 'Adjust',
@@ -1067,6 +1109,12 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     downloadTemplate: 'Excel Template',
     noShift: 'No Shift (Flexible)',
     noShiftDesc: 'Direct calculation of worked hours from check-in to check-out',
+    deductPauseOption: 'Deduct Pause / Break',
+    includePauseOption: 'Do Not Deduct Break (Include in Worked Hours)',
+    pauseHandling: 'Break / Pause Handling',
+    pauseHandlingDesc: 'Choose whether the shift break time should be deducted or included in worked hours when late hours are not counted.',
+    pauseDeducted: 'Break Deducted',
+    pauseIncluded: 'Break Included',
   },
 
   ar: {
@@ -1164,14 +1212,24 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     colObservation: 'الملاحظة',
     colActions: 'إجراءات',
     colExactPunchShort: 'تجاهل التأخير',
-    colExactPunchTooltip: 'تجاهل التأخير وعدم تضمين وقت الاستراحة: عدم احتساب التأخير، عدم خصم وقت الاستراحة، وتعيين الحالة في الوقت',
-    exactPunchEnabledTitle: 'تم تجاهل التأخير وعدم تضمين وقت الاستراحة (الحالة في الوقت). انقر للاستعادة.',
-    exactPunchDisabledTitle: 'تجاهل التأخير وعدم تضمين وقت الاستراحة لهذا اليوم (الحالة في الوقت)',
+    colExactPunchTooltip: 'عدم احتساب ساعات التأخير: تعيين الحالة في الوقت مع خيار تضمين أو خصم الاستراحة',
+    exactPunchEnabledTitle: 'تم تجاهل التأخير (الحالة في الوقت). انقر للاستعادة.',
+    exactPunchDisabledTitle: 'عدم احتساب ساعات التأخير لهذا اليوم (الحالة في الوقت)',
     exactPunchBadge: 'في الوقت',
-    exactPunchBadgeTitle: 'تم تجاهل التأخير وعدم تضمين وقت الاستراحة (الحالة في الوقت)',
-    exactPunchOptionTitle: 'تجاهل التأخير واستبعاد الاستراحة',
-    exactPunchOptionDesc: 'أيام تم فيها تجاهل التأخير وعدم تضمين وقت الاستراحة، مع احتساب ساعات العمل فقط وتعيين الحالة في الوقت.',
+    exactPunchBadgeTitle: 'تم تجاهل التأخير (الحالة في الوقت)',
+    exactPunchOptionTitle: 'عدم احتساب ساعات التأخير (الحالة في الوقت)',
+    exactPunchOptionDesc: 'تجاهل التأخير في الوصول واستئناف الاستراحة، وتعيين الحالة في الوقت مع خيار تضمين أو خصم وقت الاستراحة.',
     exactPunchObsDetail: 'في الوقت',
+    exactPunchDeductedTooltip: 'تم تجاهل التأخير وخصم الاستراحة (-30د/-60د). انقر لتضمين الاستراحة ضمن ساعات العمل.',
+    exactPunchIncludedTooltip: 'تم تجاهل التأخير وتضمين الاستراحة (غير مخصومة). انقر لخصم الاستراحة.',
+    exactPunchDefaultOptionLabel: 'الخيار الافتراضي عند تحديد «عدم احتساب ساعات التأخير»',
+    exactPunchDefaultOptionDesc: 'تحديد ما إذا كان وقت الاستراحة يُدرج ضمن الساعات المحتسبة أو يُخصم عند تحديد المربع.',
+    bulkApplyPauseIncluded: 'تطبيق «استراحة مدرجة» على جميع السجلات المحددة',
+    bulkApplyPauseDeducted: 'تطبيق «استراحة مخصومة» على جميع السجلات المحددة',
+    eligibleForOvertimeLabel: 'مؤهل للعمل الإضافي',
+    eligibleForOvertimeDesc: 'تفعيل الحساب التلقائي لساعات العمل الإضافي لهذا العامل (بعد نهاية الوردية).',
+    overtimeCalculatedPreview: 'ساعات العمل الإضافي المحتسبة',
+    noOvertimeCalculatedPreview: 'لا يوجد عمل إضافي لاحتسابه (وقت الخروج لم يتجاوز نهاية الوردية).',
     filterExactPunches: 'تجاهل التأخير (في الوقت)',
     groupSchedule: 'المجموعة والجدول',
     btnAdjust: 'تعديل',
@@ -1418,6 +1476,12 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     downloadTemplate: 'نموذج إكسل',
     noShift: 'بدون وردية (مرن)',
     noShiftDesc: 'حساب مباشر لساعات العمل من الدخول إلى الخروج دون قيود',
+    deductPauseOption: 'خصم وقت الاستراحة',
+    includePauseOption: 'عدم خصم الاستراحة (مدرجة ضمن الساعات)',
+    pauseHandling: 'معالجة وقت الاستراحة',
+    pauseHandlingDesc: 'تحديد ما إذا كان وقت استراحة الوردية يُخصم أو يُدرج ضمن الساعات المحتسبة عند تجاهل التأخير.',
+    pauseDeducted: 'استراحة مخصومة',
+    pauseIncluded: 'استراحة مدرجة',
   },
 };
 

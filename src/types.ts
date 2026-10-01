@@ -36,6 +36,7 @@ export interface Employee {
   notes?: string;
   hasSaturdayShift?: boolean; // When enabled, employee works Saturday Shift (08:30 - 17:00 for Admin, 10:00 - 17:00 for Stock) on Saturdays
   workerType?: 'Admin' | 'Stock'; // Worker category: Admin worker or Stock worker
+  eligibleForOvertime?: boolean; // When true: employee is eligible for overtime calculation
 }
 
 export interface RawDayAttendance {
@@ -97,7 +98,9 @@ export interface ManualAdjustment {
   adjustedExit?: string;
   overrideShiftId?: string; // e.g. "stock_g1", "stock_g2", "stock_g3", "stock_g4"
   injectedSuppMinutes?: number; // additional/injected overtime minutes for this worker on this day
-  exactPunchOnly?: boolean; // When true: ignores late arrival, 2nd check-in delay, early exit, and does not include/deduct rest time for this day
+  exactPunchOnly?: boolean; // When true: ignores late arrival, 2nd check-in delay, early exit
+  deductBreak?: boolean; // When exactPunchOnly is true: true = deduct pause time, false = do not deduct pause time (include in worked hours)
+  eligibleForOvertime?: boolean; // When true: calculates overtime for that worker on this day
   reason: string;
   adjustedBy: string;
   adjustedAt: string;
@@ -137,7 +140,9 @@ export interface DailyAttendanceRecord {
   // Manual Adjustment (if any)
   manualAdjustment?: ManualAdjustment;
   isManuallyAdjusted: boolean;
-  exactPunchOnly?: boolean; // When true: counts time between check-in and check-out without rest time deduction, ignoring late and early exit
+  exactPunchOnly?: boolean; // When true: ignores late arrival, 2nd check-in delay, and early exit
+  deductBreak?: boolean; // When exactPunchOnly is true: true = deduct pause time, false = do not deduct pause time
+  eligibleForOvertime?: boolean; // When true: overtime was calculated for this worker on this day
   
   // Calculated figures
   firstCheckInDelayMinutes: number; // delay on shift entry past grace
@@ -211,6 +216,7 @@ export interface AppSettings {
   allowRecalculationOnFly: boolean;
   activeRole: 'Administrator' | 'HR / Attendance User' | 'Management';
   language?: AppLanguage;
+  exactPunchDeductBreakDefault?: boolean; // Default whether pause time is deducted when checking "Don't count late hours" (false = include pause, true = deduct pause)
 }
 
 export interface HistoricalPeriodRecord {

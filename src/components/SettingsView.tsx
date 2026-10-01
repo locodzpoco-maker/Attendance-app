@@ -51,6 +51,9 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
   const [arrivalGrace, setArrivalGrace] = useState(settings.defaultArrivalGraceMinutes);
   const [breakGrace, setBreakGrace] = useState(settings.defaultBreakGraceMinutes ?? 10);
   const [activeRole, setActiveRole] = useState(settings.activeRole);
+  const [exactPunchDeductBreakDefault, setExactPunchDeductBreakDefault] = useState<boolean>(
+    Boolean(settings.exactPunchDeductBreakDefault)
+  );
   const [selectedLanguage, setSelectedLanguage] = useState<AppLanguage>(settings.language || 'fr');
   const [savedSuccess, setSavedSuccess] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -62,6 +65,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
     setArrivalGrace(settings.defaultArrivalGraceMinutes);
     setBreakGrace(settings.defaultBreakGraceMinutes ?? 10);
     setActiveRole(settings.activeRole);
+    setExactPunchDeductBreakDefault(Boolean(settings.exactPunchDeductBreakDefault));
     setSelectedLanguage(settings.language || 'fr');
   }, [settings]);
 
@@ -83,6 +87,7 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
       defaultArrivalGraceMinutes: Number(arrivalGrace),
       defaultBreakGraceMinutes: Number(breakGrace),
       activeRole,
+      exactPunchDeductBreakDefault,
       language: selectedLanguage,
     });
     setSavedSuccess(true);
@@ -286,6 +291,72 @@ export const SettingsView: React.FC<SettingsViewProps> = ({
                 <option value="HR / Attendance User">{t.hrUser}</option>
                 <option value="Management">{t.management}</option>
               </select>
+            </div>
+          </div>
+
+          {/* Exact Punch & Pause Handling Default */}
+          <div className="pt-4 border-t border-slate-100 space-y-2">
+            <div>
+              <label className="block font-semibold text-slate-800 text-xs">
+                {t.exactPunchDefaultOptionLabel}
+              </label>
+              <p className="text-[11px] text-slate-500 mt-0.5 leading-relaxed">
+                {t.exactPunchDefaultOptionDesc}
+              </p>
+            </div>
+
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 pt-1">
+              <label
+                className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                  !exactPunchDeductBreakDefault
+                    ? 'border-emerald-500 bg-emerald-50/60 ring-1 ring-emerald-500 font-semibold text-emerald-950 shadow-2xs'
+                    : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="exactPunchDeductBreakSetting"
+                  checked={!exactPunchDeductBreakDefault}
+                  onChange={() => setExactPunchDeductBreakDefault(false)}
+                  className="mt-0.5 text-emerald-600 focus:ring-emerald-500"
+                />
+                <div>
+                  <span className="text-xs font-bold block">🟢 {t.includePauseOption}</span>
+                  <span className="text-[11px] text-slate-500 font-normal block mt-0.5">
+                    {settings.language === 'ar'
+                      ? 'تُحسب جميع الساعات بين الدخول والخروج دون خصم وقت الاستراحة.'
+                      : settings.language === 'en'
+                      ? 'All hours between Entry and Exit are counted. Pause time is NOT deducted.'
+                      : 'Toutes les heures entre Entrée et Sortie sont comptées. Le temps de pause n\'est pas déduit.'}
+                  </span>
+                </div>
+              </label>
+
+              <label
+                className={`flex items-start gap-2.5 p-3 rounded-xl border cursor-pointer transition-all ${
+                  exactPunchDeductBreakDefault
+                    ? 'border-sky-500 bg-sky-50/60 ring-1 ring-sky-500 font-semibold text-sky-950 shadow-2xs'
+                    : 'border-slate-200 bg-slate-50/50 text-slate-700 hover:bg-slate-50'
+                }`}
+              >
+                <input
+                  type="radio"
+                  name="exactPunchDeductBreakSetting"
+                  checked={exactPunchDeductBreakDefault}
+                  onChange={() => setExactPunchDeductBreakDefault(true)}
+                  className="mt-0.5 text-sky-600 focus:ring-sky-500"
+                />
+                <div>
+                  <span className="text-xs font-bold block">🔵 {t.deductPauseOption}</span>
+                  <span className="text-[11px] text-slate-500 font-normal block mt-0.5">
+                    {settings.language === 'ar'
+                      ? 'يُخصم وقت استراحة الوردية من ساعات العمل (الحساب الصافي).'
+                      : settings.language === 'en'
+                      ? 'The shift break time is deducted from worked hours (net calculation).'
+                      : 'Le temps de pause du shift est déduit des heures travaillées (calcul net).'}
+                  </span>
+                </div>
+              </label>
             </div>
           </div>
 

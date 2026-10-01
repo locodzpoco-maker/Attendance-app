@@ -133,6 +133,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
   const [isArchived, setIsArchived] = useState(false);
   const [startDate, setStartDate] = useState(new Date().toISOString().slice(0, 10));
   const [hasSaturdayShift, setHasSaturdayShift] = useState(false);
+  const [eligibleForOvertime, setEligibleForOvertime] = useState(true);
   const [notes, setNotes] = useState('');
   const [formError, setFormError] = useState('');
 
@@ -180,6 +181,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setIsArchived(false);
     setStartDate(new Date().toISOString().slice(0, 10));
     setHasSaturdayShift(false);
+    setEligibleForOvertime(true);
     setNotes('');
     setFormError('');
     setModalOpen(true);
@@ -198,6 +200,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setIsArchived(Boolean(emp.isArchived || emp.status === 'Archived'));
     setStartDate(emp.startDate);
     setHasSaturdayShift(Boolean(emp.hasSaturdayShift));
+    setEligibleForOvertime(emp.eligibleForOvertime !== undefined ? Boolean(emp.eligibleForOvertime) : true);
     setNotes(emp.notes || '');
     setFormError('');
     setModalOpen(true);
@@ -257,6 +260,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       status: archivedFlag ? 'Archived' : status,
       startDate,
       hasSaturdayShift,
+      eligibleForOvertime,
       isArchived: archivedFlag,
       archivedAt: archivedFlag ? (editingEmp?.archivedAt || new Date().toISOString()) : undefined,
       notes: notes.trim() || undefined,
@@ -953,6 +957,31 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                       </div>
                     );
                   })()}
+                </label>
+              </div>
+
+              {/* Eligible for Overtime Toggle */}
+              <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3">
+                <label className="flex items-start gap-2.5 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={eligibleForOvertime}
+                    onChange={(e) => setEligibleForOvertime(e.target.checked)}
+                    className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500"
+                  />
+                  <div className="text-xs">
+                    <span className="font-bold text-indigo-950 flex items-center gap-1.5">
+                      <span>⏱️</span> {t.eligibleForOvertimeLabel}
+                      <span className={`text-[10px] font-bold rounded px-1.5 py-0.2 ${
+                        eligibleForOvertime ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
+                      }`}>
+                        {eligibleForOvertime ? '✓ Actif' : 'Inactif'}
+                      </span>
+                    </span>
+                    <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">
+                      {t.eligibleForOvertimeDesc}
+                    </p>
+                  </div>
                 </label>
               </div>
 

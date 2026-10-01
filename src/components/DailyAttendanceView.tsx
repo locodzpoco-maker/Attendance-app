@@ -28,6 +28,8 @@ import {
   UserCheck,
   Eye,
   EyeOff,
+  Settings as SettingsIcon,
+  Check,
 } from 'lucide-react';
 import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
 import { getTranslations, translateDayOfWeek, Translations } from '../utils/i18n';
@@ -50,7 +52,10 @@ interface DailyAttendanceViewProps {
   onOpenCorrection: (record: DailyAttendanceRecord) => void;
   onOpenInjectSupp?: (record?: DailyAttendanceRecord) => void;
   onOpenVacationForEmployee?: (empId: string, date: string) => void;
-  onToggleExactPunchOnly?: (recordId: string) => void;
+  onToggleExactPunchOnly?: (recordId: string, forcedDeductBreak?: boolean) => void;
+  onToggleExactPunchDeductBreak?: (recordId: string) => void;
+  onBulkSetExactPunchBreakMode?: (recordIds: string[], deductBreak: boolean) => void;
+  onUpdateSettings?: (settings: AppSettings) => void;
   onExportExcel: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   onExportPDF: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   settings: AppSettings;
@@ -110,6 +115,9 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   onOpenInjectSupp,
   onOpenVacationForEmployee,
   onToggleExactPunchOnly,
+  onToggleExactPunchDeductBreak,
+  onBulkSetExactPunchBreakMode,
+  onUpdateSettings,
   onExportExcel,
   onExportPDF,
   settings,
@@ -117,6 +125,18 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   onClearSelectedEmployee,
 }) => {
   const t = getTranslations(settings.language);
+  const [openRowMenuId, setOpenRowMenuId] = useState<string | null>(null);
+  const [showHeaderPauseMenu, setShowHeaderPauseMenu] = useState<boolean>(false);
+
+  // Close menus on outside click
+  useEffect(() => {
+    const handleGlobalClick = () => {
+      setOpenRowMenuId(null);
+      setShowHeaderPauseMenu(false);
+    };
+    window.addEventListener('click', handleGlobalClick);
+    return () => window.removeEventListener('click', handleGlobalClick);
+  }, []);
   const [savedFilters] = useState<SavedDailyFilters | null>(() =>
     getStorageItem<SavedDailyFilters | null>('ams_daily_filters', null)
   );
@@ -1032,12 +1052,142 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
             <thead>
               <tr className="border-b border-slate-200 bg-slate-50/80 text-slate-600 font-semibold text-[11px]">
                 <th
-                  className="py-2.5 px-1 text-center w-8 font-bold whitespace-nowrap"
+                  className="py-2.5 px-2 text-center font-bold whitespace-nowrap min-w-[105px]"
                   title={t.colExactPunchTooltip}
                 >
-                  <span className="text-[10px] uppercase font-bold text-slate-500 tracking-wider">
-                    {t.colExactPunchShort}
-                  </span>
+                  <div className="inline-flex flex-col items-center justify-center gap-0.5">
+                    <div className="flex items-center gap-1">
+                      <span className="text-[10px] uppercase font-bold text-slate-600 tracking-wider">
+                        {t.colExactPunchShort}
+                      </span>
+                      {/* Popover trigger for header default pause mode & bulk actions */}
+                      <div className="relative inline-block text-left">
+                        <button
+                          type="button"
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setShowHeaderPauseMenu(!showHeaderPauseMenu);
+                          }}
+                          className="p-0.5 rounded hover:bg-slate-200 text-slate-400 hover:text-slate-700 transition-colors cursor-pointer"
+                          title="Options de pause pour les retards ignorés"
+                        >
+                          <SettingsIcon className="h-3 w-3" />
+                        </button>
+
+                        {showHeaderPauseMenu && (
+                          <div
+                            onClick={(e) => e.stopPropagation()}
+                            className="absolute left-0 top-full mt-1 w-64 rounded-xl bg-white p-3 shadow-xl border border-slate-200 z-50 text-left text-xs space-y-2.5"
+                          >
+                            <div>
+                              <p className="font-bold text-slate-900 text-xs">
+                                Option Pause par défaut :
+                              </p>
+                              <p className="text-[10px] text-slate-500 mt-0.5">
+                                Mode appliqué lors du clic sur la case à cocher.
+                              </p>
+                            </div>
+
+                            <div className="space-y-1.5">
+                              <label className={`flex items-start gap-2 p-1.5 rounded-lg border cursor-pointer ${
+                                !settings.exactPunchDeductBreakDefault
+                                  ? 'bg-emerald-50 border-emerald-400 text-emerald-950 font-semibold'
+                                  : 'hover:bg-slate-50 border-slate-200 text-slate-700'
+                              }`}>
+                                <input
+                                  type="radio"
+                                  name="headerExactDefault"
+                                  checked={!settings.exactPunchDeductBreakDefault}
+                                  onChange={() => {
+                                    onUpdateSettings?.({
+                                      ...settings,
+                                      exactPunchDeductBreakDefault: false,
+                                    });
+                                  }}
+                                  className="mt-0.5 text-emerald-600"
+                                />
+                                <div>
+                                  <span className="text-[11px] block font-bold">🟢 {t.includePauseOption}</span>
+                                  <span className="text-[9px] text-slate-500 font-normal block">
+                                    Toutes les heures comptées, pause non déduite
+                                  </span>
+                                </div>
+                              </label>
+
+                              <label className={`flex items-start gap-2 p-1.5 rounded-lg border cursor-pointer ${
+                                settings.exactPunchDeductBreakDefault
+                                  ? 'bg-sky-50 border-sky-400 text-sky-950 font-semibold'
+                                  : 'hover:bg-slate-50 border-slate-200 text-slate-700'
+                              }`}>
+                                <input
+                                  type="radio"
+                                  name="headerExactDefault"
+                                  checked={Boolean(settings.exactPunchDeductBreakDefault)}
+                                  onChange={() => {
+                                    onUpdateSettings?.({
+                                      ...settings,
+                                      exactPunchDeductBreakDefault: true,
+                                    });
+                                  }}
+                                  className="mt-0.5 text-sky-600"
+                                />
+                                <div>
+                                  <span className="text-[11px] block font-bold">🔵 {t.deductPauseOption}</span>
+                                  <span className="text-[9px] text-slate-500 font-normal block">
+                                    Pause déduite des heures travaillées
+                                  </span>
+                                </div>
+                              </label>
+                            </div>
+
+                            {exactPunchCount > 0 && (
+                              <div className="pt-2 border-t border-slate-100 space-y-1">
+                                <p className="text-[10px] font-bold text-slate-400 uppercase tracking-wider">
+                                  Appliquer aux {exactPunchCount} cochés :
+                                </p>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const ids = records.filter((r) => r.exactPunchOnly).map((r) => r.id);
+                                    onBulkSetExactPunchBreakMode?.(ids, false);
+                                    setShowHeaderPauseMenu(false);
+                                  }}
+                                  className="w-full text-left px-2 py-1 rounded bg-emerald-50 hover:bg-emerald-100 text-emerald-900 font-medium text-[11px] flex items-center justify-between"
+                                >
+                                  <span>🟢 Passer en Pause Incluse</span>
+                                  <span className="text-[10px] font-bold">({exactPunchCount})</span>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    const ids = records.filter((r) => r.exactPunchOnly).map((r) => r.id);
+                                    onBulkSetExactPunchBreakMode?.(ids, true);
+                                    setShowHeaderPauseMenu(false);
+                                  }}
+                                  className="w-full text-left px-2 py-1 rounded bg-sky-50 hover:bg-sky-100 text-sky-900 font-medium text-[11px] flex items-center justify-between"
+                                >
+                                  <span>🔵 Passer en Pause Déduite</span>
+                                  <span className="text-[10px] font-bold">({exactPunchCount})</span>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Small badge indicating active default */}
+                    <span
+                      className={`text-[9px] font-semibold px-1 py-0.2 rounded border ${
+                        settings.exactPunchDeductBreakDefault
+                          ? 'bg-sky-50 text-sky-700 border-sky-200'
+                          : 'bg-emerald-50 text-emerald-700 border-emerald-200'
+                      }`}
+                      title={t.exactPunchDefaultOptionDesc}
+                    >
+                      {settings.exactPunchDeductBreakDefault ? 'Défaut: Déduite' : 'Défaut: Incluse'}
+                    </span>
+                  </div>
                 </th>
                 <th className="py-2.5 px-2 whitespace-nowrap">{t.colDate}</th>
                 <th className="py-2.5 px-2 font-mono whitespace-nowrap">{t.colId}</th>
@@ -1095,26 +1245,179 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                           : ''
                     }`}
                   >
-                    {/* Ignore Late / On Time Checkbox */}
+                    {/* Ignore Late / On Time Checkbox & Pause Mode Toggle */}
                     <td className="py-2 px-1 text-center whitespace-nowrap">
-                      <label
-                        htmlFor={`check-exact-punch-${r.id}`}
-                        className="inline-flex items-center justify-center p-0.5 rounded hover:bg-slate-100 cursor-pointer transition-colors"
-                        title={
-                          r.exactPunchOnly
-                            ? t.exactPunchEnabledTitle
-                            : t.exactPunchDisabledTitle
-                        }
-                      >
-                        <input
-                          id={`check-exact-punch-${r.id}`}
-                          type="checkbox"
-                          checked={Boolean(r.exactPunchOnly)}
-                          onChange={() => onToggleExactPunchOnly?.(r.id)}
-                          disabled={settings.activeRole === 'Management'}
-                          className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:cursor-not-allowed transition-transform hover:scale-110"
-                        />
-                      </label>
+                      <div className="inline-flex items-center gap-1 justify-center">
+                        <label
+                          htmlFor={`check-exact-punch-${r.id}`}
+                          className="inline-flex items-center justify-center p-0.5 rounded hover:bg-slate-100 cursor-pointer transition-colors"
+                          title={
+                            r.exactPunchOnly
+                              ? (r.deductBreak ? t.exactPunchDeductedTooltip : t.exactPunchIncludedTooltip)
+                              : t.exactPunchDisabledTitle
+                          }
+                        >
+                          <input
+                            id={`check-exact-punch-${r.id}`}
+                            type="checkbox"
+                            checked={Boolean(r.exactPunchOnly)}
+                            onChange={() => onToggleExactPunchOnly?.(r.id)}
+                            disabled={settings.activeRole === 'Management'}
+                            className="h-3.5 w-3.5 rounded border-slate-300 text-emerald-600 focus:ring-emerald-500 cursor-pointer disabled:cursor-not-allowed transition-transform hover:scale-110"
+                          />
+                        </label>
+
+                        {/* Interactive toggle for pause when exactPunchOnly is active */}
+                        {r.exactPunchOnly && (
+                          <div className="relative inline-flex items-center">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                onToggleExactPunchDeductBreak?.(r.id);
+                              }}
+                              disabled={settings.activeRole === 'Management'}
+                              title={
+                                r.deductBreak
+                                  ? (settings.language === 'ar'
+                                      ? 'الاستراحة مخصومة. انقر لتضمين الاستراحة في ساعات العمل.'
+                                      : settings.language === 'en'
+                                      ? 'Break is deducted. Click to INCLUDE break in worked hours.'
+                                      : 'Pause déduite. Cliquer pour INCLURE la pause dans les heures travaillées.')
+                                  : (settings.language === 'ar'
+                                      ? 'الاستراحة مدرجة. انقر لخصم وقت الاستراحة من ساعات العمل.'
+                                      : settings.language === 'en'
+                                      ? 'Break is included (not deducted). Click to DEDUCT break time.'
+                                      : 'Pause incluse. Cliquer pour DÉDUIRE la pause des heures travaillées.')
+                              }
+                              className={`inline-flex items-center gap-0.5 px-1.5 py-0.5 rounded text-[10px] font-bold transition-all border shadow-2xs hover:scale-105 active:scale-95 cursor-pointer disabled:cursor-not-allowed ${
+                                r.deductBreak
+                                  ? 'bg-sky-50 text-sky-800 border-sky-300 hover:bg-sky-100'
+                                  : 'bg-emerald-50 text-emerald-800 border-emerald-300 hover:bg-emerald-100'
+                              }`}
+                            >
+                              <span>{r.deductBreak ? '⏸️ Déduite' : '⏸️ Incluse'}</span>
+                              <span className="text-[8px] opacity-70">⇄</span>
+                            </button>
+
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenRowMenuId(openRowMenuId === r.id ? null : r.id);
+                              }}
+                              className="p-0.5 text-slate-400 hover:text-slate-700 rounded hover:bg-slate-100 cursor-pointer"
+                              title="Options de pause"
+                            >
+                              <span className="text-[9px]">▾</span>
+                            </button>
+
+                            {openRowMenuId === r.id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute left-0 top-full mt-1 w-52 rounded-lg bg-white p-1.5 shadow-xl border border-slate-200 z-50 text-left text-xs space-y-1"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onToggleExactPunchOnly?.(r.id, false);
+                                    setOpenRowMenuId(null);
+                                  }}
+                                  className={`w-full text-left px-2 py-1.5 rounded flex items-center gap-1.5 ${
+                                    !r.deductBreak ? 'bg-emerald-50 text-emerald-900 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                                  }`}
+                                >
+                                  <span>🟢</span>
+                                  <div>
+                                    <p className="font-semibold text-[11px]">Pause Incluse</p>
+                                    <p className="text-[9px] text-slate-500 font-normal">Toutes les heures comptées</p>
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onToggleExactPunchOnly?.(r.id, true);
+                                    setOpenRowMenuId(null);
+                                  }}
+                                  className={`w-full text-left px-2 py-1.5 rounded flex items-center gap-1.5 ${
+                                    r.deductBreak ? 'bg-sky-50 text-sky-900 font-bold' : 'hover:bg-slate-50 text-slate-700'
+                                  }`}
+                                >
+                                  <span>🔵</span>
+                                  <div>
+                                    <p className="font-semibold text-[11px]">Pause Déduite</p>
+                                    <p className="text-[9px] text-slate-500 font-normal">Déduire la pause du shift</p>
+                                  </div>
+                                </button>
+                                <div className="border-t border-slate-100 my-0.5"></div>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onToggleExactPunchOnly?.(r.id);
+                                    setOpenRowMenuId(null);
+                                  }}
+                                  className="w-full text-left px-2 py-1 rounded text-rose-600 hover:bg-rose-50 text-[11px]"
+                                >
+                                  ✕ Rétablir calcul normal
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+
+                        {/* If not yet checked: dropdown arrow to choose mode directly */}
+                        {!r.exactPunchOnly && (
+                          <div className="relative inline-flex items-center">
+                            <button
+                              type="button"
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                setOpenRowMenuId(openRowMenuId === r.id ? null : r.id);
+                              }}
+                              className="p-0.5 text-slate-300 hover:text-slate-600 rounded hover:bg-slate-100 cursor-pointer"
+                              title="Options de pointage..."
+                            >
+                              <span className="text-[9px]">▾</span>
+                            </button>
+
+                            {openRowMenuId === r.id && (
+                              <div
+                                onClick={(e) => e.stopPropagation()}
+                                className="absolute left-0 top-full mt-1 w-52 rounded-lg bg-white p-1.5 shadow-xl border border-slate-200 z-50 text-left text-xs space-y-1"
+                              >
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onToggleExactPunchOnly?.(r.id, false);
+                                    setOpenRowMenuId(null);
+                                  }}
+                                  className="w-full text-left px-2 py-1.5 rounded hover:bg-emerald-50 text-emerald-900 flex items-center gap-1.5"
+                                >
+                                  <span>🟢</span>
+                                  <div>
+                                    <p className="font-semibold text-[11px]">Ignorer retards + Pause Incluse</p>
+                                    <p className="text-[9px] text-slate-500 font-normal">Toutes les heures comptées</p>
+                                  </div>
+                                </button>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    onToggleExactPunchOnly?.(r.id, true);
+                                    setOpenRowMenuId(null);
+                                  }}
+                                  className="w-full text-left px-2 py-1.5 rounded hover:bg-sky-50 text-sky-900 flex items-center gap-1.5"
+                                >
+                                  <span>🔵</span>
+                                  <div>
+                                    <p className="font-semibold text-[11px]">Ignorer retards + Pause Déduite</p>
+                                    <p className="text-[9px] text-slate-500 font-normal">Déduire la pause du shift</p>
+                                  </div>
+                                </button>
+                              </div>
+                            )}
+                          </div>
+                        )}
+                      </div>
                     </td>
 
                     {/* Date */}
@@ -1288,7 +1591,17 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
 
                     {/* Break */}
                     <td className="py-2 px-1.5 text-center text-slate-500 whitespace-nowrap text-[11px]">
-                      {r.breakDurationMinutes > 0 ? (
+                      {r.exactPunchOnly ? (
+                        r.deductBreak ? (
+                          <span className="font-semibold text-sky-700 bg-sky-50 px-1 py-0.5 rounded text-[10px]" title="Temps de pause déduit des heures">
+                            {r.breakDurationMinutes > 0 ? `${Math.floor(r.breakDurationMinutes / 60)}h${r.breakDurationMinutes % 60 ? (r.breakDurationMinutes % 60) + 'm' : ''}` : 'Pause'} (déduite)
+                          </span>
+                        ) : (
+                          <span className="font-semibold text-emerald-700 bg-emerald-50 px-1.5 py-0.5 rounded text-[10px] border border-emerald-200" title="Temps de pause inclus dans les heures travaillées (non déduit)">
+                            ⏸️ Incluse
+                          </span>
+                        )
+                      ) : r.breakDurationMinutes > 0 ? (
                         `${Math.floor(r.breakDurationMinutes / 60)}h${r.breakDurationMinutes % 60 ? (r.breakDurationMinutes % 60) + 'm' : ''}`
                       ) : (
                         <span className="text-slate-300">-</span>

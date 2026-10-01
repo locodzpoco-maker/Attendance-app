@@ -16,7 +16,9 @@ interface ManualCorrectionModalProps {
     overrideShiftId?: string,
     adjustedSecondCheckIn?: string,
     injectedSuppMinutes?: number,
-    exactPunchOnly?: boolean
+    exactPunchOnly?: boolean,
+    deductBreak?: boolean,
+    eligibleForOvertime?: boolean
   ) => void;
   currentUser: string;
   language?: AppLanguage;
@@ -53,12 +55,70 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
   const [exactPunchOnly, setExactPunchOnly] = useState<boolean>(
     record.manualAdjustment?.exactPunchOnly ?? record.exactPunchOnly ?? false
   );
+  const [deductBreak, setDeductBreak] = useState<boolean>(
+    record.manualAdjustment?.deductBreak ?? record.deductBreak ?? false
+  );
+
+  const currentSched = schedules?.find((s) => s.id === (overrideShift || record.scheduleId));
+
+  // Eligible for Overtime Checkbox
+  const [eligibleForOvertime, setEligibleForOvertime] = useState<boolean>(() => {
+    if (record.manualAdjustment?.eligibleForOvertime !== undefined) {
+      return Boolean(record.manualAdjustment.eligibleForOvertime);
+    }
+    if (record.eligibleForOvertime !== undefined) {
+      return Boolean(record.eligibleForOvertime);
+    }
+    return Boolean(currentSched?.overtimeAllowed);
+  });
 
   const [reason, setReason] = useState(record.manualAdjustment?.reason || '');
   const [auditor, setAuditor] = useState(currentUser || 'HR Admin');
   const [error, setError] = useState('');
 
   const totalInjectedMins = injectedHours * 60 + injectedMinutes;
+  const schedBreakMins = currentSched?.hasBreak ? (currentSched.breakDurationMinutes || 90) : (record.breakDurationMinutes || 90);
+
+  // Helper to parse HH:MM to minutes
+  const parseTimeToMins = (tStr: string): number => {
+    if (!tStr) return 0;
+    const [h, m] = tStr.split(':').map((v) => parseInt(v, 10));
+    return (h || 0) * 60 + (m || 0);
+  };
+
+  // Preview overtime calculated for this worker when eligible
+  const calculatedOvertimeMinutes = React.useMemo(() => {
+    if (!eligibleForOvertime) return 0;
+    const effectiveExit = exit.trim() || record.exitTime || '';
+    const effectiveEntry = entry.trim() || record.entryTime || '';
+    if (!effectiveExit) return 0;
+
+    const exitM = parseTimeToMins(effectiveExit);
+    const entryM = parseTimeToMins(effectiveEntry);
+    if (exitM <= 0) return 0;
+
+    let otStartM = 0;
+    if (currentSched?.overtimeStartTime) {
+      otStartM = parseTimeToMins(currentSched.overtimeStartTime);
+    } else if (currentSched?.endTime && currentSched.endTime !== 'Dynamic' && currentSched.id !== 'no_shift') {
+      otStartM = parseTimeToMins(currentSched.endTime);
+    } else if (currentSched?.normalWorkedHours) {
+      otStartM = entryM + Math.round(currentSched.normalWorkedHours * 60) + (currentSched.hasBreak ? (currentSched.breakDurationMinutes || 0) : 0);
+    } else {
+      otStartM = entryM + 8 * 60;
+    }
+
+    if (currentSched?.crossesMidnight && otStartM < parseTimeToMins(currentSched.startTime || '00:00')) {
+      otStartM += 24 * 60;
+    }
+
+    const otGrace = currentSched?.overtimeGraceMinutes ?? 15;
+    if (exitM > otStartM) {
+      const raw = exitM - otStartM;
+      return raw > otGrace ? raw : 0;
+    }
+    return 0;
+  }, [eligibleForOvertime, exit, entry, record, currentSched]);
 
   const handleSave = (e: React.FormEvent) => {
     e.preventDefault();
@@ -75,7 +135,9 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
       overrideShift || undefined,
       secondCheckIn.trim() ? secondCheckIn.trim() : undefined,
       totalInjectedMins > 0 ? totalInjectedMins : undefined,
-      exactPunchOnly
+      exactPunchOnly,
+      deductBreak,
+      eligibleForOvertime
     );
     onClose();
   };
@@ -280,8 +342,57 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
             </div>
           </div>
 
+          {/* Eligible for Overtime Checkbox */}
+          <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 text-xs space-y-2">
+            <label className="flex items-start gap-2.5 cursor-pointer">
+              <input
+                id="correction-eligible-overtime-checkbox"
+                type="checkbox"
+                checked={eligibleForOvertime}
+                onChange={(e) => setEligibleForOvertime(e.target.checked)}
+                className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
+              />
+              <div className="flex-1">
+                <div className="flex items-center gap-2">
+                  <span className="font-semibold text-indigo-950 block text-xs">
+                    {t.eligibleForOvertimeLabel}
+                  </span>
+                  <span
+                    className={`text-[10px] font-bold px-1.5 py-0.2 rounded ${
+                      eligibleForOvertime
+                        ? 'bg-indigo-100 text-indigo-800 border border-indigo-300'
+                        : 'bg-slate-100 text-slate-600 border border-slate-300'
+                    }`}
+                  >
+                    {eligibleForOvertime ? '✓ Actif' : 'Inactif'}
+                  </span>
+                </div>
+                <span className="text-indigo-900/80 text-[11px] block mt-0.5 leading-relaxed">
+                  {t.eligibleForOvertimeDesc}
+                </span>
+              </div>
+            </label>
+
+            {eligibleForOvertime && (
+              <div className="pt-2 border-t border-indigo-200/70 text-[11px] flex items-center justify-between animate-in fade-in duration-150">
+                <span className="text-indigo-950 font-medium">
+                  {t.overtimeCalculatedPreview}:
+                </span>
+                {calculatedOvertimeMinutes > 0 ? (
+                  <span className="font-mono font-bold text-indigo-700 bg-white px-2 py-0.5 rounded border border-indigo-200 shadow-2xs">
+                    +{formatMinutesToHoursAndMinutes(calculatedOvertimeMinutes)}
+                  </span>
+                ) : (
+                  <span className="text-slate-500 italic">
+                    {t.noOvertimeCalculatedPreview}
+                  </span>
+                )}
+              </div>
+            )}
+          </div>
+
           {/* Exact Punch Only Checkbox Option */}
-          <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs">
+          <div className="rounded-xl border border-sky-200 bg-sky-50/60 p-3 text-xs space-y-2.5">
             <label className="flex items-start gap-2.5 cursor-pointer">
               <input
                 id="correction-exact-punch-checkbox"
@@ -290,7 +401,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 onChange={(e) => setExactPunchOnly(e.target.checked)}
                 className="mt-0.5 h-4 w-4 rounded border-slate-300 text-indigo-600 focus:ring-indigo-500 cursor-pointer"
               />
-              <div>
+              <div className="flex-1">
                 <span className="font-semibold text-sky-950 block">
                   {t.exactPunchOptionTitle}
                 </span>
@@ -299,6 +410,66 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                 </span>
               </div>
             </label>
+
+            {exactPunchOnly && (
+              <div className="pt-2.5 border-t border-sky-200/80 space-y-2 animate-in fade-in duration-150">
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-sky-950 text-xs">
+                    {t.pauseHandling} ({schedBreakMins > 0 ? `${schedBreakMins} min` : 'Pause'}) :
+                  </span>
+                  <span className={`text-[10px] font-bold px-1.5 py-0.5 rounded ${
+                    deductBreak ? 'bg-sky-100 text-sky-800 border border-sky-300' : 'bg-emerald-100 text-emerald-800 border border-emerald-300'
+                  }`}>
+                    {deductBreak ? `⏸️ ${t.pauseDeducted} (-${schedBreakMins}m)` : `⏸️ ${t.pauseIncluded}`}
+                  </span>
+                </div>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-2">
+                  <label
+                    className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                      deductBreak
+                        ? 'bg-white border-sky-500 ring-1 ring-sky-500 shadow-2xs text-sky-950 font-semibold'
+                        : 'bg-white/60 border-sky-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="pauseOption"
+                      checked={deductBreak === true}
+                      onChange={() => setDeductBreak(true)}
+                      className="mt-0.5 text-sky-600 focus:ring-sky-500"
+                    />
+                    <div>
+                      <p className="text-xs">{t.deductPauseOption} ({schedBreakMins}m)</p>
+                      <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                        La pause est déduite des heures travaillées (calcul net).
+                      </p>
+                    </div>
+                  </label>
+
+                  <label
+                    className={`flex items-start gap-2 p-2 rounded-lg border cursor-pointer transition-all ${
+                      !deductBreak
+                        ? 'bg-white border-sky-500 ring-1 ring-sky-500 shadow-2xs text-sky-950 font-semibold'
+                        : 'bg-white/60 border-sky-200 text-slate-700 hover:bg-white'
+                    }`}
+                  >
+                    <input
+                      type="radio"
+                      name="pauseOption"
+                      checked={deductBreak === false}
+                      onChange={() => setDeductBreak(false)}
+                      className="mt-0.5 text-sky-600 focus:ring-sky-500"
+                    />
+                    <div>
+                      <p className="text-xs">{t.includePauseOption}</p>
+                      <p className="text-[10px] text-slate-500 font-normal mt-0.5">
+                        Toutes les heures entre Entrée et Sortie sont comptées.
+                      </p>
+                    </div>
+                  </label>
+                </div>
+              </div>
+            )}
           </div>
 
           <div>

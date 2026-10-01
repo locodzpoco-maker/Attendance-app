@@ -559,7 +559,41 @@ export function calculateAttendance(
 
       const isNoShiftSchedule = assignedSchedule.id === 'no_shift';
       const isExactPunchOnly = Boolean(manualAdj?.exactPunchOnly);
+      const deductBreak = manualAdj?.deductBreak !== undefined
+        ? Boolean(manualAdj.deductBreak)
+        : Boolean(options?.settings?.exactPunchDeductBreakDefault);
       const injectedSuppMinutes = manualAdj?.injectedSuppMinutes || 0;
+      const isOvertimeEligible = manualAdj?.eligibleForOvertime !== undefined
+        ? Boolean(manualAdj.eligibleForOvertime)
+        : (dbEmp?.eligibleForOvertime !== undefined
+            ? Boolean(dbEmp.eligibleForOvertime)
+            : Boolean(assignedSchedule.overtimeAllowed));
+
+      const computeOvertimeMinutes = (otAllowed: boolean, entryM: number, exitM: number): number => {
+        if (!otAllowed) return 0;
+        if (exitM <= 0) return 0;
+
+        let otStartMins = 0;
+        if (assignedSchedule.overtimeStartTime) {
+          otStartMins = parseTimeToMinutes(assignedSchedule.overtimeStartTime);
+        } else if (assignedSchedule.endTime && assignedSchedule.endTime !== 'Dynamic' && assignedSchedule.id !== 'no_shift') {
+          otStartMins = parseTimeToMinutes(assignedSchedule.endTime);
+        } else if (assignedSchedule.normalWorkedHours) {
+          otStartMins = entryM + Math.round(assignedSchedule.normalWorkedHours * 60) + (assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0);
+        } else {
+          otStartMins = entryM + 8 * 60;
+        }
+
+        if (assignedSchedule.crossesMidnight && otStartMins < schedStartMins) {
+          otStartMins += 24 * 60;
+        }
+
+        if (exitM > otStartMins) {
+          const rawOt = exitM - otStartMins;
+          return rawOt > overtimeGrace ? rawOt : 0;
+        }
+        return 0;
+      };
 
       if (isNoShiftSchedule || isExactPunchOnly) {
         firstCheckInDelayMinutes = 0;
@@ -672,15 +706,29 @@ export function calculateAttendance(
           earlyExitMinutes = 0;
           delayMinutes = 0;
 
-          if (exitMins > entryMins) {
-            workedMinutes = exitMins - entryMins;
+          const totalDuration = exitMins > entryMins ? exitMins - entryMins : 0;
+          if (isOvertimeEligible && totalDuration > 0) {
+            const normalTarget = Math.round(assignedSchedule.normalWorkedHours * 60);
+            if (totalDuration > normalTarget) {
+              const rawOt = totalDuration - normalTarget;
+              if (rawOt > overtimeGrace) {
+                suppMinutes = rawOt;
+                workedMinutes = normalTarget;
+              } else {
+                suppMinutes = 0;
+                workedMinutes = totalDuration;
+              }
+            } else {
+              workedMinutes = totalDuration;
+              suppMinutes = 0;
+            }
           } else {
-            workedMinutes = 0;
+            workedMinutes = totalDuration;
+            suppMinutes = 0;
           }
           observation = 'Ponctuel';
           observationDetail = 'Ponctuel (Sans Shift)';
           statusType = 'success';
-          suppMinutes = injectedSuppMinutes || 0;
         } else if (isExactPunchOnly) {
           // Ignore late arrival, 2nd check-in delay, and early departure for this day
           // Count working hours between check-in and check-out, and set status to On Time (Ponctuel)
@@ -689,59 +737,48 @@ export function calculateAttendance(
           earlyExitMinutes = 0;
           delayMinutes = 0;
 
-          // Overtime (Supp Hours) calculation if overtime allowed
-          if (assignedSchedule.overtimeAllowed && assignedSchedule.overtimeStartTime) {
-            let otStartMins = parseTimeToMinutes(assignedSchedule.overtimeStartTime);
-            if (assignedSchedule.crossesMidnight && otStartMins < schedStartMins) {
-              otStartMins += 24 * 60;
-            }
+          // Overtime (Supp Hours) calculation if overtime allowed / eligible
+          suppMinutes = computeOvertimeMinutes(isOvertimeEligible, entryMins, exitMins);
 
-            if (exitMins > otStartMins) {
-              const rawOt = exitMins - otStartMins;
-              if (rawOt <= overtimeGrace) {
-                suppMinutes = 0;
-              } else {
-                suppMinutes = rawOt;
-              }
-            }
-          }
-
-          // Calculate Worked Hours: elapsed duration between punches without deducting rest time
+          // Calculate Worked Hours based on whether pause time is deducted or included
           const totalDurationMins = Math.max(0, exitMins - entryMins);
-          const netDurationBeforeOt = Math.max(0, totalDurationMins - suppMinutes);
-          // Target max normal shift duration without break deduction
-          const fullShiftMins = Math.round(
-            (assignedSchedule.normalWorkedHours * 60) +
-            (assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0)
-          );
 
-          if (netDurationBeforeOt >= fullShiftMins) {
-            workedMinutes = fullShiftMins;
+          if (deductBreak) {
+            // Deduct the pause/break time from worked hours
+            const breakDeduction = assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0;
+            const netDurationBeforeOt = Math.max(0, totalDurationMins - suppMinutes - breakDeduction);
+            const targetNormalMins = Math.round(assignedSchedule.normalWorkedHours * 60);
+
+            if (netDurationBeforeOt >= targetNormalMins) {
+              workedMinutes = targetNormalMins;
+            } else {
+              workedMinutes = netDurationBeforeOt;
+            }
+
+            observation = 'Ponctuel';
+            observationDetail = 'Ponctuel (Pause déduite)';
+            statusType = 'success';
           } else {
-            workedMinutes = netDurationBeforeOt;
-          }
+            // Do NOT deduct the pause time (include pause time in worked hours)
+            const netDurationBeforeOt = Math.max(0, totalDurationMins - suppMinutes);
+            const fullShiftMins = Math.round(
+              (assignedSchedule.normalWorkedHours * 60) +
+              (assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0)
+            );
 
-          // Status is strictly On Time
-          observation = 'Ponctuel';
-          observationDetail = 'Ponctuel';
-          statusType = 'success';
+            if (netDurationBeforeOt >= fullShiftMins) {
+              workedMinutes = fullShiftMins;
+            } else {
+              workedMinutes = netDurationBeforeOt;
+            }
+
+            observation = 'Ponctuel';
+            observationDetail = 'Ponctuel (Pause incluse)';
+            statusType = 'success';
+          }
         } else {
           // 2. Calculate Overtime (Supp Hours)
-          if (assignedSchedule.overtimeAllowed && assignedSchedule.overtimeStartTime) {
-            let otStartMins = parseTimeToMinutes(assignedSchedule.overtimeStartTime);
-            if (assignedSchedule.crossesMidnight && otStartMins < schedStartMins) {
-              otStartMins += 24 * 60;
-            }
-
-            if (exitMins > otStartMins) {
-              const rawOt = exitMins - otStartMins;
-              if (rawOt <= overtimeGrace) {
-                suppMinutes = 0;
-              } else {
-                suppMinutes = rawOt;
-              }
-            }
-          }
+          suppMinutes = computeOvertimeMinutes(isOvertimeEligible, entryMins, exitMins);
 
           // 3. Calculate Worked Hours
           const totalDurationMins = Math.max(0, exitMins - entryMins);
@@ -845,17 +882,22 @@ export function calculateAttendance(
               manualAdj.adjustedExit ||
               manualAdj.adjustedSecondCheckIn ||
               manualAdj.overrideShiftId ||
+              manualAdj.eligibleForOvertime !== undefined ||
               (manualAdj.injectedSuppMinutes && manualAdj.injectedSuppMinutes > 0))
         ),
         exactPunchOnly: isExactPunchOnly,
+        deductBreak: isExactPunchOnly ? deductBreak : undefined,
+        eligibleForOvertime: isOvertimeEligible,
         injectedSuppMinutes: injectedSuppMinutes > 0 ? injectedSuppMinutes : undefined,
         firstCheckInDelayMinutes,
         secondCheckInDelayMinutes,
         earlyExitMinutes,
         delayMinutes,
-        breakDurationMinutes: isNoShiftSchedule || isExactPunchOnly
+        breakDurationMinutes: isNoShiftSchedule
           ? 0
-          : (assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0),
+          : (isExactPunchOnly
+              ? (deductBreak ? (assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0) : 0)
+              : (assignedSchedule.hasBreak ? (assignedSchedule.breakDurationMinutes || 0) : 0)),
         workedMinutes,
         workedHoursFormatted,
         workedDecimalHours,
