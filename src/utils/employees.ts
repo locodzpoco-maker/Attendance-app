@@ -472,6 +472,7 @@ const STOCK_EMPLOYEES: Employee[] = STOCK_WORKERS_INPUT.map((worker) => {
     workerType: 'Stock',
     startDate: "2023-01-01",
     hasSaturdayShift: hasSat,
+    eligibleForOvertime: true,
     notes: hasSat
       ? "Stock (Shift Samedi 10:00-17:00 activé + Shifts 1-4 en semaine)"
       : "Stock (Dynamic shift: Shift 1, 2, 3, or 4 auto-detected daily)",
@@ -491,6 +492,7 @@ const ADMIN_EMPLOYEES: Employee[] = ADMIN_WORKERS_INPUT.map((worker) => {
     workerType: 'Admin',
     startDate: "2023-01-01",
     hasSaturdayShift: hasSat,
+    eligibleForOvertime: false,
     notes: hasSat
       ? "Administration (Shift Samedi 09:00-17:00 activé + 08:30-17:00 en semaine)"
       : "Administration (08:30 - 17:00)",

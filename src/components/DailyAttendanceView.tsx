@@ -406,7 +406,19 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
       if (selectedStatus !== 'ALL') {
         if (selectedStatus === 'SHIFT_UNCLEAR' && !r.isShiftUnclear) return false;
         if (selectedStatus === 'RETARD' && r.delayMinutes === 0) return false;
-        if (selectedStatus === 'ABSENCE' && r.observation !== 'Absence') return false;
+        if (
+          selectedStatus === 'ABSENCE' &&
+          r.observation !== 'Absence' &&
+          r.observation !== 'Absent (Après-midi)' &&
+          r.observation !== 'Absent (Matin)'
+        )
+          return false;
+        if (
+          selectedStatus === 'HALF_DAY_ABSENCE' &&
+          r.observation !== 'Absent (Après-midi)' &&
+          r.observation !== 'Absent (Matin)'
+        )
+          return false;
         if (selectedStatus === 'OFF' && r.observation !== 'OFF') return false;
         if (selectedStatus === 'VACATION' && r.observation !== 'Congé payé' && !r.isPaidVacation) return false;
         if (selectedStatus === 'SUPP' && r.suppMinutes === 0) return false;
@@ -486,6 +498,10 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
         return t.obsLate;
       case 'Absence':
         return t.obsAbsent;
+      case 'Absent (Après-midi)':
+        return t.obsAbsentAfternoon || 'Absent (Après-midi)';
+      case 'Absent (Matin)':
+        return t.obsAbsentMorning || 'Absent (Matin)';
       case 'Entrée non pointée':
         return t.obsMissingEntry;
       case 'Sortie non pointée':
@@ -599,6 +615,11 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
       case 'Absence':
         bg = 'bg-rose-50 text-rose-700 border-rose-200';
         icon = <AlertTriangle className="h-3 w-3" />;
+        break;
+      case 'Absent (Après-midi)':
+      case 'Absent (Matin)':
+        bg = 'bg-amber-50 text-amber-900 border-amber-300 font-semibold';
+        icon = <span className="text-[10px] font-bold text-amber-700">½j</span>;
         break;
       case 'Entrée non pointée':
       case 'Sortie non pointée':
@@ -816,6 +837,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
               )}
               <option value="VACATION">🌴 {t.paidVacations}</option>
               <option value="ABSENCE">{t.obsAbsent}</option>
+              <option value="HALF_DAY_ABSENCE">½j {t.filterHalfDayAbsence}</option>
               <option value="OFF">{t.obsOff}</option>
             </select>
 

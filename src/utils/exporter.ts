@@ -2,6 +2,7 @@ import * as XLSX from 'xlsx';
 import jsPDF from 'jspdf';
 import autoTable from 'jspdf-autotable';
 import { DailyAttendanceRecord, MonthlySummaryRecord, AppSettings, Employee } from '../types';
+import { formatDaysNumber } from './calculator';
 
 /**
  * Exports daily attendance records to Excel (.xlsx)
@@ -223,8 +224,8 @@ export function exportMonthlySummaryToPDF(
     s.employeeName,
     s.companyDepartment,
     s.groupName,
-    s.presentDays,
-    s.absentDays,
+    formatDaysNumber(s.presentDays, settings.language),
+    formatDaysNumber(s.absentDays, settings.language),
     s.offDays,
     s.lateDays,
     `${s.totalLateMinutes}m`,

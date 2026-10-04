@@ -8,6 +8,7 @@ import {
   ManualAdjustment,
   AppSettings,
   PaidVacation,
+  TimeAuthorization,
 } from '../types';
 import {
   DEFAULT_SCHEDULES,
@@ -32,6 +33,7 @@ export interface CalculationOptions {
   employees?: Employee[];
   manualAdjustments?: Record<string, ManualAdjustment>; // key: "empId_date"
   paidVacations?: PaidVacation[];
+  timeAuthorizations?: TimeAuthorization[];
   settings?: AppSettings;
   excludeArchived?: boolean;
 }
@@ -375,9 +377,26 @@ export function calculateAttendance(
         continue; // Employee is on approved paid vacation for this date
       }
 
+      // Check if employee has an active Schedule Dispensation / Time Authorization for this date
+      const activeAuthorization = options?.timeAuthorizations?.find((auth) => {
+        const matchEmp =
+          auth.employeeId === empId ||
+          (dbEmp && auth.employeeId === dbEmp.id) ||
+          auth.employeeId.trim() === empId.trim() ||
+          auth.employeeId.trim().replace(/^0+/, '') === empId.trim().replace(/^0+/, '');
+        const matchDate = dateStr >= auth.startDate && (!auth.endDate || dateStr <= auth.endDate);
+        return matchEmp && matchDate;
+      });
+
+      const authorizedLateArrivalMins = activeAuthorization?.allowedLateArrivalMinutes || 0;
+      const authorizedEarlyExitMins = activeAuthorization?.allowedEarlyExitMinutes || 0;
+
       let entryTime: string | null = null;
+      let secondCheckInTime: string | null = null;
       let exitTime: string | null = null;
       let isOvernightPunch = false;
+      let isHalfDayAbsent = false;
+      let halfDaySession: 'morning' | 'afternoon' | undefined = undefined;
 
       // Resolve Entry and Exit times from raw punches according to shift type
       if (assignedSchedule.crossesMidnight) {
@@ -428,6 +447,63 @@ export function calculateAttendance(
               exitTime = null;
             }
           }
+        } else if (
+          (isAdminWorkerType || isExplicitAdmin || assignedSchedule.department === 'Administration' || assignedSchedule.id.startsWith('admin_')) &&
+          assignedSchedule.hasBreak &&
+          assignedSchedule.breakStart &&
+          assignedSchedule.breakEnd &&
+          regularPunches.length > 0
+        ) {
+          // Half-day absence logic for Admin workers:
+          // A schedule with break divides the day into morning session and afternoon session.
+          const sBreakStart = parseTimeToMinutes(assignedSchedule.breakStart);
+          const sBreakEnd = parseTimeToMinutes(assignedSchedule.breakEnd);
+
+          // All punches are in the morning before the afternoon shift return (< breakEnd - 15m)
+          // i.e. worker attended morning, but the entire afterbreak shift is missing!
+          const allPunchesMorning = regularPunches.every((p) => parseTimeToMinutes(p) < sBreakEnd - 15);
+
+          // All punches are in the afternoon after morning shift (>= breakStart - 15m)
+          // and there are NO morning arrival punches before break (< breakStart - 15m)
+          // i.e. missing the morning before break punches, has punches only in the afternoon!
+          const hasMorningPunch = regularPunches.some((p) => parseTimeToMinutes(p) < sBreakStart - 15);
+          const allPunchesAfternoon = regularPunches.every((p) => parseTimeToMinutes(p) >= sBreakStart - 15);
+
+          if (allPunchesMorning) {
+            // Entire afterbreak shift is missing:
+            // Admin worker attended morning only -> simply marked as absent for the afternoon (0.5 day worked, 0.5 day absent)
+            isHalfDayAbsent = true;
+            halfDaySession = 'afternoon';
+            entryTime = regularPunches[0];
+            exitTime = regularPunches.length > 1 ? regularPunches[regularPunches.length - 1] : assignedSchedule.breakStart;
+            secondCheckInTime = null;
+          } else if (allPunchesAfternoon && !hasMorningPunch) {
+            // Missing morning before break punches, attended afternoon only:
+            // Marked as absent for half the day (morning) (0.5 day worked, 0.5 day absent)
+            isHalfDayAbsent = true;
+            halfDaySession = 'morning';
+            entryTime = null;
+            if (regularPunches.length === 1) {
+              const pM = parseTimeToMinutes(regularPunches[0]);
+              if (pM <= sBreakEnd + 60) {
+                secondCheckInTime = regularPunches[0];
+                exitTime = assignedSchedule.endTime;
+              } else {
+                secondCheckInTime = assignedSchedule.breakEnd;
+                exitTime = regularPunches[0];
+              }
+            } else {
+              secondCheckInTime = regularPunches[0];
+              exitTime = regularPunches[regularPunches.length - 1];
+            }
+          } else {
+            // Punches exist in both morning and afternoon (full day)
+            entryTime = regularPunches[0];
+            exitTime = regularPunches[regularPunches.length - 1];
+            if (regularPunches.length === 2 && entryTime === exitTime) {
+              exitTime = null;
+            }
+          }
         } else if (regularPunches.length === 1) {
           const p = regularPunches[0];
           const pMins = parseTimeToMinutes(p);
@@ -451,18 +527,24 @@ export function calculateAttendance(
       }
 
       // Override with manual punch adjustments if explicitly provided
-      if (manualAdj?.adjustedEntry) {
+      if (manualAdj?.adjustedEntry !== undefined && manualAdj.adjustedEntry !== '') {
         entryTime = manualAdj.adjustedEntry;
       }
-      if (manualAdj?.adjustedExit) {
+      if (manualAdj?.adjustedExit !== undefined && manualAdj.adjustedExit !== '') {
         exitTime = manualAdj.adjustedExit;
       }
-
-      // Extract secondCheckInTime (return from break) if the schedule has a break:
-      let secondCheckInTime: string | null = null;
-      if (manualAdj?.adjustedSecondCheckIn) {
+      if (manualAdj?.adjustedSecondCheckIn !== undefined && manualAdj.adjustedSecondCheckIn !== '') {
         secondCheckInTime = manualAdj.adjustedSecondCheckIn;
-      } else if (assignedSchedule.hasBreak && assignedSchedule.breakEnd) {
+      }
+      if (manualAdj?.isHalfDayAbsent !== undefined) {
+        isHalfDayAbsent = Boolean(manualAdj.isHalfDayAbsent);
+        if (manualAdj.halfDaySession) {
+          halfDaySession = manualAdj.halfDaySession;
+        }
+      }
+
+      // Extract secondCheckInTime (return from break) if the schedule has a break and not already set:
+      if (!secondCheckInTime && !isHalfDayAbsent && assignedSchedule.hasBreak && assignedSchedule.breakEnd) {
         // Collect intermediate regular punches that are between entry and exit
         const intermediatePunches = regularPunches.filter(
           (p) => p !== entryTime && p !== exitTime
@@ -501,14 +583,17 @@ export function calculateAttendance(
 
       const schedStartMins = parseTimeToMinutes(assignedSchedule.startTime);
 
-      // Helper to calculate late time on entry (excluding grace period from the late duration)
+      // Helper to calculate late time on entry (excluding grace period and authorized allowance from the late duration)
       const computeFirstCheckInDelay = (inTime: string): number => {
         if (!assignedSchedule.startTime || assignedSchedule.startTime === 'Dynamic') return 0;
         const entryMins = parseTimeToMinutes(inTime);
         const rawFirstDelay = entryMins - schedStartMins;
         if (rawFirstDelay <= 0) return 0;
+        // Deduct authorized late arrival allowance (e.g. 1h allowed late arrival for distance/maternity)
+        const delayAfterAuth = Math.max(0, rawFirstDelay - authorizedLateArrivalMins);
+        if (delayAfterAuth <= 0) return 0;
         // Do not include the grace period in the calculated late time
-        return rawFirstDelay > arrivalGrace ? rawFirstDelay - arrivalGrace : 0;
+        return delayAfterAuth > arrivalGrace ? delayAfterAuth - arrivalGrace : 0;
       };
 
       // Helper to calculate late time on break return (excluding grace period from the late duration)
@@ -552,7 +637,10 @@ export function calculateAttendance(
 
         if (outMins < schedEndMins) {
           const rawEarlyMins = schedEndMins - outMins;
-          return rawEarlyMins > earlyExitGrace ? rawEarlyMins - earlyExitGrace : 0;
+          // Deduct authorized early exit allowance (e.g. 1h or 2h allowed early departure)
+          const earlyAfterAuth = Math.max(0, rawEarlyMins - authorizedEarlyExitMins);
+          if (earlyAfterAuth <= 0) return 0;
+          return earlyAfterAuth > earlyExitGrace ? earlyAfterAuth - earlyExitGrace : 0;
         }
         return 0;
       };
@@ -567,7 +655,7 @@ export function calculateAttendance(
         ? Boolean(manualAdj.eligibleForOvertime)
         : (dbEmp?.eligibleForOvertime !== undefined
             ? Boolean(dbEmp.eligibleForOvertime)
-            : Boolean(assignedSchedule.overtimeAllowed));
+            : (isAdminWorkerType ? false : Boolean(assignedSchedule.overtimeAllowed)));
 
       const computeOvertimeMinutes = (otAllowed: boolean, entryM: number, exitM: number): number => {
         if (!otAllowed) return 0;
@@ -596,6 +684,12 @@ export function calculateAttendance(
       };
 
       if (isNoShiftSchedule || isExactPunchOnly) {
+        firstCheckInDelayMinutes = 0;
+        secondCheckInDelayMinutes = 0;
+        earlyExitMinutes = 0;
+        delayMinutes = 0;
+      } else if (isHalfDayAbsent) {
+        // Half-day absence: simply marked as absent for half the day, no minutes missed penalty
         firstCheckInDelayMinutes = 0;
         secondCheckInDelayMinutes = 0;
         earlyExitMinutes = 0;
@@ -654,6 +748,25 @@ export function calculateAttendance(
           observation = 'Absence';
           observationDetail = 'Absence';
           statusType = 'danger';
+        }
+      } else if (isHalfDayAbsent) {
+        // Half-day absence: 0.5 day worked, 0.5 day absent
+        const halfDayTargetMins = Math.round((assignedSchedule.normalWorkedHours / 2) * 60);
+        workedMinutes = halfDayTargetMins;
+        suppMinutes = 0;
+        firstCheckInDelayMinutes = 0;
+        secondCheckInDelayMinutes = 0;
+        earlyExitMinutes = 0;
+        delayMinutes = 0;
+
+        if (halfDaySession === 'afternoon') {
+          observation = 'Absent (Après-midi)';
+          observationDetail = 'Absent (Après-midi)';
+          statusType = 'warning';
+        } else {
+          observation = 'Absent (Matin)';
+          observationDetail = 'Absent (Matin)';
+          statusType = 'warning';
         }
       } else if (entryTime && !exitTime) {
         // Missing exit
@@ -786,10 +899,14 @@ export function calculateAttendance(
           const netDurationBeforeOt = Math.max(0, totalDurationMins - suppMinutes - breakDeduction);
           const targetNormalMins = Math.round(assignedSchedule.normalWorkedHours * 60);
 
-          if (netDurationBeforeOt >= targetNormalMins) {
+          // Credit authorized dispensation time towards normal working hours
+          const totalAuthorizedDispensationMins = authorizedLateArrivalMins + authorizedEarlyExitMins;
+          const effectiveDuration = netDurationBeforeOt + totalAuthorizedDispensationMins;
+
+          if (effectiveDuration >= targetNormalMins) {
             workedMinutes = targetNormalMins;
           } else {
-            workedMinutes = netDurationBeforeOt;
+            workedMinutes = effectiveDuration;
           }
 
           // Observation
@@ -816,6 +933,10 @@ export function calculateAttendance(
             observation = 'Sortie après minuit';
             observationDetail = 'Sortie après minuit';
             statusType = 'info';
+          } else if (activeAuthorization && (authorizedLateArrivalMins > 0 || authorizedEarlyExitMins > 0)) {
+            observation = 'Ponctuel';
+            observationDetail = `Ponctuel (${activeAuthorization.reason || 'Autorisation'})`;
+            statusType = 'success';
           } else {
             observation = 'Ponctuel';
             observationDetail = 'Ponctuel';
@@ -883,6 +1004,7 @@ export function calculateAttendance(
               manualAdj.adjustedSecondCheckIn ||
               manualAdj.overrideShiftId ||
               manualAdj.eligibleForOvertime !== undefined ||
+              manualAdj.isHalfDayAbsent !== undefined ||
               (manualAdj.injectedSuppMinutes && manualAdj.injectedSuppMinutes > 0))
         ),
         exactPunchOnly: isExactPunchOnly,
@@ -904,6 +1026,14 @@ export function calculateAttendance(
         suppMinutes,
         suppHoursFormatted,
         suppDecimalHours,
+        isHalfDayAbsent,
+        halfDaySession,
+        hasTimeAuthorization: Boolean(activeAuthorization),
+        timeAuthorizationReason: activeAuthorization?.reason,
+        allowedLateArrivalMinutes: authorizedLateArrivalMins > 0 ? authorizedLateArrivalMins : undefined,
+        allowedEarlyExitMinutes: authorizedEarlyExitMins > 0 ? authorizedEarlyExitMins : undefined,
+        workedDaysCredit: isHalfDayAbsent ? 0.5 : (observation === 'Absence' || observation === 'OFF' ? 0 : 1),
+        absentDaysCredit: isHalfDayAbsent ? 0.5 : (observation === 'Absence' ? 1 : 0),
         observation,
         observationDetail,
         statusType,
@@ -975,6 +1105,14 @@ export function generateMonthlySummaryFromDailyRecords(
       summary.presentDays += 1;
     } else if (record.observation === 'Absence') {
       summary.absentDays += 1;
+    } else if (
+      record.observation === 'Absent (Après-midi)' ||
+      record.observation === 'Absent (Matin)' ||
+      record.isHalfDayAbsent
+    ) {
+      // Half-day absence: 0.5 day worked, 0.5 day absent
+      summary.presentDays += 0.5;
+      summary.absentDays += 0.5;
     } else if (record.observation === 'Entrée non pointée') {
       summary.missingPunchesDays += 1;
       summary.missingEntryCount += 1;
@@ -1002,5 +1140,15 @@ export function generateMonthlySummaryFromDailyRecords(
     totalWorkedFormatted: formatMinutesToHoursAndMinutes(s.totalWorkedMinutes),
     totalSuppFormatted: formatMinutesToHoursAndMinutes(s.totalSuppMinutes),
   }));
+}
+
+/**
+ * Formats a day count (e.g. 21.5 or 0.5) according to locale (French uses comma '21,5', English uses '21.5')
+ */
+export function formatDaysNumber(val: number, lang: string = 'fr'): string {
+  if (val === undefined || val === null || isNaN(val)) return '0';
+  if (Number.isInteger(val)) return val.toString();
+  const fixed = val.toFixed(1);
+  return lang === 'fr' ? fixed.replace('.', ',') : fixed;
 }
 

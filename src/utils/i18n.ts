@@ -116,6 +116,9 @@ export interface Translations {
   bulkApplyPauseDeducted: string;
   eligibleForOvertimeLabel: string;
   eligibleForOvertimeDesc: string;
+  eligibleForOvertimeAdminBadge: string;
+  eligibleForOvertimeActive: string;
+  eligibleForOvertimeInactive: string;
   overtimeCalculatedPreview: string;
   noOvertimeCalculatedPreview: string;
   filterExactPunches: string;
@@ -160,6 +163,9 @@ export interface Translations {
   obsOnTime: string;
   obsLate: string;
   obsAbsent: string;
+  obsAbsentAfternoon: string;
+  obsAbsentMorning: string;
+  filterHalfDayAbsence: string;
   obsMissingEntry: string;
   obsMissingExit: string;
   obsExitAfterMidnight: string;
@@ -494,6 +500,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     bulkApplyPauseDeducted: 'Appliquer « Pause Déduite » à toutes les lignes cochées',
     eligibleForOvertimeLabel: 'Éligible aux heures supplémentaires',
     eligibleForOvertimeDesc: 'Active le calcul automatique des heures supplémentaires pour cet employé (au-delà de l\'horaire du shift).',
+    eligibleForOvertimeAdminBadge: 'Inactif (Défaut Admin)',
+    eligibleForOvertimeActive: '✓ Actif',
+    eligibleForOvertimeInactive: 'Inactif',
     overtimeCalculatedPreview: 'Heures supplémentaires calculées',
     noOvertimeCalculatedPreview: 'Aucune heure supp. à calculer (la sortie ne dépasse pas l’horaire).',
     filterExactPunches: 'Retard ignoré (Ponctuel)',
@@ -536,6 +545,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     obsOnTime: 'Ponctuel',
     obsLate: 'Retard',
     obsAbsent: 'Absence',
+    obsAbsentAfternoon: 'Absent (Après-midi)',
+    obsAbsentMorning: 'Absent (Matin)',
+    filterHalfDayAbsence: 'Absence demi-journée',
     obsMissingEntry: 'Entrée non pointée',
     obsMissingExit: 'Sortie non pointée',
     obsExitAfterMidnight: 'Sortie après minuit',
@@ -861,6 +873,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     bulkApplyPauseDeducted: 'Apply "Break Deducted" to all checked rows',
     eligibleForOvertimeLabel: 'Eligible for overtime',
     eligibleForOvertimeDesc: 'Enables automatic calculation of overtime hours for this worker (beyond shift schedule).',
+    eligibleForOvertimeAdminBadge: 'Inactive (Admin Default)',
+    eligibleForOvertimeActive: '✓ Active',
+    eligibleForOvertimeInactive: 'Inactive',
     overtimeCalculatedPreview: 'Overtime hours calculated',
     noOvertimeCalculatedPreview: 'No overtime to calculate (exit does not exceed shift end time).',
     filterExactPunches: 'Late Ignored (On Time)',
@@ -903,6 +918,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     obsOnTime: 'On Time',
     obsLate: 'Late',
     obsAbsent: 'Absent',
+    obsAbsentAfternoon: 'Absent (Afternoon)',
+    obsAbsentMorning: 'Absent (Morning)',
+    filterHalfDayAbsence: 'Half-day absence',
     obsMissingEntry: 'Missing Entry',
     obsMissingExit: 'Missing Exit',
     obsExitAfterMidnight: 'Exit After Midnight',
@@ -1228,6 +1246,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     bulkApplyPauseDeducted: 'تطبيق «استراحة مخصومة» على جميع السجلات المحددة',
     eligibleForOvertimeLabel: 'مؤهل للعمل الإضافي',
     eligibleForOvertimeDesc: 'تفعيل الحساب التلقائي لساعات العمل الإضافي لهذا العامل (بعد نهاية الوردية).',
+    eligibleForOvertimeAdminBadge: 'غير نشط (افتراضي للإدارة)',
+    eligibleForOvertimeActive: '✓ نشط',
+    eligibleForOvertimeInactive: 'غير نشط',
     overtimeCalculatedPreview: 'ساعات العمل الإضافي المحتسبة',
     noOvertimeCalculatedPreview: 'لا يوجد عمل إضافي لاحتسابه (وقت الخروج لم يتجاوز نهاية الوردية).',
     filterExactPunches: 'تجاهل التأخير (في الوقت)',
@@ -1270,6 +1291,9 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     obsOnTime: 'في الوقت',
     obsLate: 'متأخر',
     obsAbsent: 'غائب',
+    obsAbsentAfternoon: 'غائب (بعد الظهر)',
+    obsAbsentMorning: 'غائب (الصباح)',
+    filterHalfDayAbsence: 'غياب نصف يوم',
     obsMissingEntry: 'دخول غير مسجل',
     obsMissingExit: 'خروج غير مسجل',
     obsExitAfterMidnight: 'خروج بعد منتصف الليل',

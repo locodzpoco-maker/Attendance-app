@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import { DailyAttendanceRecord, AppLanguage, WorkSchedule } from '../types';
 import { Clock, ShieldAlert, Check, X, HelpCircle, Layers, Zap } from 'lucide-react';
 import { formatMinutesToHoursAndMinutes, ADMIN_SHIFT_SATURDAY, STOCK_SHIFT_SATURDAY } from '../utils/schedules';
+import { isAdminWorker } from '../utils/employees';
 import { getTranslations } from '../utils/i18n';
 
 interface ManualCorrectionModalProps {
@@ -18,7 +19,9 @@ interface ManualCorrectionModalProps {
     injectedSuppMinutes?: number,
     exactPunchOnly?: boolean,
     deductBreak?: boolean,
-    eligibleForOvertime?: boolean
+    eligibleForOvertime?: boolean,
+    isHalfDayAbsent?: boolean,
+    halfDaySession?: 'morning' | 'afternoon'
   ) => void;
   currentUser: string;
   language?: AppLanguage;
@@ -61,10 +64,33 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
 
   const currentSched = schedules?.find((s) => s.id === (overrideShift || record.scheduleId));
 
+  const isWorkerAdmin =
+    record.workerType === 'Admin' ||
+    record.isAdminWorkerType ||
+    (record.companyDepartment || '').toLowerCase().includes('admin') ||
+    isAdminWorker(record.employeeId);
+
+  // Half-Day Absence Mode
+  const [halfDayMode, setHalfDayMode] = useState<'none' | 'afternoon' | 'morning'>(() => {
+    if (record.manualAdjustment?.isHalfDayAbsent !== undefined) {
+      return record.manualAdjustment.isHalfDayAbsent
+        ? (record.manualAdjustment.halfDaySession || 'afternoon')
+        : 'none';
+    }
+    if (record.isHalfDayAbsent) {
+      return record.halfDaySession || 'afternoon';
+    }
+    return 'none';
+  });
+
   // Eligible for Overtime Checkbox
+  // Per user requirement: admin workers' eligible for overtime box is UNCHECKED by default until manually checked
   const [eligibleForOvertime, setEligibleForOvertime] = useState<boolean>(() => {
     if (record.manualAdjustment?.eligibleForOvertime !== undefined) {
       return Boolean(record.manualAdjustment.eligibleForOvertime);
+    }
+    if (isWorkerAdmin) {
+      return false;
     }
     if (record.eligibleForOvertime !== undefined) {
       return Boolean(record.eligibleForOvertime);
@@ -137,7 +163,9 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
       totalInjectedMins > 0 ? totalInjectedMins : undefined,
       exactPunchOnly,
       deductBreak,
-      eligibleForOvertime
+      eligibleForOvertime,
+      halfDayMode !== 'none',
+      halfDayMode !== 'none' ? halfDayMode : undefined
     );
     onClose();
   };
@@ -342,6 +370,59 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
             </div>
           </div>
 
+          {/* Half-Day Absence Selection */}
+          <div className="rounded-xl border border-amber-200 bg-amber-50/50 p-3 text-xs space-y-2">
+            <div className="flex items-center justify-between">
+              <span className="font-semibold text-amber-950 flex items-center gap-1.5">
+                <span className="text-[10px] font-bold px-1.5 py-0.2 rounded bg-amber-200 text-amber-900 border border-amber-300">½j</span>
+                Statut Demi-journée / Absence
+              </span>
+              <span className="text-[10px] text-amber-850 font-bold px-1.5 py-0.2 rounded bg-white border border-amber-200">
+                {halfDayMode === 'none' ? 'Journée complète' : (halfDayMode === 'afternoon' ? 'Absent après-midi (0.5j)' : 'Absent matin (0.5j)')}
+              </span>
+            </div>
+            <div className="grid grid-cols-3 gap-1.5">
+              <button
+                type="button"
+                onClick={() => setHalfDayMode('none')}
+                className={`py-1.5 px-2 rounded-lg text-center text-[11px] transition-all cursor-pointer ${
+                  halfDayMode === 'none'
+                    ? 'bg-white border-2 border-indigo-600 text-indigo-950 font-bold shadow-2xs'
+                    : 'bg-white/80 border border-slate-200 text-slate-600 hover:bg-white'
+                }`}
+              >
+                Journée complète
+              </button>
+              <button
+                type="button"
+                onClick={() => setHalfDayMode('afternoon')}
+                className={`py-1.5 px-2 rounded-lg text-center text-[11px] transition-all cursor-pointer ${
+                  halfDayMode === 'afternoon'
+                    ? 'bg-amber-100 border-2 border-amber-600 text-amber-950 font-bold shadow-2xs'
+                    : 'bg-white/80 border border-slate-200 text-slate-600 hover:bg-white'
+                }`}
+              >
+                Absent Après-midi
+              </button>
+              <button
+                type="button"
+                onClick={() => setHalfDayMode('morning')}
+                className={`py-1.5 px-2 rounded-lg text-center text-[11px] transition-all cursor-pointer ${
+                  halfDayMode === 'morning'
+                    ? 'bg-amber-100 border-2 border-amber-600 text-amber-950 font-bold shadow-2xs'
+                    : 'bg-white/80 border border-slate-200 text-slate-600 hover:bg-white'
+                }`}
+              >
+                Absent Matin
+              </button>
+            </div>
+            {halfDayMode !== 'none' && (
+              <p className="text-[11px] text-amber-900/80 leading-relaxed pt-1 border-t border-amber-200/60">
+                Comptabilisé comme 0.5 jour travaillé et 0.5 jour absent dans le récapitulatif mensuel, sans pénalité de minutes de retard.
+              </p>
+            )}
+          </div>
+
           {/* Eligible for Overtime Checkbox */}
           <div className="rounded-xl border border-indigo-200 bg-indigo-50/60 p-3 text-xs space-y-2">
             <label className="flex items-start gap-2.5 cursor-pointer">
@@ -364,7 +445,11 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
                         : 'bg-slate-100 text-slate-600 border border-slate-300'
                     }`}
                   >
-                    {eligibleForOvertime ? '✓ Actif' : 'Inactif'}
+                    {eligibleForOvertime
+                      ? t.eligibleForOvertimeActive
+                      : (isWorkerAdmin && record.manualAdjustment?.eligibleForOvertime === undefined
+                          ? t.eligibleForOvertimeAdminBadge
+                          : t.eligibleForOvertimeInactive)}
                   </span>
                 </div>
                 <span className="text-indigo-900/80 text-[11px] block mt-0.5 leading-relaxed">

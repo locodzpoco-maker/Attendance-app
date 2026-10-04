@@ -11,6 +11,7 @@ import {
   DatabaseStats,
   BackupItem,
   PaidVacation,
+  TimeAuthorization,
 } from '../types';
 
 /**

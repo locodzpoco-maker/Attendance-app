@@ -13,7 +13,7 @@ import {
   AppLanguage,
 } from './types';
 import { DEFAULT_SCHEDULES, STOCK_SHIFT_SATURDAY, ADMIN_SHIFT_SATURDAY, NO_SHIFT_SCHEDULE } from './utils/schedules';
-import { DEFAULT_EMPLOYEES, findUnmappedEmployees, DEFAULT_SATURDAY_WORKER_IDS, isSaturdayWorker } from './utils/employees';
+import { DEFAULT_EMPLOYEES, findUnmappedEmployees, DEFAULT_SATURDAY_WORKER_IDS, isSaturdayWorker, isAdminWorker } from './utils/employees';
 import { calculateAttendance } from './utils/calculator';
 import { generateReferenceDataset } from './utils/sampleData';
 import { getTranslations, isRtlLanguage } from './utils/i18n';
@@ -155,10 +155,15 @@ export default function App() {
       getStorageItem<Employee[] | null>('ams_employees_v4', null);
     if (Array.isArray(saved) && saved.length > 0) {
       return saved.map((e) => {
-        if ((e.hasSaturdayShift === undefined || !e.hasSaturdayShift) && isSaturdayWorker(e.id)) {
-          return { ...e, hasSaturdayShift: true };
+        let updated = { ...e };
+        if ((updated.hasSaturdayShift === undefined || !updated.hasSaturdayShift) && isSaturdayWorker(updated.id)) {
+          updated.hasSaturdayShift = true;
         }
-        return e;
+        if (updated.eligibleForOvertime === undefined) {
+          const isAdmin = updated.workerType === 'Admin' || isAdminWorker(updated.id, updated) || (updated.companyDepartment || '').toLowerCase().includes('admin');
+          updated.eligibleForOvertime = !isAdmin;
+        }
+        return updated;
       });
     }
     return DEFAULT_EMPLOYEES;
@@ -465,7 +470,9 @@ export default function App() {
     injectedSuppMinutes?: number,
     exactPunchOnly?: boolean,
     deductBreak?: boolean,
-    eligibleForOvertime?: boolean
+    eligibleForOvertime?: boolean,
+    isHalfDayAbsent?: boolean,
+    halfDaySession?: 'morning' | 'afternoon'
   ) => {
     const target = dailyRecords.find((r) => r.id === recordId);
     if (!target) return;
@@ -483,6 +490,8 @@ export default function App() {
       exactPunchOnly: exactPunchOnly !== undefined ? exactPunchOnly : existingAdj?.exactPunchOnly,
       deductBreak: deductBreak !== undefined ? deductBreak : existingAdj?.deductBreak,
       eligibleForOvertime: eligibleForOvertime !== undefined ? eligibleForOvertime : existingAdj?.eligibleForOvertime,
+      isHalfDayAbsent: isHalfDayAbsent !== undefined ? isHalfDayAbsent : existingAdj?.isHalfDayAbsent,
+      halfDaySession: halfDaySession !== undefined ? halfDaySession : existingAdj?.halfDaySession,
       reason,
       adjustedBy: auditor,
       adjustedAt: new Date().toISOString(),
@@ -497,6 +506,7 @@ export default function App() {
     const suppDetail = injectedSuppMinutes !== undefined ? ` | Injected Supp: +${Math.floor(injectedSuppMinutes / 60)}h ${injectedSuppMinutes % 60}m` : '';
     const exactPunchDetail = exactPunchOnly ? ` | Exact Punch Mode: Enabled (${deductBreak ? 'Pause déduite' : 'Pause incluse'}, 0 late penalty)` : '';
     const otDetail = eligibleForOvertime !== undefined ? ` | OT Eligible: ${eligibleForOvertime ? 'Yes' : 'No'}` : '';
+    const halfDayDetail = isHalfDayAbsent ? ` | Half-Day Absent: ${halfDaySession || 'afternoon'} (0.5j)` : '';
     const newLog: AttendanceAuditLog = {
       id: `audit_${Date.now()}`,
       timestamp: new Date().toISOString(),
@@ -505,7 +515,7 @@ export default function App() {
       employeeName: target.employeeName,
       date: target.date,
       action: 'MANUAL_PUNCH_ADJUSTMENT',
-      details: `Entry: ${adjustedEntry || target.entryTime || 'none'} | 2nd In: ${adjustedSecondCheckIn || target.secondCheckInTime || 'none'} | Exit: ${adjustedExit || target.exitTime || 'none'} | Shift: ${overrideShiftId || 'Auto'}${suppDetail}${exactPunchDetail}${otDetail} | Reason: ${reason}`,
+      details: `Entry: ${adjustedEntry || target.entryTime || 'none'} | 2nd In: ${adjustedSecondCheckIn || target.secondCheckInTime || 'none'} | Exit: ${adjustedExit || target.exitTime || 'none'} | Shift: ${overrideShiftId || 'Auto'}${suppDetail}${exactPunchDetail}${otDetail}${halfDayDetail} | Reason: ${reason}`,
     };
 
     setAuditLogs((prev) => [newLog, ...prev]);

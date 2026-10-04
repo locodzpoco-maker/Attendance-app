@@ -166,6 +166,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
       if (scheduleId === 'stock_dynamic' || scheduleId.startsWith('stock_')) {
         setScheduleId('admin_g1');
       }
+      setEligibleForOvertime(false);
     }
   };
 
@@ -200,7 +201,11 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
     setIsArchived(Boolean(emp.isArchived || emp.status === 'Archived'));
     setStartDate(emp.startDate);
     setHasSaturdayShift(Boolean(emp.hasSaturdayShift));
-    setEligibleForOvertime(emp.eligibleForOvertime !== undefined ? Boolean(emp.eligibleForOvertime) : true);
+    setEligibleForOvertime(
+      emp.eligibleForOvertime !== undefined
+        ? Boolean(emp.eligibleForOvertime)
+        : isStock
+    );
     setNotes(emp.notes || '');
     setFormError('');
     setModalOpen(true);
@@ -975,7 +980,7 @@ export const EmployeesView: React.FC<EmployeesViewProps> = ({
                       <span className={`text-[10px] font-bold rounded px-1.5 py-0.2 ${
                         eligibleForOvertime ? 'bg-indigo-100 text-indigo-800' : 'bg-slate-200 text-slate-600'
                       }`}>
-                        {eligibleForOvertime ? '✓ Actif' : 'Inactif'}
+                        {eligibleForOvertime ? t.eligibleForOvertimeActive : t.eligibleForOvertimeInactive}
                       </span>
                     </span>
                     <p className="text-slate-600 text-[11px] mt-0.5 leading-relaxed">

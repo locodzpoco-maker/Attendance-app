@@ -71,6 +71,8 @@ export type AttendanceObservation =
   | 'Ponctuel'
   | 'Retard'
   | 'Absence'
+  | 'Absent (Après-midi)'
+  | 'Absent (Matin)'
   | 'Entrée non pointée'
   | 'Sortie non pointée'
   | 'Sortie après minuit'
@@ -90,6 +92,21 @@ export interface PaidVacation {
   createdBy: string; // e.g. "Administrator"
 }
 
+export interface TimeAuthorization {
+  id: string; // unique ID
+  employeeId: string;
+  employeeName: string;
+  startDate: string; // "YYYY-MM-DD"
+  endDate: string; // "YYYY-MM-DD"
+  type: 'early_exit' | 'late_arrival' | 'both';
+  allowedLateArrivalMinutes?: number; // allowed delay on entry (e.g. 60 min)
+  allowedEarlyExitMinutes?: number; // allowed early departure before shift end (e.g. 60 min, 120 min)
+  reason: string; // e.g. "Maternité / Heure d'allaitement", "Éloignement géographique", etc.
+  notes?: string;
+  createdAt: string; // ISO string
+  createdBy: string;
+}
+
 export interface ManualAdjustment {
   date: string;
   employeeId: string;
@@ -101,6 +118,8 @@ export interface ManualAdjustment {
   exactPunchOnly?: boolean; // When true: ignores late arrival, 2nd check-in delay, early exit
   deductBreak?: boolean; // When exactPunchOnly is true: true = deduct pause time, false = do not deduct pause time (include in worked hours)
   eligibleForOvertime?: boolean; // When true: calculates overtime for that worker on this day
+  isHalfDayAbsent?: boolean; // When true: marks half day absence (0.5 day worked, 0.5 day absent)
+  halfDaySession?: 'morning' | 'afternoon'; // Absent session
   reason: string;
   adjustedBy: string;
   adjustedAt: string;
@@ -162,6 +181,18 @@ export interface DailyAttendanceRecord {
   // Paid Vacation Info (if on approved paid leave)
   isPaidVacation?: boolean;
   vacationReason?: string;
+
+  // Time Authorization / Schedule Dispensation (e.g. Nursing hour, late arrival / early exit allowance)
+  hasTimeAuthorization?: boolean;
+  timeAuthorizationReason?: string;
+  allowedLateArrivalMinutes?: number;
+  allowedEarlyExitMinutes?: number;
+
+  // Half-Day Absence Info (e.g. Admin worker missing morning or afternoon session)
+  isHalfDayAbsent?: boolean;
+  halfDaySession?: 'morning' | 'afternoon';
+  workedDaysCredit?: number; // e.g. 1 for full day, 0.5 for half day, 0 for absent
+  absentDaysCredit?: number; // e.g. 0 for full day, 0.5 for half day, 1 for absent
 
   observation: AttendanceObservation;
   observationDetail: string; // e.g. "Retard 8 min", "Sortie non pointée", "OFF", etc.

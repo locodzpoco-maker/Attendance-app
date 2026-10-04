@@ -20,7 +20,7 @@ import {
   EyeOff,
   AlertCircle,
 } from 'lucide-react';
-import { generateMonthlySummaryFromDailyRecords } from '../utils/calculator';
+import { generateMonthlySummaryFromDailyRecords, formatDaysNumber } from '../utils/calculator';
 import { getTranslations, translateShiftName } from '../utils/i18n';
 import { getStorageItem, saveStorageItem } from '../utils/storage';
 
@@ -783,7 +783,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                           0 ptg
                         </span>
                       ) : (
-                        s.presentDays
+                        formatDaysNumber(s.presentDays, settings.language)
                       )}
                     </td>
 
@@ -792,7 +792,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                       {s.paidVacationDays && s.paidVacationDays > 0 ? (
                         <span className="inline-flex items-center gap-1 rounded-md bg-teal-50 border border-teal-200 px-1.5 py-0.5 text-xs font-bold text-teal-700">
                           <Palmtree className="h-3 w-3 text-teal-600" />
-                          {s.paidVacationDays} j
+                          {formatDaysNumber(s.paidVacationDays, settings.language)} j
                         </span>
                       ) : (
                         <span className="text-slate-300">-</span>
@@ -803,7 +803,7 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                     <td className="py-2.5 px-3 text-center font-semibold text-rose-600">
                       {s.absentDays > 0 ? (
                         <span className="rounded bg-rose-50 px-1.5 py-0.5 text-rose-700">
-                          {s.absentDays}
+                          {formatDaysNumber(s.absentDays, settings.language)}
                         </span>
                       ) : (
                         '0'
@@ -878,9 +878,9 @@ export const MonthlySummaryView: React.FC<MonthlySummaryViewProps> = ({
                   <td className="py-3 px-3 uppercase tracking-wider text-[11px]" colSpan={4}>
                     Aggregated Total ({filteredSummaries.length} Employees)
                   </td>
-                  <td className="py-3 px-3 text-center text-emerald-700">{aggregates.present}</td>
-                  <td className="py-3 px-3 text-center text-teal-800 font-bold">{aggregates.vacation}</td>
-                  <td className="py-3 px-3 text-center text-rose-700">{aggregates.absent}</td>
+                  <td className="py-3 px-3 text-center text-emerald-700">{formatDaysNumber(aggregates.present, settings.language)}</td>
+                  <td className="py-3 px-3 text-center text-teal-800 font-bold">{formatDaysNumber(aggregates.vacation, settings.language)}</td>
+                  <td className="py-3 px-3 text-center text-rose-700">{formatDaysNumber(aggregates.absent, settings.language)}</td>
                   <td className="py-3 px-3 text-center text-slate-400">-</td>
                   <td className="py-3 px-3 text-center text-slate-900">{aggregates.workedHours}</td>
                   <td className="py-3 px-3 text-center text-indigo-700">{aggregates.suppHours}</td>

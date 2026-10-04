@@ -22,6 +22,7 @@ import {
   AppSettings,
 } from '../types';
 import { getTranslations } from '../utils/i18n';
+import { formatDaysNumber } from '../utils/calculator';
 
 interface DashboardProps {
   dataset: RawAttendanceDataset | null;
@@ -209,7 +210,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.colPresentDays}</span>
             <CheckCircle2 className="h-4 w-4 text-emerald-500" />
           </div>
-          <p className="mt-2 text-2xl font-bold text-emerald-600">{totalPresentDays}</p>
+          <p className="mt-2 text-2xl font-bold text-emerald-600">{formatDaysNumber(totalPresentDays, settings.language)}</p>
           <span className="text-[11px] text-slate-400">{t.daysWord}</span>
         </div>
 
@@ -219,7 +220,7 @@ export const Dashboard: React.FC<DashboardProps> = ({
             <span className="text-xs font-semibold uppercase tracking-wider text-slate-500">{t.colAbsentDays}</span>
             <AlertTriangle className="h-4 w-4 text-rose-500" />
           </div>
-          <p className="mt-2 text-2xl font-bold text-rose-600">{totalAbsentDays}</p>
+          <p className="mt-2 text-2xl font-bold text-rose-600">{formatDaysNumber(totalAbsentDays, settings.language)}</p>
           <span className="text-[11px] text-slate-400">{t.daysWord}</span>
         </div>
 

@@ -1,4 +1,4 @@
-import { AppSettings, WorkSchedule, Employee, ManualAdjustment, AttendanceAuditLog, RawAttendanceDataset, HistoricalPeriodRecord, PaidVacation } from '../types';
+import { AppSettings, WorkSchedule, Employee, ManualAdjustment, AttendanceAuditLog, RawAttendanceDataset, HistoricalPeriodRecord, PaidVacation, TimeAuthorization } from '../types';
 
 export const STORAGE_KEYS = {
   SETTINGS: 'ams_settings',
@@ -59,6 +59,7 @@ export interface AppProgressSnapshot {
   employees: Employee[];
   manualAdjustments: Record<string, ManualAdjustment>;
   paidVacations?: PaidVacation[];
+  timeAuthorizations?: TimeAuthorization[];
   auditLogs?: AttendanceAuditLog[];
   dailyFilters?: SavedDailyFilters;
   monthlyFilters?: SavedMonthlyFilters;
@@ -82,6 +83,7 @@ export interface AppBackupPayload {
   employees: Employee[];
   manualAdjustments: Record<string, ManualAdjustment>;
   paidVacations?: PaidVacation[];
+  timeAuthorizations?: TimeAuthorization[];
   activeDataset?: RawAttendanceDataset | null;
   historicalPeriods?: HistoricalPeriodRecord[];
 }
