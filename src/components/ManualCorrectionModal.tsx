@@ -418,7 +418,7 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
             </div>
             {halfDayMode !== 'none' && (
               <p className="text-[11px] text-amber-900/80 leading-relaxed pt-1 border-t border-amber-200/60">
-                Comptabilisé comme 0.5 jour travaillé et 0.5 jour absent dans le récapitulatif mensuel, sans pénalité de minutes de retard.
+                Comptabilisé comme 0.5 jour travaillé et 0.5 jour absent dans le récapitulatif mensuel (heures travaillées et retard calculés sur la session effectuée).
               </p>
             )}
           </div>

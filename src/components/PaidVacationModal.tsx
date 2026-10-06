@@ -16,7 +16,7 @@ import {
   FileText,
   CalendarRange,
 } from 'lucide-react';
-import { Employee, WorkSchedule, PaidVacation } from '../types';
+import { Employee, WorkSchedule, PaidVacation, TimeAuthorization } from '../types';
 import { getDayOfWeekFromDate } from '../utils/schedules';
 
 interface PaidVacationModalProps {
@@ -27,6 +27,9 @@ interface PaidVacationModalProps {
   paidVacations: PaidVacation[];
   onSaveVacation: (vacation: PaidVacation) => void;
   onDeleteVacation: (vacationId: string) => void;
+  timeAuthorizations?: TimeAuthorization[];
+  onSaveTimeAuthorization?: (auth: TimeAuthorization) => void;
+  onDeleteTimeAuthorization?: (authId: string) => void;
   preSelectedEmployee?: Employee | null;
   preSelectedDate?: string;
   currentUserRole?: string;
@@ -49,11 +52,14 @@ export const PaidVacationModal: React.FC<PaidVacationModalProps> = ({
   paidVacations,
   onSaveVacation,
   onDeleteVacation,
+  timeAuthorizations = [],
+  onSaveTimeAuthorization,
+  onDeleteTimeAuthorization,
   preSelectedEmployee,
   preSelectedDate,
   currentUserRole = 'Administrator',
 }) => {
-  const [activeTab, setActiveTab] = useState<'create' | 'list'>('create');
+  const [activeTab, setActiveTab] = useState<'create' | 'list' | 'authorizations'>('create');
   const [selectedEmpId, setSelectedEmpId] = useState<string>('');
   const [empSearch, setEmpSearch] = useState<string>('');
   const [startDate, setStartDate] = useState<string>('');
@@ -63,6 +69,20 @@ export const PaidVacationModal: React.FC<PaidVacationModalProps> = ({
   const [formError, setFormError] = useState<string>('');
   const [listSearch, setListSearch] = useState<string>('');
   const [confirmDeleteId, setConfirmDeleteId] = useState<string | null>(null);
+
+  // Time Authorization (Dispensation for maternity, distance, etc.) State
+  const [authEmpId, setAuthEmpId] = useState<string>('');
+  const [authStartDate, setAuthStartDate] = useState<string>('');
+  const [authEndDate, setAuthEndDate] = useState<string>('');
+  const [authType, setAuthType] = useState<'early_exit' | 'late_arrival' | 'both'>('early_exit');
+  const [authLateMinutes, setAuthLateMinutes] = useState<number>(60);
+  const [authEarlyMinutes, setAuthEarlyMinutes] = useState<number>(60);
+  const [authReason, setAuthReason] = useState<string>("Maternité / Allaitement (Sortie 1h)");
+  const [authNotes, setAuthNotes] = useState<string>('');
+  const [editingAuthId, setEditingAuthId] = useState<string | null>(null);
+  const [authSearch, setAuthSearch] = useState<string>('');
+  const [confirmDeleteAuthId, setConfirmDeleteAuthId] = useState<string | null>(null);
+  const [authFormOpen, setAuthFormOpen] = useState<boolean>(true);
 
   // Initialize preselection when modal opens
   useEffect(() => {
@@ -223,6 +243,80 @@ export const PaidVacationModal: React.FC<PaidVacationModalProps> = ({
     setReason('Congé annuel / Annual Leave');
   };
 
+  // Filtered recorded authorizations
+  const filteredAuthorizations = useMemo(() => {
+    let list = [...timeAuthorizations];
+    if (authSearch.trim()) {
+      const term = authSearch.toLowerCase().trim();
+      list = list.filter(
+        (a) =>
+          a.employeeName.toLowerCase().includes(term) ||
+          a.employeeId.toLowerCase().includes(term) ||
+          (a.reason && a.reason.toLowerCase().includes(term))
+      );
+    }
+    return list.sort((a, b) => b.startDate.localeCompare(a.startDate));
+  }, [timeAuthorizations, authSearch]);
+
+  const handleSaveAuth = (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!authEmpId) {
+      setFormError('Veuillez sélectionner un travailleur.');
+      return;
+    }
+    if (!authStartDate) {
+      setFormError('Veuillez sélectionner une date de début.');
+      return;
+    }
+    const targetEmp = employees.find((e) => e.id === authEmpId);
+    if (!targetEmp) return;
+
+    const newAuth: TimeAuthorization = {
+      id: editingAuthId || `auth_${Date.now()}_${Math.random().toString(36).slice(2, 6)}`,
+      employeeId: targetEmp.id,
+      employeeName: targetEmp.name,
+      startDate: authStartDate,
+      endDate: authEndDate || authStartDate,
+      type: authType,
+      allowedLateArrivalMinutes:
+        authType === 'late_arrival' || authType === 'both' ? authLateMinutes : undefined,
+      allowedEarlyExitMinutes:
+        authType === 'early_exit' || authType === 'both' ? authEarlyMinutes : undefined,
+      reason: authReason.trim() || "Autorisation d'horaire",
+      notes: authNotes.trim() || undefined,
+      createdAt: new Date().toISOString(),
+      createdBy: currentUserRole,
+    };
+
+    onSaveTimeAuthorization?.(newAuth);
+    setEditingAuthId(null);
+    setAuthNotes('');
+    setFormError('');
+  };
+
+  const startEditAuth = (auth: TimeAuthorization) => {
+    setEditingAuthId(auth.id);
+    setAuthEmpId(auth.employeeId);
+    setAuthStartDate(auth.startDate);
+    setAuthEndDate(auth.endDate || auth.startDate);
+    setAuthType(auth.type);
+    if (auth.allowedLateArrivalMinutes) setAuthLateMinutes(auth.allowedLateArrivalMinutes);
+    if (auth.allowedEarlyExitMinutes) setAuthEarlyMinutes(auth.allowedEarlyExitMinutes);
+    setAuthReason(auth.reason);
+    setAuthNotes(auth.notes || '');
+    setAuthFormOpen(true);
+    setActiveTab('authorizations');
+  };
+
+  const cancelEditAuth = () => {
+    setEditingAuthId(null);
+    setAuthNotes('');
+    const todayStr = new Date().toISOString().slice(0, 10);
+    setAuthStartDate(todayStr);
+    setAuthEndDate(todayStr);
+    setAuthReason("Maternité / Allaitement (Sortie 1h)");
+  };
+
   // Filtered recorded vacations
   const filteredVacations = useMemo(() => {
     let list = [...paidVacations];
@@ -308,6 +402,33 @@ export const PaidVacationModal: React.FC<PaidVacationModalProps> = ({
             {paidVacations.length > 0 && (
               <span className="rounded-full bg-teal-100 text-teal-800 text-[10px] font-bold px-1.5 py-0.2">
                 {paidVacations.length}
+              </span>
+            )}
+          </button>
+          <button
+            id="tab-time-authorizations"
+            onClick={() => {
+              setActiveTab('authorizations');
+              if (!authEmpId && employees.length > 0) {
+                setAuthEmpId(employees[0].id);
+              }
+              if (!authStartDate) {
+                const todayStr = new Date().toISOString().slice(0, 10);
+                setAuthStartDate(todayStr);
+                setAuthEndDate(todayStr);
+              }
+            }}
+            className={`inline-flex items-center gap-2 py-3 px-4 border-b-2 text-xs font-semibold transition-colors ${
+              activeTab === 'authorizations'
+                ? 'border-indigo-600 text-indigo-700 font-bold'
+                : 'border-transparent text-slate-500 hover:text-slate-800'
+            }`}
+          >
+            <Clock className="h-3.5 w-3.5 text-indigo-600" />
+            Autorisations d'Horaire (Dispensation)
+            {timeAuthorizations.length > 0 && (
+              <span className="rounded-full bg-indigo-100 text-indigo-800 text-[10px] font-bold px-1.5 py-0.2">
+                {timeAuthorizations.length}
               </span>
             )}
           </button>
@@ -549,7 +670,7 @@ export const PaidVacationModal: React.FC<PaidVacationModalProps> = ({
                 </div>
               </div>
             </form>
-          ) : (
+          ) : activeTab === 'list' ? (
             /* Active & Recorded Vacations List */
             <div className="space-y-4">
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
@@ -697,6 +818,446 @@ export const PaidVacationModal: React.FC<PaidVacationModalProps> = ({
                   </div>
                 </div>
               )}
+            </div>
+          ) : (
+            /* Time Authorizations / Dispensation View (Maternity, Distance, etc.) */
+            <div className="space-y-5">
+              {/* Informative Banner */}
+              <div className="rounded-xl bg-indigo-50 border border-indigo-200 p-3.5 text-xs text-indigo-900 space-y-1">
+                <div className="flex items-center gap-2 font-bold text-indigo-950">
+                  <Clock className="h-4 w-4 text-indigo-600" />
+                  <span>Autorisation d'Horaire Personnalisée (Sortie anticipée ou Arrivée tardive)</span>
+                </div>
+                <p className="text-[11px] text-indigo-850 leading-relaxed">
+                  Pour les employées venant d'accoucher (maternité / allaitement), les travailleurs habitant loin ou toute situation particulière, accordez une durée personnalisée autorisée (ex: 1 heure ou 2 heures).
+                  <strong> Lors du calcul de l'assiduité, le retard ignore automatiquement cette durée autorisée</strong> et celle-ci est comptabilisée dans les heures travaillées normales.
+                </p>
+              </div>
+
+              {/* Form Section */}
+              <div className="rounded-2xl border border-indigo-100 bg-slate-50/50 p-4 space-y-4">
+                <div className="flex items-center justify-between">
+                  <h3 className="text-xs font-bold text-slate-900 flex items-center gap-2">
+                    <span className="flex h-5 w-5 items-center justify-center rounded-full bg-indigo-600 text-white text-[10px]">
+                      {editingAuthId ? '✎' : '+'}
+                    </span>
+                    {editingAuthId ? "Modifier l'Autorisation" : "Créer une Nouvelle Autorisation d'Horaire"}
+                  </h3>
+                  {editingAuthId && (
+                    <button
+                      type="button"
+                      onClick={cancelEditAuth}
+                      className="text-[11px] text-rose-600 hover:underline"
+                    >
+                      Annuler la modification
+                    </button>
+                  )}
+                </div>
+
+                <form onSubmit={handleSaveAuth} className="space-y-4">
+                  {/* Worker & Date Range Row */}
+                  <div className="grid grid-cols-1 md:grid-cols-3 gap-3">
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Travailleur / Employé <span className="text-rose-500">*</span>
+                      </label>
+                      <select
+                        id="auth-worker-select"
+                        value={authEmpId}
+                        onChange={(e) => setAuthEmpId(e.target.value)}
+                        required
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      >
+                        <option value="">-- Choisir un travailleur --</option>
+                        {employees.map((emp) => (
+                          <option key={emp.id} value={emp.id}>
+                            {emp.name} ({emp.id}) - {emp.companyDepartment}
+                          </option>
+                        ))}
+                      </select>
+                    </div>
+
+                    <div>
+                      <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                        Date de début <span className="text-rose-500">*</span>
+                      </label>
+                      <input
+                        type="date"
+                        id="auth-start-date"
+                        value={authStartDate}
+                        onChange={(e) => setAuthStartDate(e.target.value)}
+                        required
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+
+                    <div>
+                      <div className="flex items-center justify-between mb-1">
+                        <label className="text-[11px] font-bold text-slate-700">
+                          Date de fin <span className="text-rose-500">*</span>
+                        </label>
+                        <div className="flex gap-1">
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (authStartDate) {
+                                const d = new Date(authStartDate);
+                                d.setMonth(d.getMonth() + 1);
+                                setAuthEndDate(d.toISOString().slice(0, 10));
+                              }
+                            }}
+                            className="text-[10px] text-indigo-600 hover:underline"
+                            title="Ajouter 1 mois"
+                          >
+                            +1 Mois
+                          </button>
+                          <span className="text-[10px] text-slate-300">|</span>
+                          <button
+                            type="button"
+                            onClick={() => {
+                              if (authStartDate) {
+                                const d = new Date(authStartDate);
+                                d.setMonth(d.getMonth() + 3);
+                                setAuthEndDate(d.toISOString().slice(0, 10));
+                              }
+                            }}
+                            className="text-[10px] text-indigo-600 hover:underline"
+                            title="Ajouter 3 mois (congé maternité)"
+                          >
+                            +3 Mois
+                          </button>
+                        </div>
+                      </div>
+                      <input
+                        type="date"
+                        id="auth-end-date"
+                        value={authEndDate}
+                        onChange={(e) => setAuthEndDate(e.target.value)}
+                        required
+                        className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                      />
+                    </div>
+                  </div>
+
+                  {/* Dispensation Type Selector */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1.5">
+                      Type de Dispensation d'Horaire
+                    </label>
+                    <div className="grid grid-cols-3 gap-2">
+                      <button
+                        type="button"
+                        onClick={() => setAuthType('early_exit')}
+                        className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
+                          authType === 'early_exit'
+                            ? 'bg-white border-indigo-600 ring-2 ring-indigo-600/20 text-indigo-950 font-bold shadow-2xs'
+                            : 'bg-white/80 border-slate-200 text-slate-600 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>🚪 Sortie Anticipée</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-normal mt-0.5">
+                          Autorisé à partir plus tôt avant la fin du shift
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAuthType('late_arrival')}
+                        className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
+                          authType === 'late_arrival'
+                            ? 'bg-white border-indigo-600 ring-2 ring-indigo-600/20 text-indigo-950 font-bold shadow-2xs'
+                            : 'bg-white/80 border-slate-200 text-slate-600 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>🌅 Arrivée Tardive</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-normal mt-0.5">
+                          Autorisé à arriver plus tard le matin
+                        </div>
+                      </button>
+
+                      <button
+                        type="button"
+                        onClick={() => setAuthType('both')}
+                        className={`p-2.5 rounded-xl border text-left text-xs transition-all cursor-pointer ${
+                          authType === 'both'
+                            ? 'bg-white border-indigo-600 ring-2 ring-indigo-600/20 text-indigo-950 font-bold shadow-2xs'
+                            : 'bg-white/80 border-slate-200 text-slate-600 hover:bg-white'
+                        }`}
+                      >
+                        <div className="flex items-center gap-1.5">
+                          <span>🔄 Les Deux</span>
+                        </div>
+                        <div className="text-[10px] text-slate-500 font-normal mt-0.5">
+                          Arrivée tardive ET sortie anticipée
+                        </div>
+                      </button>
+                    </div>
+                  </div>
+
+                  {/* Allowed Time Settings */}
+                  <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 p-3 bg-white rounded-xl border border-slate-200 shadow-2xs">
+                    {(authType === 'early_exit' || authType === 'both') && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-bold text-slate-800">
+                            Durée sortie anticipée autorisée :
+                          </label>
+                          <span className="font-mono text-xs font-bold text-indigo-600">
+                            {authEarlyMinutes} min ({Math.floor(authEarlyMinutes / 60)}h{authEarlyMinutes % 60 ? (authEarlyMinutes % 60) + 'm' : ''})
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {[30, 60, 90, 120].map((mins) => (
+                            <button
+                              key={mins}
+                              type="button"
+                              onClick={() => setAuthEarlyMinutes(mins)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                                authEarlyMinutes === mins
+                                  ? 'bg-indigo-600 text-white font-bold'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {mins >= 60 ? `${mins / 60} heure${mins > 60 ? 's' : ''}` : `${mins} min`}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="number"
+                          min={5}
+                          max={300}
+                          step={5}
+                          value={authEarlyMinutes}
+                          onChange={(e) => setAuthEarlyMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                          className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-indigo-500 font-mono"
+                          placeholder="Minutes personnalisées (ex: 60)"
+                        />
+                      </div>
+                    )}
+
+                    {(authType === 'late_arrival' || authType === 'both') && (
+                      <div>
+                        <div className="flex items-center justify-between mb-1">
+                          <label className="text-[11px] font-bold text-slate-800">
+                            Durée arrivée tardive autorisée :
+                          </label>
+                          <span className="font-mono text-xs font-bold text-indigo-600">
+                            {authLateMinutes} min ({Math.floor(authLateMinutes / 60)}h{authLateMinutes % 60 ? (authLateMinutes % 60) + 'm' : ''})
+                          </span>
+                        </div>
+                        <div className="flex flex-wrap gap-1.5 mb-2">
+                          {[30, 60, 90, 120].map((mins) => (
+                            <button
+                              key={mins}
+                              type="button"
+                              onClick={() => setAuthLateMinutes(mins)}
+                              className={`px-2 py-0.5 rounded text-[11px] font-medium transition-colors ${
+                                authLateMinutes === mins
+                                  ? 'bg-indigo-600 text-white font-bold'
+                                  : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                              }`}
+                            >
+                              {mins >= 60 ? `${mins / 60} heure${mins > 60 ? 's' : ''}` : `${mins} min`}
+                            </button>
+                          ))}
+                        </div>
+                        <input
+                          type="number"
+                          min={5}
+                          max={300}
+                          step={5}
+                          value={authLateMinutes}
+                          onChange={(e) => setAuthLateMinutes(Math.max(0, parseInt(e.target.value, 10) || 0))}
+                          className="w-full rounded-lg border border-slate-300 px-2.5 py-1.5 text-xs text-slate-800 outline-none focus:border-indigo-500 font-mono"
+                          placeholder="Minutes personnalisées (ex: 60)"
+                        />
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Reason & Situation */}
+                  <div>
+                    <label className="block text-[11px] font-bold text-slate-700 mb-1">
+                      Motif / Justification <span className="text-rose-500">*</span>
+                    </label>
+                    <div className="flex flex-wrap gap-1.5 mb-2">
+                      {[
+                        "Maternité / Allaitement (Sortie 1h)",
+                        "Maternité (Sortie 2h)",
+                        "Éloignement géographique / Transport",
+                        "Situation familiale particulière",
+                        "Raison médicale / Santé",
+                        "Autorisation spéciale direction",
+                      ].map((preset) => (
+                        <button
+                          key={preset}
+                          type="button"
+                          onClick={() => setAuthReason(preset)}
+                          className={`rounded-lg px-2 py-0.5 text-[11px] transition-colors ${
+                            authReason === preset
+                              ? 'bg-indigo-600 text-white font-semibold'
+                              : 'bg-slate-100 text-slate-700 hover:bg-slate-200'
+                          }`}
+                        >
+                          {preset}
+                        </button>
+                      ))}
+                    </div>
+                    <input
+                      type="text"
+                      id="auth-reason-input"
+                      value={authReason}
+                      onChange={(e) => setAuthReason(e.target.value)}
+                      placeholder="e.g. Maternité / Heure d'allaitement"
+                      required
+                      className="w-full rounded-xl border border-slate-300 bg-white px-3 py-2 text-xs text-slate-800 shadow-2xs focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 outline-none"
+                    />
+                  </div>
+
+                  {/* Submit buttons */}
+                  <div className="flex justify-end gap-2 pt-2 border-t border-slate-200">
+                    {editingAuthId && (
+                      <button
+                        type="button"
+                        onClick={cancelEditAuth}
+                        className="rounded-xl px-4 py-2 text-xs font-medium text-slate-600 hover:bg-slate-100"
+                      >
+                        Annuler
+                      </button>
+                    )}
+                    <button
+                      type="submit"
+                      id="save-auth-btn"
+                      className="rounded-xl bg-indigo-600 hover:bg-indigo-700 px-5 py-2 text-xs font-bold text-white shadow-md transition-colors"
+                    >
+                      {editingAuthId ? "Mettre à jour l'Autorisation" : "Enregistrer l'Autorisation"}
+                    </button>
+                  </div>
+                </form>
+              </div>
+
+              {/* List of Registered Time Authorizations */}
+              <div className="space-y-3 pt-2">
+                <div className="flex items-center justify-between">
+                  <h4 className="text-xs font-bold text-slate-900 flex items-center gap-1.5">
+                    <span>Autorisations Actives ({timeAuthorizations.length})</span>
+                  </h4>
+                  {timeAuthorizations.length > 3 && (
+                    <div className="relative max-w-xs">
+                      <Search className="h-3 w-3 absolute left-2.5 top-2 text-slate-400" />
+                      <input
+                        type="text"
+                        placeholder="Rechercher..."
+                        value={authSearch}
+                        onChange={(e) => setAuthSearch(e.target.value)}
+                        className="rounded-lg border border-slate-200 bg-white pl-7 pr-2.5 py-1 text-xs text-slate-800 outline-none focus:border-indigo-500"
+                      />
+                    </div>
+                  )}
+                </div>
+
+                {filteredAuthorizations.length === 0 ? (
+                  <div className="rounded-xl border border-dashed border-slate-200 p-8 text-center bg-white">
+                    <Clock className="h-8 w-8 text-slate-300 mx-auto mb-2" />
+                    <p className="text-xs font-semibold text-slate-600">Aucune autorisation d'horaire enregistrée</p>
+                    <p className="text-[11px] text-slate-400 max-w-md mx-auto mt-0.5">
+                      Utilisez le formulaire ci-dessus pour accorder à un travailleur une dispense de retard à l'entrée ou une sortie anticipée (maternité, transport, etc.).
+                    </p>
+                  </div>
+                ) : (
+                  <div className="rounded-xl border border-slate-200 overflow-hidden bg-white shadow-2xs">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-left text-xs border-collapse">
+                        <thead>
+                          <tr className="border-b border-slate-200 bg-slate-50/75 text-[11px] font-semibold text-slate-600 uppercase tracking-wider">
+                            <th className="py-2.5 px-3">Employé</th>
+                            <th className="py-2.5 px-3">Période de Validité</th>
+                            <th className="py-2.5 px-3">Type & Durée Autorisée</th>
+                            <th className="py-2.5 px-3">Motif</th>
+                            <th className="py-2.5 px-3 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-slate-100">
+                          {filteredAuthorizations.map((auth) => (
+                            <tr key={auth.id} className="hover:bg-slate-50/80 transition-colors">
+                              <td className="py-2.5 px-3 font-medium text-slate-900">
+                                <div className="font-semibold text-slate-900">{auth.employeeName}</div>
+                                <div className="text-[10px] font-mono text-slate-400">ID: {auth.employeeId}</div>
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap text-slate-700">
+                                <div className="font-mono text-[11px]">
+                                  {auth.startDate} <span className="text-slate-400">→</span> {auth.endDate}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 whitespace-nowrap">
+                                <div className="flex flex-col gap-1">
+                                  {(auth.type === 'early_exit' || auth.type === 'both') && auth.allowedEarlyExitMinutes && (
+                                    <span className="inline-flex items-center gap-1 rounded bg-amber-50 px-2 py-0.5 text-[10px] font-bold text-amber-800 border border-amber-200">
+                                      🚪 Sortie: {Math.floor(auth.allowedEarlyExitMinutes / 60)}h{auth.allowedEarlyExitMinutes % 60 ? `${auth.allowedEarlyExitMinutes % 60}m` : ''} (-{auth.allowedEarlyExitMinutes}m)
+                                    </span>
+                                  )}
+                                  {(auth.type === 'late_arrival' || auth.type === 'both') && auth.allowedLateArrivalMinutes && (
+                                    <span className="inline-flex items-center gap-1 rounded bg-indigo-50 px-2 py-0.5 text-[10px] font-bold text-indigo-800 border border-indigo-200">
+                                      🌅 Arrivée: {Math.floor(auth.allowedLateArrivalMinutes / 60)}h{auth.allowedLateArrivalMinutes % 60 ? `${auth.allowedLateArrivalMinutes % 60}m` : ''} (+{auth.allowedLateArrivalMinutes}m)
+                                    </span>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="py-2.5 px-3 text-slate-600">
+                                <span className="text-[11px] text-slate-800 font-medium">{auth.reason}</span>
+                              </td>
+                              <td className="py-2.5 px-3 text-right whitespace-nowrap">
+                                {confirmDeleteAuthId === auth.id ? (
+                                  <div className="inline-flex items-center gap-1">
+                                    <span className="text-[10px] text-rose-600 font-semibold mr-1">
+                                      Supprimer ?
+                                    </span>
+                                    <button
+                                      onClick={() => {
+                                        onDeleteTimeAuthorization?.(auth.id);
+                                        setConfirmDeleteAuthId(null);
+                                      }}
+                                      className="rounded bg-rose-600 px-2 py-0.5 text-[11px] font-bold text-white hover:bg-rose-700 transition-colors"
+                                    >
+                                      Oui
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmDeleteAuthId(null)}
+                                      className="rounded bg-slate-200 px-2 py-0.5 text-[11px] font-medium text-slate-700 hover:bg-slate-300 transition-colors"
+                                    >
+                                      Non
+                                    </button>
+                                  </div>
+                                ) : (
+                                  <div className="inline-flex items-center gap-1">
+                                    <button
+                                      onClick={() => startEditAuth(auth)}
+                                      className="rounded-lg px-2 py-1 text-xs font-medium text-slate-600 hover:bg-slate-100 hover:text-indigo-700 transition-colors"
+                                    >
+                                      Modifier
+                                    </button>
+                                    <button
+                                      onClick={() => setConfirmDeleteAuthId(auth.id)}
+                                      className="rounded-lg p-1 text-slate-400 hover:bg-rose-50 hover:text-rose-600 transition-colors"
+                                      title="Supprimer l'autorisation"
+                                    >
+                                      <Trash2 className="h-3.5 w-3.5" />
+                                    </button>
+                                  </div>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                )}
+              </div>
             </div>
           )}
         </div>

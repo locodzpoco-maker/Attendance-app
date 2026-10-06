@@ -10,6 +10,7 @@ import {
   AttendanceAuditLog,
   HistoricalPeriodRecord,
   PaidVacation,
+  TimeAuthorization,
   AppLanguage,
 } from './types';
 import { DEFAULT_SCHEDULES, STOCK_SHIFT_SATURDAY, ADMIN_SHIFT_SATURDAY, NO_SHIFT_SCHEDULE } from './utils/schedules';
@@ -229,6 +230,15 @@ export default function App() {
   const [paidVacations, setPaidVacations] = useState<PaidVacation[]>(() => {
     return getStorageItem<PaidVacation[]>('ams_paid_vacations', []);
   });
+
+  // Time Authorizations State (Dispensation for late arrival / early exit for maternity, distance, etc.)
+  const [timeAuthorizations, setTimeAuthorizations] = useState<TimeAuthorization[]>(() => {
+    return getStorageItem<TimeAuthorization[]>(STORAGE_KEYS.TIME_AUTHORIZATIONS, []);
+  });
+
+  useEffect(() => {
+    saveStorageItem(STORAGE_KEYS.TIME_AUTHORIZATIONS, timeAuthorizations);
+  }, [timeAuthorizations]);
   const [isVacationModalOpen, setIsVacationModalOpen] = useState(false);
   const [vacationModalPreSelectedEmp, setVacationModalPreSelectedEmp] = useState<Employee | null>(null);
   const [vacationModalPreSelectedDate, setVacationModalPreSelectedDate] = useState<string | undefined>(undefined);
@@ -392,9 +402,10 @@ export default function App() {
       employees,
       manualAdjustments,
       paidVacations,
+      timeAuthorizations,
       settings,
     });
-  }, [activeDataset, schedules, employees, manualAdjustments, paidVacations, settings]);
+  }, [activeDataset, schedules, employees, manualAdjustments, paidVacations, timeAuthorizations, settings]);
 
   const handleRecalculate = useCallback(() => {
     setIsCalculating(true);
@@ -414,6 +425,7 @@ export default function App() {
       employees,
       manualAdjustments,
       paidVacations,
+      timeAuthorizations,
       settings,
     });
 
@@ -928,6 +940,26 @@ export default function App() {
     });
   };
 
+  // Time Authorization handlers (Allowed early exit / allowed late arrival)
+  const handleSaveTimeAuthorization = (auth: TimeAuthorization) => {
+    setTimeAuthorizations((prev) => {
+      const filtered = prev.filter((a) => a.id !== auth.id);
+      const updated = [...filtered, auth];
+      saveStorageItem(STORAGE_KEYS.TIME_AUTHORIZATIONS, updated);
+      return updated;
+    });
+    showToast(`Autorisation d'horaire enregistrée pour ${auth.employeeName}`);
+  };
+
+  const handleDeleteTimeAuthorization = (authId: string) => {
+    setTimeAuthorizations((prev) => {
+      const updated = prev.filter((a) => a.id !== authId);
+      saveStorageItem(STORAGE_KEYS.TIME_AUTHORIZATIONS, updated);
+      return updated;
+    });
+    showToast(`Autorisation d'horaire supprimée`);
+  };
+
   // Export / Import entire application progress snapshot (dataset, periods, schedules, employees, manual adjustments with checkboxes, settings, filters, and active tab)
   const handleExportBackup = () => {
     const dailyFilters = getStorageItem<SavedDailyFilters | undefined>(STORAGE_KEYS.DAILY_FILTERS, undefined);
@@ -948,6 +980,7 @@ export default function App() {
       employees,
       manualAdjustments,
       paidVacations,
+      timeAuthorizations,
       auditLogs,
       dailyFilters: {
         ...dailyFilters,
@@ -991,6 +1024,10 @@ export default function App() {
       if (Array.isArray(backup.paidVacations)) {
         setPaidVacations(backup.paidVacations);
         saveStorageItem(STORAGE_KEYS.PAID_VACATIONS, backup.paidVacations);
+      }
+      if (Array.isArray(backup.timeAuthorizations)) {
+        setTimeAuthorizations(backup.timeAuthorizations);
+        saveStorageItem(STORAGE_KEYS.TIME_AUTHORIZATIONS, backup.timeAuthorizations);
       }
       if (Array.isArray(backup.auditLogs) && backup.auditLogs.length > 0) {
         setAuditLogs(backup.auditLogs);
@@ -1288,6 +1325,9 @@ export default function App() {
         paidVacations={paidVacations}
         onSaveVacation={handleSaveVacation}
         onDeleteVacation={handleDeleteVacation}
+        timeAuthorizations={timeAuthorizations}
+        onSaveTimeAuthorization={handleSaveTimeAuthorization}
+        onDeleteTimeAuthorization={handleDeleteTimeAuthorization}
         preSelectedEmployee={vacationModalPreSelectedEmp}
         preSelectedDate={vacationModalPreSelectedDate}
         currentUserRole={settings.activeRole}

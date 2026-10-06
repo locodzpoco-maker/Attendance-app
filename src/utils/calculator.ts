@@ -482,6 +482,7 @@ export function calculateAttendance(
             // Marked as absent for half the day (morning) (0.5 day worked, 0.5 day absent)
             isHalfDayAbsent = true;
             halfDaySession = 'morning';
+            firstCheckInTime = null;
             entryTime = null;
             if (regularPunches.length === 1) {
               const pM = parseTimeToMinutes(regularPunches[0]);
@@ -612,8 +613,12 @@ export function calculateAttendance(
         }
         if (rawSecondDelay <= 0) return 0;
 
+        // Deduct authorized late arrival allowance if applicable
+        const delayAfterAuth = Math.max(0, rawSecondDelay - authorizedLateArrivalMins);
+        if (delayAfterAuth <= 0) return 0;
+
         // Do not include the grace period in the calculated late time
-        return rawSecondDelay > breakGrace ? rawSecondDelay - breakGrace : 0;
+        return delayAfterAuth > breakGrace ? delayAfterAuth - breakGrace : 0;
       };
 
       // Helper to calculate early departure before scheduled shift end time with 5-minute grace period
@@ -689,11 +694,37 @@ export function calculateAttendance(
         earlyExitMinutes = 0;
         delayMinutes = 0;
       } else if (isHalfDayAbsent) {
-        // Half-day absence: simply marked as absent for half the day, no minutes missed penalty
-        firstCheckInDelayMinutes = 0;
-        secondCheckInDelayMinutes = 0;
-        earlyExitMinutes = 0;
-        delayMinutes = 0;
+        // Half-day absence: calculate late arrival / early departure for the attended session
+        if (halfDaySession === 'afternoon') {
+          // Attended MORNING session (absent in afternoon)
+          firstCheckInDelayMinutes = entryTime ? computeFirstCheckInDelay(entryTime) : 0;
+          secondCheckInDelayMinutes = 0;
+
+          earlyExitMinutes = 0;
+          if (exitTime && assignedSchedule.breakStart) {
+            const schedBreakStartM = parseTimeToMinutes(assignedSchedule.breakStart);
+            const exitM = parseTimeToMinutes(exitTime);
+            if (exitM < schedBreakStartM) {
+              const rawEarly = schedBreakStartM - exitM;
+              const earlyAfterAuth = Math.max(0, rawEarly - authorizedEarlyExitMins);
+              earlyExitMinutes = earlyAfterAuth > earlyExitGrace ? earlyAfterAuth - earlyExitGrace : 0;
+            }
+          }
+
+          delayMinutes = firstCheckInDelayMinutes + earlyExitMinutes;
+        } else {
+          // Attended AFTERNOON session (absent in morning)
+          firstCheckInDelayMinutes = 0;
+          const afternoonInTime = secondCheckInTime || entryTime;
+          secondCheckInDelayMinutes = afternoonInTime ? computeSecondCheckInDelay(afternoonInTime) : 0;
+
+          earlyExitMinutes = 0;
+          if (exitTime) {
+            earlyExitMinutes = computeEarlyExit(exitTime);
+          }
+
+          delayMinutes = secondCheckInDelayMinutes + earlyExitMinutes;
+        }
       } else {
         if (entryTime) {
           firstCheckInDelayMinutes = computeFirstCheckInDelay(entryTime);
@@ -751,21 +782,44 @@ export function calculateAttendance(
         }
       } else if (isHalfDayAbsent) {
         // Half-day absence: 0.5 day worked, 0.5 day absent
-        const halfDayTargetMins = Math.round((assignedSchedule.normalWorkedHours / 2) * 60);
-        workedMinutes = halfDayTargetMins;
-        suppMinutes = 0;
-        firstCheckInDelayMinutes = 0;
-        secondCheckInDelayMinutes = 0;
-        earlyExitMinutes = 0;
-        delayMinutes = 0;
+        // Dynamically compute session target minutes based on the attended session (Morning vs Afternoon)
+        let sessionTargetMins = 0;
+        if (assignedSchedule.hasBreak && assignedSchedule.breakStart && assignedSchedule.breakEnd) {
+          const sStartM = parseTimeToMinutes(assignedSchedule.startTime);
+          const sBreakStartM = parseTimeToMinutes(assignedSchedule.breakStart);
+          const sBreakEndM = parseTimeToMinutes(assignedSchedule.breakEnd);
+          const sEndM = parseTimeToMinutes(assignedSchedule.endTime);
+
+          if (halfDaySession === 'afternoon') {
+            // Attended morning session (e.g. 08:30 to 12:30 = 240 mins / 4h00)
+            sessionTargetMins = Math.max(0, sBreakStartM - sStartM);
+          } else {
+            // Attended afternoon session (e.g. 14:00 to 17:00 = 180 mins / 3h00)
+            sessionTargetMins = Math.max(0, sEndM - sBreakEndM);
+          }
+        } else {
+          sessionTargetMins = Math.round((assignedSchedule.normalWorkedHours / 2) * 60);
+        }
 
         if (halfDaySession === 'afternoon') {
+          // Attended morning session (e.g. 08:30 to 12:30 = 240 mins / 4h00)
+          // Deduct late arrival and early exit penalties from the session target hours
+          workedMinutes = Math.max(0, sessionTargetMins - delayMinutes);
+          suppMinutes = 0;
           observation = 'Absent (Après-midi)';
-          observationDetail = 'Absent (Après-midi)';
+          observationDetail = delayMinutes > 0
+            ? `Absent (Après-midi) (Retard: ${delayMinutes} min)`
+            : 'Absent (Après-midi)';
           statusType = 'warning';
         } else {
+          // Attended afternoon session (e.g. 14:00 to 17:00 = 180 mins / 3h00)
+          // Deduct late arrival and early exit penalties from the 3 hours
+          workedMinutes = Math.max(0, sessionTargetMins - delayMinutes);
+          suppMinutes = 0;
           observation = 'Absent (Matin)';
-          observationDetail = 'Absent (Matin)';
+          observationDetail = delayMinutes > 0
+            ? `Absent (Matin) (Retard: ${delayMinutes} min)`
+            : 'Absent (Matin)';
           statusType = 'warning';
         }
       } else if (entryTime && !exitTime) {

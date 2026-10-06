@@ -12,6 +12,7 @@ export const STORAGE_KEYS = {
   SELECTED_PERIOD_ID: 'ams_selected_period_id',
   SELECTED_EMP_FOR_DAILY: 'ams_selected_emp_for_daily',
   PAID_VACATIONS: 'ams_paid_vacations',
+  TIME_AUTHORIZATIONS: 'ams_time_authorizations',
   DAILY_FILTERS: 'ams_daily_filters',
   MONTHLY_FILTERS: 'ams_monthly_filters',
   EMPLOYEES_FILTERS: 'ams_employees_filters',
