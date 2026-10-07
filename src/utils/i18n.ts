@@ -33,6 +33,7 @@ export interface Translations {
   exportAction: string;
   exportExcel: string;
   exportPdf: string;
+  exportFirstPunchPdf: string;
   printPdf: string;
   exportBackup: string;
   importBackup: string;
@@ -419,6 +420,7 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     exportAction: 'Exporter',
     exportExcel: 'Exporter Excel',
     exportPdf: 'Exporter PDF',
+    exportFirstPunchPdf: 'Rapport Journalier 1er Pointage (PDF)',
     printPdf: 'Imprimer PDF',
     exportBackup: 'Exporter Sauvegarde',
     importBackup: 'Importer Sauvegarde',
@@ -792,6 +794,7 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     exportAction: 'Export',
     exportExcel: 'Export Excel',
     exportPdf: 'Export PDF',
+    exportFirstPunchPdf: 'Daily First Punch Report (PDF)',
     printPdf: 'Print PDF',
     exportBackup: 'Export Backup',
     importBackup: 'Import Backup',
@@ -1165,6 +1168,7 @@ export const TRANSLATIONS: Record<AppLanguage, Translations> = {
     exportAction: 'تصدير',
     exportExcel: 'تصدير إكسل',
     exportPdf: 'تصدير PDF',
+    exportFirstPunchPdf: 'تقرير البصمة الأولى اليومية (PDF)',
     printPdf: 'طباعة PDF',
     exportBackup: 'تصدير نسخة احتياطية',
     importBackup: 'استيراد نسخة احتياطية',

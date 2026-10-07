@@ -21,6 +21,7 @@ import { getTranslations, isRtlLanguage } from './utils/i18n';
 import {
   exportDailyAttendanceToExcel,
   exportDailyAttendanceToPDF,
+  exportDailyFirstPunchToPDF,
   exportMonthlySummaryToExcel,
   exportMonthlySummaryToPDF,
 } from './utils/exporter';
@@ -1107,6 +1108,14 @@ export default function App() {
     );
   };
 
+  const handleExportDailyFirstPunchPDF = (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => {
+    exportDailyFirstPunchToPDF(
+      recordsToExport && recordsToExport.length > 0 ? recordsToExport : dailyRecords,
+      customPeriodLabel || currentPeriodLabel,
+      settings
+    );
+  };
+
   const handleExportMonthlyExcel = (summariesToExport?: MonthlySummaryRecord[], customPeriodLabel?: string) => {
     exportMonthlySummaryToExcel(
       summariesToExport && summariesToExport.length > 0 ? summariesToExport : monthlySummary,
@@ -1179,6 +1188,7 @@ export default function App() {
             onUpdateSettings={handleUpdateSettings}
             onExportExcel={handleExportDailyExcel}
             onExportPDF={handleExportDailyPDF}
+            onExportFirstPunchPDF={handleExportDailyFirstPunchPDF}
             settings={settings}
             selectedEmployeeId={selectedEmployeeIdForDaily}
             onClearSelectedEmployee={handleClearSelectedEmployeeForDaily}

@@ -197,6 +197,176 @@ export function exportDailyAttendanceToPDF(
 }
 
 /**
+ * Exports Daily Report containing First Punch of Day, Entry Status (Early/On Time/Late),
+ * and Late Time for each worker to an elegant A4 PDF.
+ */
+export function exportDailyFirstPunchToPDF(
+  records: DailyAttendanceRecord[],
+  periodLabel: string,
+  settings: AppSettings
+): void {
+  const doc = new jsPDF({
+    orientation: 'portrait',
+    unit: 'mm',
+    format: 'a4',
+  });
+
+  const pageWidth = doc.internal.pageSize.getWidth();
+
+  // Header Title
+  doc.setFontSize(15);
+  doc.setTextColor(30, 41, 59); // Slate-800
+  doc.text(settings.companyName || 'Attendance Management System', 14, 14);
+
+  doc.setFontSize(11);
+  doc.setTextColor(79, 70, 229); // Indigo-600
+  doc.text(`Rapport Journalier - Premier Pointage du Jour (First Punch Report)`, 14, 20);
+
+  doc.setFontSize(9);
+  doc.setTextColor(100, 116, 139); // Slate-500
+  doc.text(`Période / Date : ${periodLabel}`, 14, 25);
+  doc.text(`Généré le : ${new Date().toLocaleString()}`, pageWidth - 14, 25, { align: 'right' });
+
+  // Calculate high-level stats for the summary header banner
+  let earlyCount = 0;
+  let onTimeCount = 0;
+  let lateCount = 0;
+  let missingFirstPunchCount = 0;
+  let totalLateMinutes = 0;
+
+  records.forEach((r) => {
+    const firstPunch = r.firstCheckInTime || r.entryTime;
+    if (!firstPunch) {
+      missingFirstPunchCount++;
+    } else if (r.firstCheckInDelayMinutes > 0) {
+      lateCount++;
+      totalLateMinutes += r.firstCheckInDelayMinutes;
+    } else {
+      // Check if arrived earlier than normal start time
+      onTimeCount++;
+      // If we want to distinguish early vs on-time:
+      if (r.observation === 'Ponctuel') {
+        earlyCount++;
+      }
+    }
+  });
+
+  // Summary banner card
+  doc.setFillColor(248, 250, 252); // slate-50
+  doc.setDrawColor(226, 232, 240); // slate-200
+  doc.roundedRect(14, 28, pageWidth - 28, 12, 2, 2, 'FD');
+
+  doc.setFontSize(8.5);
+  doc.setTextColor(51, 65, 85);
+  const summaryText = `Total Enregistrements: ${records.length}   |   À l'heure / Avance: ${onTimeCount}   |   En Retard: ${lateCount}   |   Non Pointé: ${missingFirstPunchCount}   |   Total Retard: ${totalLateMinutes} min`;
+  doc.text(summaryText, 18, 35.5);
+
+  const tableBody = records.map((r) => {
+    const firstPunch = r.firstCheckInTime || r.entryTime;
+    const firstDelay = r.firstCheckInDelayMinutes;
+    const totalDelay = r.delayMinutes;
+
+    let arrivalStatus = 'À l\'heure';
+    if (!firstPunch) {
+      if (r.observation.includes('Absent') || r.observation === 'Absence') {
+        arrivalStatus = r.observation;
+      } else if (r.observation === 'OFF' || r.observation.includes('Congé')) {
+        arrivalStatus = r.observation;
+      } else {
+        arrivalStatus = 'Non pointé';
+      }
+    } else if (firstDelay > 0) {
+      arrivalStatus = `En retard (+${firstDelay}m)`;
+    } else {
+      arrivalStatus = 'À l\'heure / En avance';
+    }
+
+    const lateDisplay = firstDelay > 0
+      ? `${firstDelay} min${totalDelay > firstDelay ? ` (Total ${totalDelay}m)` : ''}`
+      : (totalDelay > 0 ? `0m (Pause ${totalDelay}m)` : '0 min');
+
+    return [
+      r.formattedDate,
+      r.employeeId,
+      r.employeeName,
+      r.detectedShiftName || r.scheduleName || r.groupName || '-',
+      firstPunch || 'Non pointé',
+      arrivalStatus,
+      lateDisplay,
+      r.observationDetail || r.observation,
+    ];
+  });
+
+  autoTable(doc, {
+    startY: 43,
+    head: [
+      [
+        'Date',
+        'ID',
+        'Employé',
+        'Shift / Groupe',
+        '1er Pointage',
+        'Statut Entrée',
+        'Temps Retard',
+        'Observation',
+      ],
+    ],
+    body: tableBody,
+    styles: {
+      fontSize: 8,
+      cellPadding: 2.2,
+      overflow: 'linebreak',
+    },
+    headStyles: {
+      fillColor: [30, 41, 59],
+      textColor: [255, 255, 255],
+      fontStyle: 'bold',
+      halign: 'left',
+    },
+    columnStyles: {
+      0: { cellWidth: 20 }, // Date
+      1: { cellWidth: 16 }, // ID
+      2: { cellWidth: 42 }, // Employee Name
+      3: { cellWidth: 26 }, // Shift
+      4: { cellWidth: 22, halign: 'center' }, // 1st Punch
+      5: { cellWidth: 28 }, // Status
+      6: { cellWidth: 20, halign: 'right' }, // Late time
+      7: { cellWidth: 'auto' }, // Observation
+    },
+    alternateRowStyles: {
+      fillColor: [248, 250, 252],
+    },
+    didParseCell: (data) => {
+      // Color-code the Late Time and Status cells for quick scanning
+      if (data.section === 'body') {
+        const rawRow = records[data.row.index];
+        if (rawRow) {
+          if (data.column.index === 5) {
+            // Status column
+            if (rawRow.firstCheckInDelayMinutes > 0) {
+              data.cell.styles.textColor = [185, 28, 28]; // red-700
+              data.cell.styles.fontStyle = 'bold';
+            } else if (rawRow.firstCheckInTime || rawRow.entryTime) {
+              data.cell.styles.textColor = [4, 120, 87]; // emerald-700
+            }
+          }
+          if (data.column.index === 6) {
+            // Late time column
+            if (rawRow.firstCheckInDelayMinutes > 0 || rawRow.delayMinutes > 0) {
+              data.cell.styles.textColor = [180, 83, 9]; // amber-700
+              data.cell.styles.fontStyle = 'bold';
+            }
+          }
+        }
+      }
+    },
+    margin: { left: 14, right: 14 },
+  });
+
+  doc.save(`Rapport_Premier_Pointage_${periodLabel.replace(/[^a-zA-Z0-9]/g, '_')}.pdf`);
+}
+
+/**
  * Exports Monthly Summary to an elegant A4 PDF
  */
 export function exportMonthlySummaryToPDF(

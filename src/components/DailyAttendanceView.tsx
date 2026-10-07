@@ -30,6 +30,7 @@ import {
   EyeOff,
   Settings as SettingsIcon,
   Check,
+  FileText,
 } from 'lucide-react';
 import { formatMinutesToHoursAndMinutes } from '../utils/schedules';
 import { getTranslations, translateDayOfWeek, Translations } from '../utils/i18n';
@@ -58,6 +59,7 @@ interface DailyAttendanceViewProps {
   onUpdateSettings?: (settings: AppSettings) => void;
   onExportExcel: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   onExportPDF: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
+  onExportFirstPunchPDF?: (recordsToExport?: DailyAttendanceRecord[], customPeriodLabel?: string) => void;
   settings: AppSettings;
   selectedEmployeeId?: string | null;
   onClearSelectedEmployee?: () => void;
@@ -120,6 +122,7 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
   onUpdateSettings,
   onExportExcel,
   onExportPDF,
+  onExportFirstPunchPDF,
   settings,
   selectedEmployeeId,
   onClearSelectedEmployee,
@@ -482,6 +485,12 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
 
   const handleExportPDFFile = () => {
     onExportPDF(filteredRecords, activePeriodLabel);
+  };
+
+  const handleExportFirstPunchPDFFile = () => {
+    if (onExportFirstPunchPDF) {
+      onExportFirstPunchPDF(filteredRecords, activePeriodLabel);
+    }
   };
 
   // Helper to translate observation details
@@ -932,6 +941,15 @@ export const DailyAttendanceView: React.FC<DailyAttendanceViewProps> = ({
                 title={isDateRangeFiltered ? `${t.exportPdf} (${activePeriodLabel})` : t.exportPdf}
               >
                 <Download className="h-3 w-3" /> {t.exportPdf}
+              </button>
+              <button
+                id="daily-export-first-punch-pdf-btn"
+                onClick={handleExportFirstPunchPDFFile}
+                className="inline-flex items-center gap-1 rounded-lg bg-indigo-600 px-2.5 py-1 font-semibold text-white hover:bg-indigo-700 transition-colors shadow-2xs"
+                title={t.exportFirstPunchPdf || 'Rapport 1er Pointage (PDF)'}
+              >
+                <FileText className="h-3 w-3" />
+                <span>{t.exportFirstPunchPdf ? (settings.language === 'fr' ? '1er Pointage (PDF)' : settings.language === 'ar' ? 'البصمة الأولى (PDF)' : 'First Punch (PDF)') : '1st Punch PDF'}</span>
               </button>
             </div>
           </div>
