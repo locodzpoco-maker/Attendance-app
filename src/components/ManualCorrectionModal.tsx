@@ -119,9 +119,15 @@ export const ManualCorrectionModal: React.FC<ManualCorrectionModalProps> = ({
     const effectiveEntry = entry.trim() || record.entryTime || '';
     if (!effectiveExit) return 0;
 
-    const exitM = parseTimeToMins(effectiveExit);
+    let exitM = parseTimeToMins(effectiveExit);
     const entryM = parseTimeToMins(effectiveEntry);
     if (exitM <= 0) return 0;
+
+    if (currentSched?.crossesMidnight || exitM < entryM || record.isOvernightPunch) {
+      if (exitM < entryM || exitM <= 8 * 60) {
+        exitM += 24 * 60;
+      }
+    }
 
     let otStartM = 0;
     if (currentSched?.overtimeStartTime) {

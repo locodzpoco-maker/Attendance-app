@@ -164,25 +164,45 @@ export function calculateAttendance(
       const rawPunches = rawDay ? [...rawDay.rawPunches] : [];
       const rawPunchesText = rawDay ? rawDay.rawPunchesText : '';
 
-      // Separate punches into early morning (00:00 to 05:30) vs regular (> 05:30)
-      // Early morning punches (00:00 - 05:30) are ALWAYS overnight exits, NEVER shift starts!
+      // Separate punches into early morning (00:00 to 07:00) vs regular (> 07:00)
+      // Early morning punches (00:00 - 07:00) are overnight exits, NEVER daytime shift starts!
       const earlyMorningPunches = rawPunches.filter((p) => isEarlyMorningTime(p));
       const regularPunches = rawPunches.filter((p) => !isEarlyMorningTime(p));
 
       // Has today's early morning punch already been consumed as yesterday's overnight exit?
       const isEarlyPunchConsumed = consumedEarlyPunchDays.has(dayNum);
       const availableEarlyPunch = !isEarlyPunchConsumed && earlyMorningPunches.length > 0
-        ? earlyMorningPunches[0]
+        ? earlyMorningPunches[earlyMorningPunches.length - 1]
         : null;
 
+      // Check next day's early morning punches (Day D+1)
+      let nextDayEarlyPunch: string | null = null;
+      if (dayNum < daysInMonth) {
+        const nextDayRaw = rawEmp.days[dayNum + 1];
+        if (nextDayRaw && nextDayRaw.rawPunches.length > 0) {
+          const nextDayEarlies = nextDayRaw.rawPunches.filter((p) => isEarlyMorningTime(p));
+          if (nextDayEarlies.length > 0) {
+            // Pick the latest early morning exit punch (e.g. 02:05)
+            nextDayEarlyPunch = nextDayEarlies[nextDayEarlies.length - 1];
+          }
+        }
+      }
+
       // Determine genuine first check-in time:
-      // Early morning punches (00:00 - 05:30) can NEVER be an in-time / check-in!
+      // Early morning punches (00:00 - 07:00) can NEVER be an in-time / check-in!
       let firstCheckInTime: string | null = null;
       if (manualAdj?.adjustedEntry) {
         firstCheckInTime = manualAdj.adjustedEntry;
       } else if (regularPunches.length > 0) {
         firstCheckInTime = regularPunches[0];
       }
+
+      // Check if this check-in corresponds to an overnight shift (e.g. 18:00 - 02:00 or 16:00 - 00:00)
+      const firstCheckInMins = firstCheckInTime ? parseTimeToMinutes(firstCheckInTime) : 0;
+      const isOvernightExitAvailable = Boolean(availableEarlyPunch || nextDayEarlyPunch);
+      const isShift2CheckInWindow = firstCheckInMins >= 1006 && firstCheckInMins <= 1350; // 16:46 to 22:30 (Shift 2: 18:00)
+      const isShift4CheckInWindow = firstCheckInMins >= 870 && firstCheckInMins <= 1005; // 14:30 to 16:45 (Shift 4: 16:00)
+      const isEveningCheckIn = firstCheckInMins >= 960 && firstCheckInMins <= 1380; // 16:00 to 23:00
 
       // Determine schedule for THIS day:
       let assignedSchedule: WorkSchedule = baseSchedule;
@@ -197,30 +217,43 @@ export function calculateAttendance(
         (baseSchedule.id === 'stock_sat')
       );
 
-      if (isStock) {
-        // STOCK EMPLOYEE: Dynamic Shift Detection per individual day!
-        if (manualAdj?.overrideShiftId) {
-          // Manual supervisor override
-          const over =
-            scheduleMap.get(manualAdj.overrideShiftId) ||
-            (manualAdj.overrideShiftId === 'stock_sat'
-              ? (scheduleMap.get('stock_sat') || STOCK_SHIFT_SATURDAY)
-              : (scheduleMap.get('stock_g1') || STOCK_SHIFT_1));
-          assignedSchedule = over;
-          detectedShiftId = over.id;
-          detectedShiftName = over.name.split(' (')[0];
-          dayGroupName = `Stock ${detectedShiftName}`;
-        } else if (firstCheckInTime) {
-          // Auto-detect based on first check-in time and day of week
+      if (manualAdj?.overrideShiftId) {
+        // Manual supervisor override takes top precedence
+        const over =
+          scheduleMap.get(manualAdj.overrideShiftId) ||
+          (manualAdj.overrideShiftId === 'stock_g2' ? STOCK_SHIFT_2 :
+           manualAdj.overrideShiftId === 'stock_g4' ? STOCK_SHIFT_4 :
+           manualAdj.overrideShiftId === 'stock_sat' ? (scheduleMap.get('stock_sat') || STOCK_SHIFT_SATURDAY) :
+           (scheduleMap.get('stock_g1') || STOCK_SHIFT_1));
+        assignedSchedule = over;
+        detectedShiftId = over.id;
+        detectedShiftName = over.name.split(' (')[0];
+        dayGroupName = over.groupName || `Stock ${detectedShiftName}`;
+      } else if (isStock || isShift2CheckInWindow || (isEveningCheckIn && isOvernightExitAvailable)) {
+        // AUTO-DETECT SHIFT: Runs for Stock workers, AND for ANY worker who punches in for an evening/night shift!
+        if (firstCheckInTime) {
           const customStockSat = scheduleMap.get('stock_sat') || STOCK_SHIFT_SATURDAY;
-          const detected = detectStockShift(firstCheckInTime, dayOfWeek, hasSaturdayShift, customStockSat);
+          const detected = detectStockShift(
+            firstCheckInTime,
+            dayOfWeek,
+            hasSaturdayShift,
+            customStockSat,
+            isOvernightExitAvailable
+          );
           detectedShiftId = detected.shiftId;
           detectedShiftName = detected.shiftName;
           isShiftUnclear = detected.isUnclear;
 
           if (detected.schedule) {
             assignedSchedule = detected.schedule;
-            dayGroupName = `Stock ${detected.shiftName}`;
+            dayGroupName = detected.schedule.groupName || `Stock ${detected.shiftName}`;
+          } else if (isEveningCheckIn && isOvernightExitAvailable) {
+            // Worker punched in during evening and exited next morning -> Shift 2 (18:00 - 02:00)
+            assignedSchedule = STOCK_SHIFT_2;
+            detectedShiftId = 'stock_g2';
+            detectedShiftName = 'Shift 2';
+            isShiftUnclear = false;
+            dayGroupName = 'Stock Shift 2';
           } else {
             // Unclear shift
             assignedSchedule = (dayOfWeek === 'Saturday' && hasSaturdayShift)
@@ -239,31 +272,16 @@ export function calculateAttendance(
             assignedSchedule = scheduleMap.get('stock_g1') || STOCK_SHIFT_1;
             detectedShiftId = 'NONE';
             detectedShiftName = '-';
-            dayGroupName = 'Stock';
+            dayGroupName = isStock ? 'Stock' : defaultGroupName;
           }
         }
       } else {
-        // ADMIN OR NO-SHIFT EMPLOYEE: Standard schedule
+        // ADMIN OR STANDARD SCHEDULE EMPLOYEE
         if (assignedSchedule.id === 'no_shift') {
           detectedShiftId = 'no_shift';
           detectedShiftName = 'Sans Shift';
           dayGroupName = 'Sans Shift';
-        } else if (manualAdj?.overrideShiftId) {
-          const over =
-            scheduleMap.get(manualAdj.overrideShiftId) ||
-            (manualAdj.overrideShiftId === 'admin_sat'
-              ? (scheduleMap.get('admin_sat') || ADMIN_SHIFT_SATURDAY)
-              : manualAdj.overrideShiftId === 'stock_sat'
-              ? (scheduleMap.get('stock_sat') || STOCK_SHIFT_SATURDAY)
-              : undefined);
-          if (over) {
-            assignedSchedule = over;
-            detectedShiftId = over.id;
-            detectedShiftName = over.name.split(' (')[0];
-            dayGroupName = over.groupName;
-          }
         } else if (dayOfWeek === 'Saturday' && hasSaturdayShift && assignedSchedule.id !== 'admin_g2') {
-          // If this employee is specifically assigned to Saturday shift (Admin: 09:00 - 17:00 or user-customized)
           assignedSchedule = scheduleMap.get('admin_sat') || ADMIN_SHIFT_SATURDAY;
           detectedShiftId = assignedSchedule.id;
           detectedShiftName = assignedSchedule.name.split(' (')[0] || 'Shift Samedi';
@@ -275,7 +293,9 @@ export function calculateAttendance(
         }
       }
 
-      const isWorkingDay = assignedSchedule.workingDays.includes(dayOfWeek);
+      // Check if today was a post-night-shift rest day (early morning punch consumed, no new check-in)
+      const isPostNightShiftRest = isEarlyPunchConsumed && !firstCheckInTime;
+      const isWorkingDay = isPostNightShiftRest ? false : assignedSchedule.workingDays.includes(dayOfWeek);
       const arrivalGrace = assignedSchedule.arrivalGraceMinutes ?? globalArrivalGrace;
       const breakGrace = assignedSchedule.breakGraceMinutes ?? globalBreakGrace;
       const earlyExitGrace = assignedSchedule.earlyExitGraceMinutes ?? globalEarlyExitGrace;
@@ -399,7 +419,9 @@ export function calculateAttendance(
       let halfDaySession: 'morning' | 'afternoon' | undefined = undefined;
 
       // Resolve Entry and Exit times from raw punches according to shift type
-      if (assignedSchedule.crossesMidnight) {
+      const isShiftOvernight = assignedSchedule.crossesMidnight || (isEveningCheckIn && isOvernightExitAvailable);
+
+      if (isShiftOvernight) {
         // Overnight Shift: Shift 2 (18:00 - 02:00) or Shift 4 (16:00 - 00:00)
         entryTime = firstCheckInTime;
 
@@ -407,20 +429,16 @@ export function calculateAttendance(
           let foundExit = false;
 
           // Priority 1: Check next day's early morning punch (Day D+1)
-          if (dayNum < daysInMonth) {
-            const nextDayRaw = rawEmp.days[dayNum + 1];
-            if (nextDayRaw && nextDayRaw.rawPunches.length > 0) {
-              const nextEarly = nextDayRaw.rawPunches.find((p) => isEarlyMorningTime(p));
-              if (nextEarly) {
-                exitTime = nextEarly;
-                isOvernightPunch = true;
-                consumedEarlyPunchDays.add(dayNum + 1);
-                foundExit = true;
-              }
-            }
+          // As per biometric device export: the exit of Day D is recorded in Day D+1's cell
+          if (nextDayEarlyPunch) {
+            exitTime = nextDayEarlyPunch;
+            isOvernightPunch = true;
+            consumedEarlyPunchDays.add(dayNum + 1);
+            foundExit = true;
           }
 
-          // Priority 2: Check today's available early morning punch (both punches recorded in same day cell)
+          // Priority 2: Fallback to today's available early morning punch
+          // (Only if next day has no morning punch, e.g. standalone pre-paired record or last day of period)
           if (!foundExit && availableEarlyPunch) {
             exitTime = availableEarlyPunch;
             isOvernightPunch = true;
@@ -428,7 +446,7 @@ export function calculateAttendance(
             foundExit = true;
           }
 
-          // Priority 3: Check if a second regular punch exists (e.g. exited before midnight like 23:55)
+          // Priority 3: Check if a second regular punch exists in today's cell (e.g. exited before midnight like 23:55)
           if (!foundExit && regularPunches.length > 1) {
             exitTime = regularPunches[regularPunches.length - 1];
             foundExit = true;
@@ -983,7 +1001,13 @@ export function calculateAttendance(
               observationDetail = `Retard ${delayMinutes} min`;
             }
             statusType = 'warning';
+          } else if (assignedSchedule.crossesMidnight) {
+            // Scheduled overnight shift (e.g. Shift 2: 18:00 - 02:00): leaving at scheduled time is Ponctuel!
+            observation = 'Ponctuel';
+            observationDetail = 'Ponctuel';
+            statusType = 'success';
           } else if (isOvernightPunch) {
+            // Unscheduled overnight exit for a daytime shift
             observation = 'Sortie après minuit';
             observationDetail = 'Sortie après minuit';
             statusType = 'info';

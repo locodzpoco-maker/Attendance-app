@@ -2,25 +2,22 @@ import * as XLSX from 'xlsx';
 import { RawAttendanceDataset, RawEmployeeRecord, RawDayAttendance } from '../types';
 
 /**
- * Extracts valid HH:MM punches from a text string containing line breaks or spaces.
+ * Extracts valid HH:MM punches from a text string containing line breaks, spaces, commas, etc.
  */
 export function extractPunches(cellContent: unknown): string[] {
   if (cellContent === null || cellContent === undefined) return [];
   const text = String(cellContent).trim();
   if (!text) return [];
 
-  // Split by line breaks, carriage returns, or multiple spaces
-  const lines = text.split(/[\r\n]+/);
   const punches: string[] = [];
+  // Match any time formatted as HH:MM or HH:MM:SS or H:MM anywhere in the text
+  const timeRegex = /\b([0-2]?[0-9]):([0-5][0-9])(?::[0-5][0-9])?\b/g;
+  let match: RegExpExecArray | null;
 
-  for (const line of lines) {
-    // Look for times matching HH:MM or HH:MM:SS
-    const timeMatch = line.match(/\b([0-2]?[0-9]):([0-5][0-9])(?::[0-5][0-9])?\b/);
-    if (timeMatch) {
-      const hours = timeMatch[1].padStart(2, '0');
-      const minutes = timeMatch[2];
-      punches.push(`${hours}:${minutes}`);
-    }
+  while ((match = timeRegex.exec(text)) !== null) {
+    const hours = match[1].padStart(2, '0');
+    const minutes = match[2];
+    punches.push(`${hours}:${minutes}`);
   }
 
   return punches;

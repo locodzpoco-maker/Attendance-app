@@ -226,15 +226,15 @@ export interface DetectedShiftResult {
 }
 
 /**
- * Automatically determines which shift a Stock employee worked on a given date
- * based on their actual first check-in time and day of week.
+ * Automatically determines which shift an employee worked on a given date
+ * based on their actual first check-in time, day of week, and punch context.
  *
- * Expected Stock shift check-in targets:
- * - Saturday Shift: 10:00 (10:00 - 17:00) -> ONLY on Saturdays for designated workers! (Window: 08:00 - 13:00)
- * - Shift 3: 08:30 (Window: 07:00 - 09:14, e.g. 08:35) [Sunday - Thursday]
- * - Shift 1: 10:00 (Window: 09:15 - 12:30, e.g. 09:57) [Sunday - Thursday]
- * - Shift 4: 16:00 (Window: 14:30 - 16:45, e.g. 16:02) [Sunday - Thursday]
- * - Shift 2: 18:00 (Window: 16:46 - 21:00, e.g. 18:04) [Sunday - Thursday]
+ * Expected shift check-in targets:
+ * - Saturday Shift: 10:00 (10:00 - 17:00) -> on Saturdays for designated workers! (Window: 08:00 - 13:00)
+ * - Shift 3: 08:30 (Window: 07:00 - 09:14) [Sunday - Thursday]
+ * - Shift 1: 10:00 (Window: 09:15 - 12:30) [Sunday - Thursday]
+ * - Shift 4: 16:00 (Window: 14:30 - 16:45) (crosses midnight into next day)
+ * - Shift 2: 18:00 (Window: 16:46 - 22:30, e.g. 18:00 to 02:00) (crosses midnight into next day)
  *
  * If outside these clear windows, returns isUnclear: true ("SHIFT UNCLEAR").
  */
@@ -242,7 +242,8 @@ export function detectStockShift(
   firstCheckInTime: string | null,
   dayOfWeek?: DayOfWeek,
   hasSaturdayShift?: boolean,
-  customStockSatSchedule?: WorkSchedule | null
+  customStockSatSchedule?: WorkSchedule | null,
+  hasOvernightExit?: boolean
 ): DetectedShiftResult {
   if (!firstCheckInTime) {
     return {
@@ -255,12 +256,23 @@ export function detectStockShift(
 
   const mins = parseTimeToMinutes(firstCheckInTime);
 
-  // Early morning punch (00:00 to 05:30) is an overnight exit punch, not a shift entry
-  if (mins >= 0 && mins <= 330) {
+  // Early morning punch (00:00 to 07:00) is an overnight exit punch, not a shift entry
+  if (mins >= 0 && mins <= 420) {
     return {
       schedule: null,
       shiftId: 'NONE',
       shiftName: '-',
+      isUnclear: false,
+    };
+  }
+
+  // Shift 2 OVERNIGHT CHECK: Check-in around 18:00 (Window: 16:46 to 22:30, or has overnight next-morning exit)
+  // Shift 2 (18:00 - 02:00) crosses midnight. Can be worked on weekdays, and also on Saturdays if scheduled.
+  if ((mins >= 1006 && mins <= 1350) || (mins >= 960 && mins <= 1380 && hasOvernightExit)) {
+    return {
+      schedule: STOCK_SHIFT_2,
+      shiftId: 'stock_g2',
+      shiftName: 'Shift 2',
       isUnclear: false,
     };
   }
@@ -300,7 +312,6 @@ export function detectStockShift(
   }
 
   // WEEKDAYS (Sunday - Thursday):
-  // Notice Saturday shift (10:00 - 17:00) is NEVER detected on weekdays!
   // Shift 3: Check-in 08:30 (Window: 07:00 to 09:14)
   if (mins >= 420 && mins <= 554) {
     return {
@@ -331,16 +342,6 @@ export function detectStockShift(
     };
   }
 
-  // Shift 2: Check-in 18:00 (Window: 16:46 to 21:00)
-  if (mins >= 1006 && mins <= 1260) {
-    return {
-      schedule: STOCK_SHIFT_2,
-      shiftId: 'stock_g2',
-      shiftName: 'Shift 2',
-      isUnclear: false,
-    };
-  }
-
   // If the first check-in does not clearly correspond to any shift:
   return {
     schedule: null,
@@ -351,14 +352,15 @@ export function detectStockShift(
 }
 
 /**
- * Checks whether a punch time falls in the early morning overnight window (00:00 - 05:30).
- * In all shifts, early morning punches represent exit punches for overnight shifts (Shift 2 or Shift 4),
- * and NEVER represent the entry time of a new work shift.
+ * Checks whether a punch time falls in the early morning overnight window (00:00 - 07:00).
+ * In overnight shifts (Shift 2: 18:00 - 02:00, Shift 4: 16:00 - 00:00, etc.), early morning
+ * punches represent exit punches for the shift that began the previous evening,
+ * and NEVER represent the entry time of a new daytime work shift.
  */
-export function isEarlyMorningTime(timeStr: string): boolean {
+export function isEarlyMorningTime(timeStr: string, maxMinutes: number = 7 * 60): boolean {
   if (!timeStr) return false;
   const mins = parseTimeToMinutes(timeStr);
-  return mins >= 0 && mins <= 5 * 60 + 30; // 00:00 to 05:30
+  return mins >= 0 && mins <= maxMinutes; // 00:00 to 07:00
 }
 
 export const DAYS_OF_WEEK: DayOfWeek[] = [
